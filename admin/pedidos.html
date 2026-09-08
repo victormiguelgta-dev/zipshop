@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pedidos Admin — Zipshop</title>
+  <link rel="stylesheet" href="../css/style.css">
+
+<style>
+.admin-mobile-bar {
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 200;
+}
+.admin-hamburger {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 20px;
+  width: 38px;
+  height: 38px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.admin-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 299;
+}
+.admin-overlay.active { display: block; }
+@media (max-width: 900px) {
+  .admin-mobile-bar { display: flex; }
+  .admin-sidebar {
+    display: flex !important;
+    position: fixed;
+    top: 0;
+    left: -260px;
+    height: 100vh;
+    width: 240px;
+    z-index: 300;
+    transition: left 0.25s ease;
+    overflow-y: auto;
+  }
+  .admin-sidebar.admin-sidebar-open { left: 0; }
+}
+</style>
+</head>
+<body>
+<div class="admin-layout">
+  <aside class="admin-sidebar">
+    <div class="admin-sidebar-logo">
+      <div class="logo"><img src="../img/logo-icon.jpeg" style="width:32px;height:32px" onerror="this.style.display='none'"><span class="logo-text"><span>ZIP</span><span>SHOP</span></span></div>
+      <div class="admin-sidebar-subtitle">Painel Administrativo</div>
+    </div>
+    <nav class="admin-nav">
+      <a href="index.html" class="admin-nav-item">📊 Dashboard</a>
+      <a href="produtos.html" class="admin-nav-item">📦 Produtos</a>
+      <a href="importar.html" class="admin-nav-item">🛍️ Importar da Shopee</a>
+      <a href="pedidos.html" class="admin-nav-item active">🛒 Pedidos</a>
+      <a href="clientes.html" class="admin-nav-item">👥 Clientes</a>
+      <a href="categorias.html" class="admin-nav-item">🏷️ Categorias</a>
+      <a href="banners.html" class="admin-nav-item">🖼️ Banners</a>
+      <a href="textos.html" class="admin-nav-item">📝 Textos do Site</a>
+      <a href="cupons.html" class="admin-nav-item">🎟️ Cupons</a>
+      <a href="devolucoes.html" class="admin-nav-item">↩️ Devoluções</a>
+      <a href="analytics.html" class="admin-nav-item">📈 Analytics</a>
+    </nav>
+    <div style="padding:16px;border-top:1px solid var(--border)">
+      <a href="../index.html" class="admin-nav-item" style="color:var(--text-muted)">🏪 Ver Loja</a>
+    </div>
+  </aside>
+
+  <main class="admin-main">
+  <!-- MOBILE MENU BAR -->
+  <div class="admin-mobile-bar">
+    <button class="admin-hamburger" onclick="toggleAdminMenu()" id="admin-hamburger-btn">☰</button>
+    <div class="logo" style="display:flex;align-items:center;gap:8px">
+      <img src="../img/logo-icon.jpeg" alt="Zipshop" class="logo-img" style="width:28px;height:28px" onerror="this.style.display='none'">
+      <span class="logo-text"><span>ZIP</span><span>SHOP</span></span>
+    </div>
+    <span style="font-size:11px;color:var(--text-muted)">Admin</span>
+  </div>
+  <!-- OVERLAY -->
+  <div class="admin-overlay" id="admin-overlay" onclick="toggleAdminMenu()"></div>
+
+    <h1 class="admin-page-title">Pedidos</h1>
+    <p class="admin-page-sub">Gerencie e atualize o status dos pedidos</p>
+
+    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:20px" id="status-cards">
+      <div style="background:var(--bg-card);border:2px solid var(--border);border-radius:12px;padding:12px;text-align:center">
+        <p style="font-size:22px;font-weight:900">—</p><p style="font-size:11px;color:var(--text-muted)">Total</p>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-body" style="display:flex;gap:12px;flex-wrap:wrap">
+        <input type="text" class="form-input" id="busca" placeholder="Buscar por cliente ou pedido..." style="flex:1" oninput="filtrar()">
+        <select class="form-input" id="filtro-status" style="width:100%;max-width:180px" onchange="filtrar()">
+          <option value="">Todos os status</option>
+          <option>pendente</option>
+          <option>pago</option>
+          <option>enviado</option>
+          <option>entregue</option>
+          <option>cancelado</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Pedido</th><th>Cliente</th><th>Data</th><th>Itens</th><th>Total</th><th>Pagamento</th><th>Status</th><th>Confirmar Entrega</th></tr></thead>
+        <tbody id="orders-table">
+          <tr><td colspan="7" style="text-align:center;padding:40px;color:var(--text-muted)">Carregando...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </main>
+</div>
+
+<script type="module">
+import { isAdmin, supabase } from '../js/admin-guard.js';
+if (!isAdmin) throw new Error('not admin');
+
+
+let pedidos = [];
+
+function esc(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+}
+
+function formatPrice(v) {
+  return Number(v||0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+function formatDate(d) {
+  return new Date(d).toLocaleDateString('pt-BR');
+}
+function statusBadge(s) {
+  const map = { 'pendente':'badge-yellow','pago':'badge-blue','enviado':'badge-blue','entregue':'badge-green','cancelado':'badge-red' };
+  const labels = { 'pendente':'Recebido','pago':'Pagamento OK','enviado':'Saiu p/ entrega','entregue':'Entregue','cancelado':'Cancelado' };
+  return `<span class="badge ${map[s]||'badge-muted'}">${labels[s]||s}</span>`;
+}
+
+async function carregar() {
+  const { data } = await supabase.from('pedidos').select('*').order('created_at', { ascending: false });
+  pedidos = data || [];
+  renderCards();
+  renderTabela(pedidos);
+}
+
+function renderCards() {
+  const statuses = ['pendente','pago','enviado','entregue','cancelado'];
+  const colors = { pendente:'#f59e0b', pago:'#3b82f6', enviado:'#8b5cf6', entregue:'#22c55e', cancelado:'#ef4444' };
+  const currentFilter = document.getElementById('filtro-status').value;
+
+  document.getElementById('status-cards').innerHTML = [
+    { label: 'Total', value: '', count: pedidos.length },
+    ...statuses.map(s => ({ label: s, value: s, count: pedidos.filter(p => p.status === s).length }))
+  ].map(item => `
+    <button onclick="document.getElementById('filtro-status').value='${item.value}';filtrar()"
+      style="background:var(--bg-card);border:2px solid ${currentFilter===item.value?'var(--primary)':'var(--border)'};border-radius:12px;padding:12px;text-align:center;cursor:pointer;color:var(--text);width:100%">
+      <p style="font-size:22px;font-weight:900;color:${colors[item.value]||'var(--text)'}">${item.count}</p>
+      <p style="font-size:11px;color:var(--text-muted);margin-top:2px;text-transform:capitalize">${item.label}</p>
+    </button>`).join('');
+}
+
+function renderTabela(lista) {
+  const tbody = document.getElementById('orders-table');
+  if (!lista.length) {
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text-muted)">Nenhum pedido encontrado</td></tr>';
+    return;
+  }
+  tbody.innerHTML = lista.map(p => {
+    const itens = (p.itens||[]).map(i => i.emoji||'📦').join(' ');
+    return `<tr>
+      <td style="font-weight:700">
+        #${p.id.slice(0,8).toUpperCase()}
+        <button onclick="abrirDetalhesPedido('${p.id}')" title="Ver endereço, telefone e itens"
+          style="display:block;margin-top:4px;background:none;border:none;color:var(--primary);font-size:11px;font-weight:700;cursor:pointer;padding:0">👁 Detalhes</button>
+      </td>
+      <td>
+        <div style="font-weight:600">${esc(p.usuario_nome||'Visitante')}</div>
+        <div style="font-size:12px;color:var(--text-muted)">${esc(p.usuario_email||'')}</div>
+      </td>
+      <td style="color:var(--text-muted)">${formatDate(p.created_at)}</td>
+      <td style="font-size:18px">${itens}</td>
+      <td style="font-weight:700">${formatPrice(p.total)}</td>
+      <td style="font-size:12px;color:var(--text-muted)">${p.pagamento||'—'}</td>
+      <td>
+        <select onchange="updateStatus('${p.id}', this.value)"
+          style="background:var(--bg-muted);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:4px 8px;font-size:12px">
+          <option value="pendente" ${p.status==='pendente'?'selected':''}>Recebido</option>
+          <option value="pago" ${p.status==='pago'?'selected':''}>Pagamento confirmado</option>
+          <option value="enviado" ${p.status==='enviado'?'selected':''}>Saiu para entrega</option>
+          <option value="entregue" ${p.status==='entregue'?'selected':''}>Entregue</option>
+          <option value="cancelado" ${p.status==='cancelado'?'selected':''}>Cancelado</option>
+        </select>
+      </td>
+      <td>${confirmacaoEntregaHTML(p)}</td>
+    </tr>`;
+  }).join('');
+}
+
+// Confirmação de entrega tipo iFood: o admin digita o código que o
+// cliente informa na porta, e o pedido é marcado como entregue sozinho
+// se o código bater. Serve de respaldo pra loja.
+function confirmacaoEntregaHTML(p) {
+  if (p.status === 'entregue') {
+    return `<span style="font-size:12px;color:var(--primary);font-weight:700">✓ Entrega confirmada</span>`;
+  }
+  if (p.status === 'cancelado') {
+    return `<span style="font-size:12px;color:var(--text-muted)">—</span>`;
+  }
+  return `
+    <div style="display:flex;gap:6px">
+      <input type="text" id="cod-entrega-${p.id}" maxlength="4" placeholder="Código"
+        style="width:70px;background:var(--bg-muted);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:4px 8px;font-size:12px;text-align:center">
+      <button onclick="confirmarEntregaPorCodigo('${p.id}')" class="btn btn-outline btn-sm" style="font-size:11px;padding:4px 8px">Confirmar</button>
+    </div>`;
+}
+
+// Modal com os dados que o admin precisa pra entregar: endereço completo,
+// telefone de contato e a lista de itens do pedido.
+window.abrirDetalhesPedido = function(id) {
+  const p = pedidos.find(x => x.id === id);
+  if (!p) return;
+  const end = p.endereco || {};
+  const itensHTML = (p.itens || []).map(i => `
+    <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px">
+      <span>${i.emoji||'📦'} ${esc(i.nome||i.name||'Produto')} ${i.quantidade ? `× ${i.quantidade}` : ''}</span>
+      <span style="color:var(--text-muted)">${formatPrice(i.preco || i.price || 0)}</span>
+    </div>`).join('');
+
+  const modal = document.createElement('div');
+  modal.id = 'modal-detalhes-pedido';
+  modal.style = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;display:flex;align-items:center;justify-content:center;padding:16px';
+  modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+  modal.innerHTML = `
+    <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:16px;padding:22px;width:100%;max-width:440px;max-height:88vh;overflow-y:auto">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <p style="font-weight:900;font-size:16px">Pedido #${p.id.slice(0,8).toUpperCase()}</p>
+        <button onclick="document.getElementById('modal-detalhes-pedido').remove()" style="background:none;border:none;color:var(--text-muted);font-size:20px;cursor:pointer">✕</button>
+      </div>
+
+      <p style="font-size:11px;color:var(--text-muted);text-transform:uppercase;font-weight:700;margin-bottom:4px">Cliente</p>
+      <p style="font-size:14px;margin-bottom:2px">${esc(p.usuario_nome || 'Visitante')}</p>
+      <p style="font-size:13px;color:var(--text-muted);margin-bottom:14px">${esc(p.usuario_email || '—')}</p>
+
+      <p style="font-size:11px;color:var(--text-muted);text-transform:uppercase;font-weight:700;margin-bottom:4px">📞 Telefone / Contato</p>
+      <p style="font-size:15px;font-weight:700;margin-bottom:14px">
+        ${esc(p.usuario_telefone || '—')}
+        ${p.usuario_telefone ? `<a href="https://wa.me/55${(p.usuario_telefone||'').replace(/\D/g,'')}" target="_blank" style="margin-left:8px;color:var(--primary);font-size:12px;font-weight:700">Abrir WhatsApp →</a>` : ''}
+      </p>
+
+      <p style="font-size:11px;color:var(--text-muted);text-transform:uppercase;font-weight:700;margin-bottom:4px">📍 Endereço de entrega</p>
+      <p style="font-size:14px;line-height:1.5;margin-bottom:6px">
+        ${esc(end.endereco || '—')}${end.bairro ? `, ${esc(end.bairro)}` : ''}<br>
+        ${esc(end.cidade || 'Santa Maria - RS')}
+      </p>
+      ${end.referencia ? `<p style="font-size:13px;color:var(--text-muted);margin-bottom:6px">Referência: ${esc(end.referencia)}</p>` : ''}
+      ${end.instrucao_ausencia ? `<p style="font-size:13px;color:var(--text-muted);margin-bottom:14px">Instrução: ${esc(end.instrucao_ausencia)}</p>` : '<div style="margin-bottom:8px"></div>'}
+      ${end.horario_preferido ? `<p style="font-size:13px;color:var(--text-muted);margin-bottom:14px">Janela/Previsão: ${esc(end.horario_preferido)}</p>` : ''}
+
+      <p style="font-size:11px;color:var(--text-muted);text-transform:uppercase;font-weight:700;margin-bottom:4px">Pagamento / Entrega</p>
+      <p style="font-size:13px;margin-bottom:14px">${p.pagamento || '—'} · ${p.tipo_entrega || '—'}${p.codigo_confirmacao ? ` · Código de confirmação: <strong>${p.codigo_confirmacao}</strong>` : ''}</p>
+
+      <p style="font-size:11px;color:var(--text-muted);text-transform:uppercase;font-weight:700;margin-bottom:6px">Itens</p>
+      ${itensHTML || '<p style="font-size:13px;color:var(--text-muted)">Nenhum item registrado.</p>'}
+      <div style="display:flex;justify-content:space-between;font-weight:900;padding-top:10px;margin-top:6px">
+        <span>Total</span><span>${formatPrice(p.total)}</span>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+};
+
+window.confirmarEntregaPorCodigo = async function(id) {
+  const input = document.getElementById(`cod-entrega-${id}`);
+  const codigoDigitado = (input.value || '').trim();
+  const p = pedidos.find(x => x.id === id);
+  if (!codigoDigitado) { input.style.borderColor = '#ef4444'; return; }
+
+  if (!p.codigo_confirmacao || codigoDigitado !== p.codigo_confirmacao) {
+    input.style.borderColor = '#ef4444';
+    input.value = '';
+    input.placeholder = 'Errado';
+    setTimeout(() => { input.placeholder = 'Código'; input.style.borderColor = 'var(--border)'; }, 1800);
+    return;
+  }
+
+  await supabase.from('pedidos').update({ status: 'entregue' }).eq('id', id);
+  p.status = 'entregue';
+  window.filtrar();
+};
+
+window.filtrar = function() {
+  const q = document.getElementById('busca').value.toLowerCase();
+  const status = document.getElementById('filtro-status').value;
+  const lista = pedidos.filter(p =>
+    (!q || p.usuario_nome?.toLowerCase().includes(q) || p.usuario_email?.toLowerCase().includes(q) || p.id.includes(q)) &&
+    (!status || p.status === status)
+  );
+  renderCards();
+  renderTabela(lista);
+};
+
+window.updateStatus = async function(id, status) {
+  await supabase.from('pedidos').update({ status }).eq('id', id);
+  const p = pedidos.find(x => x.id === id);
+  if (p) p.status = status;
+  renderCards();
+  const toast = document.createElement('div');
+  toast.className = 'toast success show';
+  toast.textContent = 'Status atualizado!';
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 2500);
+
+  // E-mail avisando o cliente (não trava a tela se falhar)
+  if ((status === 'enviado' || status === 'entregue') && p) {
+    fetch('/.netlify/functions/enviar-email-status', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pedido: p, tipo: status })
+    }).catch(() => {});
+  }
+};
+
+carregar();
+</script>
+
+<script>
+function toggleAdminMenu() {
+  const sidebar = document.querySelector('.admin-sidebar');
+  const overlay = document.getElementById('admin-overlay');
+  const btn = document.getElementById('admin-hamburger-btn');
+  const open = sidebar.classList.toggle('admin-sidebar-open');
+  overlay.classList.toggle('active', open);
+  btn.textContent = open ? '✕' : '☰';
+}
+</script>
+</body>
+</html>

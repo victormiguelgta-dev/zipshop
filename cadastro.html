@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="base" content="">
+  <title>Criar Conta — Zipshop</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="navbar"></div>
+
+<div class="auth-page">
+  <div class="auth-box">
+    <div class="auth-logo">
+      <img src="img/logo-icon.jpeg" alt="Zipshop" onerror="this.style.display='none'">
+      <div class="logo-text" style="font-size:22px;justify-content:center;display:flex"><span>ZIP</span><span>SHOP</span></div>
+      <h1 style="font-size:22px;font-weight:900;margin-top:8px">Crie sua conta</h1>
+      <p class="subtitle">Rápido, grátis e sem complicação</p>
+    </div>
+    <div class="auth-card">
+      <div id="msg-erro" style="display:none;background:#fee2e2;color:#b91c1c;padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:12px;font-weight:600"></div>
+      <div id="msg-ok" style="display:none;background:#dcfce7;color:#166534;padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:12px;font-weight:600"></div>
+      <form id="form-cadastro">
+        <div class="form-group">
+          <label class="form-label">Nome completo</label>
+          <input type="text" class="form-input" id="name" placeholder="João Silva" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">E-mail</label>
+          <input type="email" class="form-input" id="email" placeholder="seu@email.com" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">CPF</label>
+          <input type="text" class="form-input" id="cpf" placeholder="000.000.000-00" maxlength="14" oninput="mascaraCPFCadastro(this)" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Senha</label>
+          <div class="input-wrapper">
+            <input type="password" class="form-input" id="password" placeholder="Mínimo 8 caracteres" required minlength="8">
+            <button type="button" class="show-pass" onclick="togglePass('password', this)">👁️</button>
+          </div>
+          <p style="font-size:11px;color:var(--text-muted);margin-top:4px">Use maiúscula, minúscula, número e caractere especial (ex: Senha@123)</p>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Confirmar Senha</label>
+          <div class="input-wrapper">
+            <input type="password" class="form-input" id="password2" placeholder="Repita a senha" required>
+            <button type="button" class="show-pass" onclick="togglePass('password2', this)">👁️</button>
+          </div>
+        </div>
+        <label class="checkbox-label" style="margin-bottom:16px">
+          <input type="checkbox" required>
+          <span>Aceito os <a href="#" style="color:var(--primary)">Termos de Uso</a> e <a href="#" style="color:var(--primary)">Política de Privacidade</a></span>
+        </label>
+        <button type="submit" class="btn btn-primary btn-full" id="btn-cadastro">Criar Conta Grátis</button>
+      </form>
+    </div>
+    <div class="auth-footer">Já tem conta? <a href="login.html">Entrar</a></div>
+  </div>
+</div>
+
+<div id="footer"></div>
+
+<script src="js/data.js"></script>
+<script src="js/cart.js"></script>
+<script src="js/main.js"></script>
+<script src="js/validadores.js"></script>
+<script type="module">
+  import { supabase } from './js/supabase-config.js';
+
+  function mostrarErro(msg) {
+    document.getElementById('msg-ok').style.display = 'none';
+    const el = document.getElementById('msg-erro');
+    el.textContent = msg; el.style.display = 'block';
+  }
+  function mostrarOk(msg) {
+    document.getElementById('msg-erro').style.display = 'none';
+    const el = document.getElementById('msg-ok');
+    el.textContent = msg; el.style.display = 'block';
+  }
+
+  // Valida formato real de e-mail
+  function validarEmail(email) {
+    const regex = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+    return regex.test(String(email || '').trim());
+  }
+
+  // Exige senha forte: maiúscula, minúscula, número e caractere especial
+  function validarSenhaForte(senha) {
+    const temMaiuscula = /[A-Z]/.test(senha);
+    const temMinuscula = /[a-z]/.test(senha);
+    const temNumero = /[0-9]/.test(senha);
+    const temEspecial = /[^A-Za-z0-9]/.test(senha);
+    return senha.length >= 8 && temMaiuscula && temMinuscula && temNumero && temEspecial;
+  }
+
+  document.getElementById('form-cadastro').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    document.getElementById('msg-erro').style.display = 'none';
+
+    const nome  = document.getElementById('name').value.trim();
+    const email = document.getElementById('email').value.trim();
+    const cpf   = document.getElementById('cpf').value.trim();
+    const p1    = document.getElementById('password').value;
+    const p2    = document.getElementById('password2').value;
+
+    if (!validarEmail(email)) { mostrarErro('Digite um e-mail válido.'); return; }
+    if (!window.validarCPFReal(cpf)) { mostrarErro('Digite um CPF válido.'); return; }
+    if (p1 !== p2) { mostrarErro('As senhas não coincidem.'); return; }
+    if (!validarSenhaForte(p1)) {
+      mostrarErro('A senha deve ter no mínimo 8 caracteres, com letra maiúscula, minúscula, número e caractere especial.');
+      return;
+    }
+
+    const btn = document.getElementById('btn-cadastro');
+    btn.disabled = true; btn.textContent = 'Verificando CPF...';
+
+    // Confere ANTES de criar a conta se esse CPF já pertence a outra
+    // conta, pra avisar o usuário na hora em vez de deixar ele criar
+    // login/senha pra descobrir depois que não vai poder usar.
+    const { data: cpfLivre, error: erroCpf } = await supabase.rpc('cpf_disponivel', { cpf_input: cpf });
+    if (erroCpf) {
+      btn.disabled = false; btn.textContent = 'Criar Conta Grátis';
+      mostrarErro('Não foi possível validar o CPF agora. Tente novamente.');
+      return;
+    }
+    if (cpfLivre === false) {
+      btn.disabled = false; btn.textContent = 'Criar Conta Grátis';
+      mostrarErro('Este CPF já está cadastrado em outra conta.');
+      return;
+    }
+
+    btn.textContent = 'Criando conta...';
+
+    const { data, error } = await supabase.auth.signUp({
+      email, password: p1,
+      options: { data: { full_name: nome, cpf } }
+    });
+
+    btn.disabled = false; btn.textContent = 'Criar Conta Grátis';
+
+    if (error) {
+      const msgs = {
+        'User already registered': 'Este e-mail já está cadastrado.',
+        'Password should be at least 6 characters': 'Senha muito curta.'
+      };
+      mostrarErro(msgs[error.message] || 'Erro ao criar conta. Tente novamente.');
+      return;
+    }
+
+    if (data.user) {
+      const { error: erroPerfil } = await supabase.from('usuarios').upsert({ id: data.user.id, email, nome, cpf });
+      if (erroPerfil) {
+        // Alguém cadastrou o mesmo CPF entre a checagem acima e agora
+        // (caso raro). A conta de login já foi criada, mas o perfil
+        // não foi salvo com esse CPF — orienta o usuário em vez de
+        // mostrar sucesso de forma enganosa.
+        if (erroPerfil.code === '23505') {
+          mostrarErro('Este CPF já está em uso por outra conta. Fale com o suporte para regularizar seu cadastro.');
+        } else {
+          mostrarErro('Conta criada, mas houve um erro ao salvar seus dados. Complete seu perfil após confirmar o e-mail.');
+        }
+        return;
+      }
+    }
+
+    mostrarOk('Conta criada! Verifique seu e-mail para confirmar o cadastro.');
+    setTimeout(() => window.location.href = 'login.html', 3000);
+  });
+
+  window.mascaraCPFCadastro = function(input) {
+    let v = input.value.replace(/\D/g, '').slice(0, 11);
+    v = v.replace(/(\d{3})(\d)/, '$1.$2');
+    v = v.replace(/(\d{3})(\d)/, '$1.$2');
+    v = v.replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+    input.value = v;
+  };
+
+  window.togglePass = function(id, btn) {
+    const input = document.getElementById(id);
+    if (input.type === 'password') { input.type = 'text'; btn.textContent = '🙈'; }
+    else { input.type = 'password'; btn.textContent = '👁️'; }
+  };
+</script>
+</body>
+</html>

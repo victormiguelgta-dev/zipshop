@@ -1,0 +1,25 @@
+[build]
+  publish = "."
+  functions = "netlify/functions"
+
+# Roda de hora em hora, verificando carrinhos parados há mais de 3h
+[functions."lembrete-carrinho-abandonado"]
+  schedule = "@hourly"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=()"
+    Strict-Transport-Security = "max-age=31536000; includeSubDomains"
+
+# CORS só nas funções (API), restrito ao domínio do site — antes estava
+# "*" (qualquer site podia chamar essas funções), agora só o Zipshop.
+[[headers]]
+  for = "/.netlify/functions/*"
+  [headers.values]
+    Access-Control-Allow-Origin = "https://zipshop01.netlify.app"
+    Access-Control-Allow-Methods = "GET, POST, OPTIONS"
+    Access-Control-Allow-Headers = "Content-Type"

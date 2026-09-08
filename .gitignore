@@ -1,0 +1,9 @@
+cat > .gitignore << 'EOF'
+node_modules/
+.env
+.env.local
+.netlify/
+mudança/
+*.zip
+.DS_Store
+EOF

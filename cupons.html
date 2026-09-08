@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<link rel="preconnect" href="https://kkliwdphrdbguclsvxcw.supabase.co">
+<link rel="dns-prefetch" href="https://kkliwdphrdbguclsvxcw.supabase.co">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="base" content="">
+  <title>Meus Cupons — Zipshop</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="navbar"></div>
+
+<div class="page-hero">
+  <div class="container">
+    <div class="breadcrumb"><a href="index.html">Home</a><span>/</span><span>Meus Cupons</span></div>
+    <h1>🎟️ Meus Cupons</h1>
+  </div>
+</div>
+
+<div class="container" style="max-width:680px;padding:24px 16px 64px">
+
+  <!-- Inserir código manualmente -->
+  <div class="card" style="margin-bottom:20px">
+    <div class="card-body">
+      <p style="font-weight:700;margin-bottom:10px">Tem um código? Insira aqui:</p>
+      <div style="display:flex;gap:8px">
+        <input type="text" class="form-input" id="input-codigo" placeholder="Ex: FRETE10" style="flex:1;text-transform:uppercase">
+        <button class="btn btn-primary" onclick="verificarCodigo()" style="white-space:nowrap">Verificar</button>
+      </div>
+      <div id="codigo-feedback" style="display:none;margin-top:8px;font-size:13px"></div>
+    </div>
+  </div>
+
+  <!-- Lista de cupons disponíveis -->
+  <div id="cupons-lista">
+    <div style="padding:40px;text-align:center;color:var(--text-muted)">Carregando cupons...</div>
+  </div>
+</div>
+
+<div id="footer"></div>
+<script src="js/cart.js"></script>
+<script src="js/main.js"></script>
+<script type="module">
+import { supabase } from './js/supabase-config.js';
+
+const { data: { session: _sessaoCupons } } = await supabase.auth.getSession();
+const user = _sessaoCupons?.user || null;
+
+function getCodigosVerificados() {
+  try { return JSON.parse(localStorage.getItem('cupons_verificados') || '[]'); }
+  catch { return []; }
+}
+
+async function carregarCupons() {
+  const { data: publicos } = await supabase
+    .from('cupons')
+    .select('*')
+    .eq('ativo', true)
+    .or('publico.eq.true,usuario_id.eq.' + (user?.id || '00000000-0000-0000-0000-000000000000'))
+    .order('created_at', { ascending: false });
+
+  // CORREÇÃO: códigos privados verificados manualmente também entram
+  // na lista, senão eles "somem" depois de validados (não ficavam
+  // no inventário).
+  const codigosVerificados = getCodigosVerificados();
+  let extras = [];
+  if (codigosVerificados.length) {
+    const { data: privados } = await supabase
+      .from('cupons')
+      .select('*')
+      .eq('ativo', true)
+      .in('codigo', codigosVerificados);
+    extras = privados || [];
+  }
+
+  const vistos = new Set();
+  const cupons = [...(publicos || []), ...extras].filter(c => {
+    if (vistos.has(c.id)) return false;
+    vistos.add(c.id);
+    return true;
+  });
+
+  const lista = document.getElementById('cupons-lista');
+
+  if (!cupons?.length) {
+    lista.innerHTML = `<div class="card"><div class="card-body" style="text-align:center;padding:48px">
+      <p style="font-size:40px;margin-bottom:12px">🎟️</p>
+      <p style="font-weight:700;margin-bottom:8px">Nenhum cupom disponível</p>
+      <p style="color:var(--text-muted)">Fique de olho nas promoções da Zipshop!</p>
+    </div></div>`;
+    return;
+  }
+
+  // Verifica quais o usuário já usou
+  let usados = new Set();
+  if (user) {
+    const { data: usos } = await supabase.from('cupons_usos').select('cupom_id').eq('usuario_id', user.id);
+    (usos || []).forEach(u => usados.add(u.cupom_id));
+  }
+
+  lista.innerHTML = cupons.map(c => {
+    const expirado = c.valido_ate && new Date(c.valido_ate) < new Date();
+    const esgotado = c.uso_maximo && c.uso_atual >= c.uso_maximo;
+    const jaUsou = usados.has(c.id) && c.uso_unico_por_usuario;
+    const indisponivel = expirado || esgotado || jaUsou;
+
+    const descTipo = c.tipo === 'percentual' ? `${c.valor}% OFF`
+      : c.tipo === 'fixo' ? `R$ ${c.valor} OFF`
+      : 'Frete Grátis';
+
+    const icone = c.tipo === 'frete_gratis' ? '🚚' : c.tipo === 'percentual' ? '💸' : '🏷️';
+
+    const validade = c.valido_ate
+      ? `Válido até ${new Date(c.valido_ate).toLocaleDateString('pt-BR')}`
+      : 'Sem data de expiração';
+
+    const minimo = c.pedido_minimo ? `Pedido mínimo: R$ ${c.pedido_minimo}` : 'Sem valor mínimo';
+
+    const statusTag = indisponivel
+      ? `<span style="font-size:11px;background:#3a1a1a;color:#f87171;padding:2px 8px;border-radius:20px;font-weight:700">${jaUsou ? 'Já utilizado' : expirado ? 'Expirado' : 'Esgotado'}</span>`
+      : `<span style="font-size:11px;background:rgba(170,239,0,0.12);color:var(--primary);padding:2px 8px;border-radius:20px;font-weight:700">Disponível</span>`;
+
+    return `
+    <div class="card" style="margin-bottom:12px;opacity:${indisponivel ? '.55' : '1'}">
+      <div class="card-body">
+        <div style="display:flex;gap:14px;align-items:flex-start">
+          <div style="width:56px;height:56px;border-radius:12px;background:${indisponivel ? 'var(--bg-muted)' : 'rgba(170,239,0,0.1)'};border:1px solid ${indisponivel ? 'var(--border)' : 'rgba(170,239,0,0.3)'};display:flex;align-items:center;justify-content:center;font-size:26px;flex-shrink:0">${icone}</div>
+          <div style="flex:1">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap">
+              <p style="font-weight:900;font-size:16px">${descTipo}</p>
+              ${statusTag}
+            </div>
+            <p style="font-size:13px;color:var(--text-muted);margin-bottom:2px">${minimo}</p>
+            ${c.descricao ? `<p style="font-size:12px;color:var(--text-muted);margin-bottom:4px">${c.descricao}</p>` : ''}
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-top:10px;padding-top:10px;border-top:1px dashed var(--border);flex-wrap:wrap;gap:8px">
+              <div>
+                <span style="font-family:monospace;font-size:15px;font-weight:900;background:var(--bg-muted);padding:4px 12px;border-radius:6px;letter-spacing:2px">${c.codigo}</span>
+                <button onclick="copiarCodigo('${c.codigo}')" style="background:none;border:none;color:var(--primary);font-size:12px;cursor:pointer;margin-left:6px;font-weight:700">📋 Copiar</button>
+              </div>
+              <div style="display:flex;align-items:center;gap:4px">
+                <span style="font-size:11px;color:var(--text-muted)">⏰ ${validade}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        ${!indisponivel ? `
+        <div style="margin-top:12px;text-align:right">
+          <a href="carrinho.html" onclick="localStorage.setItem('cupom_pre', '${c.codigo}')"
+            class="btn btn-primary btn-sm">Usar agora →</a>
+        </div>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+window.copiarCodigo = function(codigo) {
+  navigator.clipboard.writeText(codigo).then(() => showToast('Código copiado! ' + codigo, 'success'));
+};
+
+window.verificarCodigo = async function() {
+  const codigo = (document.getElementById('input-codigo').value || '').trim().toUpperCase();
+  const fb = document.getElementById('codigo-feedback');
+  if (!codigo) return;
+
+  fb.style.display = 'block'; fb.style.color = 'var(--text-muted)'; fb.textContent = 'Verificando...';
+
+  const { data: cupom } = await supabase.from('cupons').select('*').eq('codigo', codigo).eq('ativo', true).single();
+
+  if (!cupom) { fb.style.color = '#ef4444'; fb.textContent = '❌ Cupom não encontrado ou inválido.'; return; }
+
+  const expirado = cupom.valido_ate && new Date(cupom.valido_ate) < new Date();
+  if (expirado) { fb.style.color = '#ef4444'; fb.textContent = '❌ Este cupom já expirou.'; return; }
+
+  const desc = cupom.tipo === 'percentual' ? `${cupom.valor}% de desconto`
+    : cupom.tipo === 'fixo' ? `R$ ${cupom.valor} de desconto`
+    : 'Frete Grátis';
+  fb.style.color = '#22c55e';
+  fb.innerHTML = `✅ Cupom válido! <strong>${desc}</strong>. <a href="carrinho.html" style="color:var(--primary);font-weight:700">Ir para o carrinho →</a>`;
+
+  // CORREÇÃO BUG 13: antes o código verificado aqui não era guardado
+  // em lugar nenhum — por isso "sumia" quando o cliente ia pro carrinho.
+  // Agora guardamos como pendente, e o carrinho aplica automaticamente.
+  localStorage.setItem('cupom_pre', codigo);
+
+  // CORREÇÃO: guarda o código verificado para ele continuar aparecendo
+  // no inventário de "Meus Cupons" (antes sumia da lista de baixo).
+  const verificados = getCodigosVerificados();
+  if (!verificados.includes(codigo)) {
+    verificados.push(codigo);
+    localStorage.setItem('cupons_verificados', JSON.stringify(verificados));
+  }
+  carregarCupons();
+};
+
+carregarCupons();
+</script>
+</body>
+</html>

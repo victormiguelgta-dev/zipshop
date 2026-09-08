@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<link rel="preconnect" href="https://kkliwdphrdbguclsvxcw.supabase.co">
+<link rel="dns-prefetch" href="https://kkliwdphrdbguclsvxcw.supabase.co">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="base" content="">
+  <title>Zipshop — Eletrônicos pra ontem</title>
+  <meta name="description" content="A loja de eletrônicos mais rápida do Brasil. Smartphones, notebooks, headphones e mais, com entrega expressa em Santa Maria - RS.">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Zipshop — Eletrônicos pra ontem, pra agora, pra você">
+  <meta property="og:description" content="A loja de eletrônicos mais rápida do Brasil. Smartphones, notebooks, headphones e mais, com entrega expressa.">
+  <meta property="og:image" content="https://zipshop01.netlify.app/img/logo-icon.jpeg">
+  <meta property="og:url" content="https://zipshop01.netlify.app/">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="canonical" href="https://zipshop01.netlify.app/">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<!-- WhatsApp Flutuante -->
+<a href="https://wa.me/5555984566918" target="_blank" class="whatsapp-float">
+  <svg width="28" height="28" viewBox="0 0 24 24" fill="white">
+    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/>
+    <path d="M12 0C5.373 0 0 5.373 0 12c0 2.122.554 4.118 1.528 5.855L.057 23.928a.5.5 0 00.636.607l6.263-1.643A11.944 11.944 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.886 0-3.655-.52-5.17-1.427l-.36-.214-3.733.979.997-3.645-.235-.374A9.953 9.953 0 012 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/>
+  </svg>
+</a>
+<body>
+<div id="navbar"></div>
+
+<!-- HERO SLIDER — carregado do Supabase -->
+<section class="hero" id="hero-section">
+  <div style="display:flex;align-items:center;justify-content:center;height:400px;color:var(--text-muted)">Carregando...</div>
+</section>
+
+<!-- FEATURE STRIP -->
+<div class="feature-strip">
+  <div class="feature-strip-inner">
+    <div class="feature-item">
+      <div class="feature-icon" data-texto="feature_seguranca_emoji">🔒</div>
+      <div><div class="feature-title" data-texto="feature_seguranca_titulo">Compra Segura</div><div class="feature-sub" data-texto="feature_seguranca_sub">Pagamento 100% protegido</div></div>
+    </div>
+    <div class="feature-item">
+      <div class="feature-icon" data-texto="feature_pagamento_emoji">💳</div>
+      <div><div class="feature-title" data-texto="feature_pagamento_titulo">PIX e Cartão</div><div class="feature-sub" data-texto="feature_pagamento_sub">Parcele em até 12x sem juros</div></div>
+    </div>
+    <div class="feature-item">
+      <div class="feature-icon" data-texto="feature_qualidade_emoji">📦</div>
+      <div><div class="feature-title" data-texto="feature_qualidade_titulo">Ótima Qualidade</div><div class="feature-sub" data-texto="feature_qualidade_sub">Selecionados com cuidado</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- CATEGORIAS -->
+<div class="section">
+  <div class="section-header">
+    <h2 class="section-title" data-texto="home_titulo_categorias">Categorias</h2>
+    <a href="produtos.html" class="section-link">Ver todas →</a>
+  </div>
+  <div class="category-grid" id="cat-grid"></div>
+</div>
+
+<!-- PRODUTOS EM DESTAQUE -->
+<div class="section" style="padding-top:0">
+  <div class="section-header">
+    <h2 class="section-title" data-texto="home_titulo_ofertas">⚡ Ofertas do Dia</h2>
+    <a href="produtos.html" class="section-link">Ver todos →</a>
+  </div>
+  <div class="product-grid" id="featured-grid"></div>
+</div>
+
+<!-- TODOS OS PRODUTOS -->
+<div class="section" style="padding-top:0">
+  <div class="section-header">
+    <h2 class="section-title" data-texto="home_titulo_mais_vendidos">Mais Vendidos</h2>
+    <a href="produtos.html" class="section-link">Ver todos →</a>
+  </div>
+  <div class="product-grid" id="all-grid"></div>
+</div>
+
+<!-- NEWSLETTER -->
+<div class="newsletter">
+  <h2 data-texto="home_newsletter_titulo">Não perca nenhuma oferta!</h2>
+  <p data-texto="home_newsletter_texto">Cadastre seu e-mail e receba as melhores promoções em primeira mão.</p>
+  <form class="newsletter-form" onsubmit="handleNewsletter(event)">
+    <input type="email" placeholder="Seu melhor e-mail" required>
+    <button type="submit" class="btn btn-primary">Quero Receber</button>
+  </form>
+</div>
+
+<div id="footer"></div>
+
+
+
+
+<script src="js/cart.js"></script>
+<script src="js/main.js"></script>
+<script type="module">
+function esc(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+import { loadProducts, formatPrice, starsHTML } from './js/data.js';
+import { getFavoritosIds, toggleFavorito } from './js/favoritos.js';
+
+// Carrega banners do Supabase
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+const _sb = createClient('https://kkliwdphrdbguclsvxcw.supabase.co','sb_publishable_OMXANLsZK98fPWygp8ZHfA_xzSpWgYb');
+const { data: banners } = await _sb.from('banners').select('*').eq('ativo', true).order('ordem');
+
+let heroIdx = 0;
+const BANNERS = banners && banners.length > 0 ? banners : [
+  { titulo: 'Bem-vindo à Zipshop', subtitulo: 'Os melhores eletrônicos', preco: '', badge: 'Novidade', link: 'produtos.html', link_cat: 'produtos.html', image_url: null }
+];
+const totalSlides = BANNERS.length;
+
+function renderHero() {
+  const section = document.getElementById('hero-section');
+  section.innerHTML = BANNERS.map((b, i) => `
+    <div class="hero-slide ${i === 0 ? 'active' : ''}" id="slide-${i}">
+      <div class="hero-img-box">
+        ${b.image_url ? `<img src="${b.image_url}" style="width:100%;height:100%;object-fit:contain">` : `<span style='font-size:80px'>🛍️</span>`}
+        <div class="hero-text-wrap">
+          ${b.badge ? `<div class="hero-badge">${b.badge}</div>` : ''}
+          <h1 class="hero-title">${(b.titulo||'').replace(' ', '<br>')}</h1>
+          ${b.subtitulo ? `<p class="hero-sub">${b.subtitulo}</p>` : ''}
+          ${b.preco ? `<p class="hero-price">${b.preco}</p>` : ''}
+          <div class="hero-btns">
+            <a href="${b.link_cat || 'produtos.html'}" class="btn btn-primary btn-lg">Ver Produtos</a>
+          </div>
+        </div>
+      </div>
+    </div>`).join('') +
+    `<button class="hero-nav-btn hero-prev" onclick="changeSlide(-1)">&#8249;</button>
+     <button class="hero-nav-btn hero-next" onclick="changeSlide(1)">&#8250;</button>
+     <div class="hero-dots" id="hero-dots"></div>`;
+}
+
+function renderDots() {
+  const d = document.getElementById('hero-dots');
+  if (!d) return;
+  d.innerHTML = '';
+  for (let i = 0; i < totalSlides; i++) {
+    const btn = document.createElement('button');
+    btn.className = 'hero-dot' + (i === heroIdx ? ' active' : '');
+    btn.onclick = () => goSlide(i);
+    d.appendChild(btn);
+  }
+}
+
+function goSlide(idx) {
+  document.getElementById('slide-' + heroIdx)?.classList.remove('active');
+  heroIdx = (idx + totalSlides) % totalSlides;
+  document.getElementById('slide-' + heroIdx)?.classList.add('active');
+  renderDots();
+}
+
+window.changeSlide = (dir) => goSlide(heroIdx + dir);
+renderHero();
+renderDots();
+setInterval(() => changeSlide(1), 5000);
+
+function productCardHTML(p) {
+  const favoritado = _favoritosIds && _favoritosIds.has(p.id);
+  return `
+  <a href="produto.html?id=${p.id}" class="product-card">
+    <div class="product-card-img" style="background:linear-gradient(135deg,#1e3a6e,#2563eb)">
+      ${p.discount ? `<div class="discount-badge">-${p.discount}%</div>` : ''}
+      <button onclick="event.preventDefault(); toggleFavoritoCard(${p.id}, this)" class="fav-btn" data-fav="${favoritado ? '1' : '0'}" aria-label="Favoritar">${favoritado ? '💚' : '🤍'}</button>
+      ${p.image_url ? `<img src="${p.image_thumb_url || p.image_url}" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:cover">` : `<span style="font-size:64px">${p.emoji}</span>`}
+    </div>
+    <div class="product-card-body">
+      <div class="product-brand">${p.brand}</div>
+      <div class="product-name">${p.name}</div>
+      <div class="product-rating-row">
+        <span class="rating-pill">★ ${p.rating ? p.rating.toFixed(1) : '5.0'}</span>
+        ${p.reviews ? `<span class="product-sold">${p.reviews >= 1000 ? (p.reviews/1000).toFixed(1)+'mil' : p.reviews}+ vendido(s)</span>` : ''}
+      </div>
+      ${p.oldPrice ? `<div class="product-price-old">${formatPrice(p.oldPrice)}</div>` : ''}
+      <div class="product-price">${formatPrice(p.price)}</div>
+      <div class="product-installment">ou 10x de ${formatPrice(p.price/10)}</div>
+      <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px">
+        ${p.frete_gratis ? '<span style="font-size:10px;background:#1a3a1a;color:#4ade80;padding:2px 6px;border-radius:4px;font-weight:700">🚚 Frete Grátis</span>' : ''}
+        ${p.entrega_24h ? '<span style="font-size:10px;background:#1a2a3a;color:#60a5fa;padding:2px 6px;border-radius:4px;font-weight:700">⚡ 24h</span>' : ''}
+      </div>
+    </div>
+    <div class="product-card-footer">
+      <button class="btn btn-primary btn-full btn-sm" onclick="event.preventDefault(); addToCart(${p.id}, 1, ${JSON.stringify(p).replace(/"/g, '&quot;')})">🛒 Adicionar</button>
+    </div>
+  </a>`;
+}
+
+// Carrega produtos do Supabase
+const PRODUCTS = await loadProducts();
+const _favoritosIds = await getFavoritosIds();
+
+window.toggleFavoritoCard = async function(produtoId, btn) {
+  const r = await toggleFavorito(produtoId);
+  if (r.precisaLogin) { window.location.href = 'login.html'; return; }
+  btn.textContent = r.favoritado ? '💚' : '🤍';
+  btn.dataset.fav = r.favoritado ? '1' : '0';
+};
+
+// Categorias — busca do Supabase com fotos
+const catGrid = document.getElementById('cat-grid');
+const { data: categoriasDB } = await _sb.from('categorias').select('*').eq('ativo', true).order('name');
+if (categoriasDB && categoriasDB.length > 0) {
+  categoriasDB.forEach(cat => {
+    catGrid.innerHTML += `<a href="produtos.html?cat=${encodeURIComponent(cat.name)}" class="cat-card">
+      ${cat.image_url
+        ? `<div class="cat-icon"><img src="${cat.image_url}" alt="${cat.name}" loading="lazy"></div>`
+        : `<div class="cat-icon">${cat.emoji||'📦'}</div>`
+      }
+      <div class="cat-name">${cat.name}</div>
+    </a>`;
+  });
+} else {
+  const cats = [...new Set(PRODUCTS.map(p => p.category))];
+  cats.forEach(cat => {
+    const icon = PRODUCTS.find(p => p.category === cat)?.emoji || '📦';
+    catGrid.innerHTML += `<a href="produtos.html?cat=${encodeURIComponent(cat)}" class="cat-card">
+      <div class="cat-icon">${icon}</div>
+      <div class="cat-name">${cat}</div>
+    </a>`;
+  });
+}
+
+// Produtos em destaque
+const featGrid = document.getElementById('featured-grid');
+// Oferta do dia: prioriza produtos marcados como oferta, fallback para discount > 0
+const ofertas = PRODUCTS.filter(p => p.oferta || p.discount > 0);
+ofertas.forEach(p => featGrid.innerHTML += productCardHTML(p));
+if (ofertas.length === 0) featGrid.innerHTML = '<p style="color:var(--text-muted);padding:20px">Nenhuma oferta no momento.</p>';
+
+// Todos os produtos
+const allGrid = document.getElementById('all-grid');
+PRODUCTS.slice(0, 8).forEach(p => allGrid.innerHTML += productCardHTML(p));
+
+window.handleNewsletter = (e) => {
+  e.preventDefault();
+  showToast('Inscrito com sucesso! 🎉', 'success');
+  e.target.reset();
+};
+</script>
+
+<!-- Aplica os textos editáveis pelo painel admin/textos.html.
+     Se o texto não estiver cadastrado no banco, o texto original
+     escrito acima (fallback) continua aparecendo normalmente. -->
+<script type="module">
+import { aplicarTextosSite } from './js/textos-loader.js';
+aplicarTextosSite();
+</script>
+</body>
+</html>

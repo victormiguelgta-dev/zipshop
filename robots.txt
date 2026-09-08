@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /conta.html
+Disallow: /carrinho.html
+Disallow: /checkout.html
+
+Sitemap: https://zipshop01.netlify.app/sitemap.xml

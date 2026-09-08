@@ -1,0 +1,43 @@
+meu-ecommerce/
+├── public/
+│   ├── index.html          # Página principal / catálogo
+│   ├── produto.html        # Página do produto
+│   ├── carrinho.html       # Carrinho de compras
+│   ├── login.html          # Login e cadastro
+│   ├── perfil.html         # Pedidos do usuário
+│   ├── css/
+│   │   └── style.css
+│   └── js/
+│       ├── firebase-config.js
+│       ├── auth.js
+│       ├── produtos.js
+│       ├── carrinho.js
+│       └── pedidos.js
+├── firestore.rules         # Regras de segurança
+├── firebase.json           # Configuração do Firebase
+├── .env.example            # Variáveis de ambiente (modelo)
+└── README.md
+## 🔒 Regras de Segurança
+
+- Produtos: leitura pública, escrita somente para admins
+- Pedidos: cada usuário acessa apenas os próprios pedidos
+- Usuários: cada um acessa apenas o próprio perfil
+
+Veja o arquivo `firestore.rules` para a implementação completa.
+
+## 🚢 Deploy
+
+```bash
+firebase deploy
+```
+
+O site ficará disponível em: `https://seu-projeto.web.app`
+
+Para fazer deploy apenas do hosting:
+```bash
+firebase deploy --only hosting
+```
+
+## 📌 Variáveis de Ambiente
+
+Crie um arquivo `.env` baseado no `.env.example`:

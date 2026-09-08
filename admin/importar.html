@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Importar da Shopee — Zipshop Admin</title>
+  <link rel="stylesheet" href="../css/style.css">
+
+<style>
+.admin-mobile-bar {
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 200;
+}
+.admin-hamburger {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 20px;
+  width: 38px;
+  height: 38px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.admin-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 299;
+}
+.admin-overlay.active { display: block; }
+@media (max-width: 900px) {
+  .admin-mobile-bar { display: flex; }
+  .admin-sidebar {
+    display: flex !important;
+    position: fixed;
+    top: 0; left: -260px;
+    height: 100vh; width: 240px;
+    z-index: 300;
+    transition: left 0.25s ease;
+    overflow-y: auto;
+  }
+  .admin-sidebar.admin-sidebar-open { left: 0; }
+}
+
+.passo-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px; height: 24px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: #000;
+  font-weight: 900;
+  font-size: 13px;
+  margin-right: 8px;
+}
+.passo-titulo {
+  display: flex;
+  align-items: center;
+  font-size: 15px;
+  font-weight: 800;
+  margin-bottom: 6px;
+}
+.passo-dica {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+  margin-left: 32px;
+}
+.dropzone {
+  border: 2px dashed var(--border);
+  border-radius: 12px;
+  padding: 24px;
+  text-align: center;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 13px;
+  transition: border-color .15s, background .15s;
+}
+.dropzone.dragover { border-color: var(--primary); background: var(--bg-muted); }
+.thumb-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+.thumb-item { position: relative; aspect-ratio: 1; border-radius: 8px; overflow: hidden; }
+.thumb-item img { width: 100%; height: 100%; object-fit: cover; }
+.thumb-remove {
+  position: absolute; top: 4px; right: 4px;
+  background: rgba(0,0,0,.7); color: #fff;
+  border: none; border-radius: 50%;
+  width: 22px; height: 22px; cursor: pointer; font-size: 12px;
+}
+.thumb-principal {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  background: var(--primary); color: #000;
+  font-size: 10px; font-weight: 800; text-align: center; padding: 2px;
+}
+.preco-box {
+  background: var(--bg-muted);
+  border-radius: 10px;
+  padding: 14px;
+  margin-top: 10px;
+}
+.preco-linha { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 6px; }
+.preco-final { font-size: 20px; font-weight: 900; color: var(--primary); }
+</style>
+</head>
+<body>
+<div class="admin-layout">
+  <aside class="admin-sidebar">
+    <div class="admin-sidebar-logo">
+      <div class="logo">
+        <img src="../img/logo-icon.jpeg" alt="Zipshop" class="logo-img" style="width:32px;height:32px" onerror="this.style.display='none'">
+        <span class="logo-text"><span>ZIP</span><span>SHOP</span></span>
+      </div>
+      <div class="admin-sidebar-subtitle">Painel Administrativo</div>
+    </div>
+    <nav class="admin-nav">
+      <a href="index.html" class="admin-nav-item">📊 Dashboard</a>
+      <a href="produtos.html" class="admin-nav-item">📦 Produtos</a>
+      <a href="importar.html" class="admin-nav-item active">🛍️ Importar da Shopee</a>
+      <a href="pedidos.html" class="admin-nav-item">🛒 Pedidos</a>
+      <a href="clientes.html" class="admin-nav-item">👥 Clientes</a>
+      <a href="categorias.html" class="admin-nav-item">🏷️ Categorias</a>
+      <a href="banners.html" class="admin-nav-item">🖼️ Banners</a>
+      <a href="textos.html" class="admin-nav-item">📝 Textos do Site</a>
+      <a href="cupons.html" class="admin-nav-item">🎟️ Cupons</a>
+      <a href="devolucoes.html" class="admin-nav-item">↩️ Devoluções</a>
+      <a href="analytics.html" class="admin-nav-item">📈 Analytics</a>
+    </nav>
+    <div style="padding:16px;border-top:1px solid var(--border)">
+      <a href="../index.html" class="admin-nav-item" style="color:var(--text-muted)">🏪 Ver Loja</a>
+      <a href="#" id="btn-logout" class="admin-nav-item" style="color:#e53e3e">🚪 Sair</a>
+    </div>
+  </aside>
+
+  <main class="admin-main">
+  <div class="admin-mobile-bar">
+    <button class="admin-hamburger" onclick="toggleAdminMenu()" id="admin-hamburger-btn">☰</button>
+    <div class="logo" style="display:flex;align-items:center;gap:8px">
+      <img src="../img/logo-icon.jpeg" alt="Zipshop" class="logo-img" style="width:28px;height:28px" onerror="this.style.display='none'">
+      <span class="logo-text"><span>ZIP</span><span>SHOP</span></span>
+    </div>
+    <span style="font-size:11px;color:var(--text-muted)">Admin</span>
+  </div>
+  <div class="admin-overlay" id="admin-overlay" onclick="toggleAdminMenu()"></div>
+
+    <h1 class="admin-page-title">🛍️ Importar da Shopee</h1>
+    <p class="admin-page-sub">Cole o conteúdo da página do produto e a IA organiza os dados pra você.</p>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start" id="layout-grid">
+
+      <!-- COLUNA ESQUERDA: entrada -->
+      <div class="card" style="padding:20px">
+        <div class="passo-titulo"><span class="passo-num">1</span> Link do produto na Shopee</div>
+        <div class="passo-dica">Esse link fica guardado. Quando alguém comprar, você clica nele pra comprar na Shopee.</div>
+        <input type="text" class="form-input" id="in-link" placeholder="https://shopee.com.br/...">
+
+        <div style="height:20px"></div>
+
+        <div class="passo-titulo"><span class="passo-num">2</span> Cole o texto da página</div>
+        <div class="passo-dica">Na página do produto: Ctrl+A (selecionar tudo) → Ctrl+C (copiar) → cole aqui.</div>
+        <textarea class="form-input" id="in-texto" rows="8" placeholder="Cole aqui o conteúdo copiado da página do produto..." style="resize:vertical;font-size:12px"></textarea>
+        <button class="btn btn-primary btn-full" id="btn-analisar" onclick="analisar()" style="margin-top:10px">✨ Analisar com IA</button>
+        <div id="status-analise" style="font-size:12px;margin-top:8px;text-align:center;color:var(--text-muted)"></div>
+
+        <div style="height:20px"></div>
+
+        <div class="passo-titulo"><span class="passo-num">3</span> Imagens</div>
+        <div class="passo-dica">Arraste as imagens ou clique pra escolher. A primeira vira a foto principal.</div>
+        <div class="dropzone" id="dropzone" onclick="document.getElementById('in-imagens').click()">
+          📷 Arraste as imagens aqui ou clique pra escolher
+        </div>
+        <input type="file" id="in-imagens" accept="image/*" multiple style="display:none" onchange="adicionarImagens(this.files)">
+        <div class="thumb-grid" id="thumbs"></div>
+      </div>
+
+      <!-- COLUNA DIREITA: revisão -->
+      <div class="card" style="padding:20px">
+        <div class="passo-titulo"><span class="passo-num">4</span> Confira e ajuste</div>
+        <div class="passo-dica">A IA preenche, você revisa antes de salvar.</div>
+
+        <div class="form-group">
+          <label class="form-label">Nome do produto *</label>
+          <input type="text" class="form-input" id="in-nome" placeholder="Preenchido pela IA...">
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div class="form-group">
+            <label class="form-label">Categoria</label>
+            <select class="form-input" id="in-categoria">
+              <option>Smartphones</option>
+              <option>Notebooks</option>
+              <option>Headphones</option>
+              <option>Smart TVs</option>
+              <option>Games</option>
+              <option>Acessorios</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Marca</label>
+            <input type="text" class="form-input" id="in-marca" placeholder="Ex: Xiaomi">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Descrição</label>
+          <textarea class="form-input" id="in-desc" rows="3" style="resize:vertical"></textarea>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+          <div class="form-group">
+            <label class="form-label">Custo Shopee (R$) *</label>
+            <input type="number" class="form-input" id="in-custo" step="0.01" placeholder="0,00" oninput="calcularPreco()">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Sua margem (%)</label>
+            <input type="number" class="form-input" id="in-margem" value="30" step="1" oninput="calcularPreco()">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Emoji</label>
+            <input type="text" class="form-input" id="in-emoji" maxlength="4" placeholder="📦">
+          </div>
+        </div>
+
+        <div class="preco-box">
+          <div class="preco-linha"><span>Custo na Shopee</span><span id="lbl-custo">R$ 0,00</span></div>
+          <div class="preco-linha"><span>Seu lucro</span><span id="lbl-lucro" style="color:var(--primary);font-weight:700">R$ 0,00</span></div>
+          <div class="preco-linha" style="margin-bottom:0;padding-top:8px;border-top:1px solid var(--border)">
+            <span style="font-weight:700">Preço de venda</span>
+            <span class="preco-final" id="lbl-venda">R$ 0,00</span>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px">
+          <div class="form-group">
+            <label class="form-label">Prazo de entrega (dias)</label>
+            <input type="number" class="form-input" id="in-prazo" value="15" min="1">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Estoque</label>
+            <input type="number" class="form-input" id="in-estoque" value="99" min="0">
+          </div>
+        </div>
+
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:16px">
+          <input type="checkbox" id="in-frete-gratis" checked style="width:16px;height:16px;accent-color:var(--primary)">
+          <span style="font-size:13px;font-weight:600">🚚 Frete grátis</span>
+        </label>
+
+        <button class="btn btn-primary btn-full" id="btn-salvar" onclick="salvarProduto()">💾 Cadastrar Produto</button>
+        <div id="status-salvar" style="font-size:12px;margin-top:8px;text-align:center;color:var(--text-muted)"></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script type="module">
+import { isAdmin, supabase } from '../js/admin-guard.js';
+if (!isAdmin) throw new Error('not admin');
+
+document.getElementById('btn-logout').addEventListener('click', async (e) => {
+  e.preventDefault();
+  await supabase.auth.signOut();
+  window.location.href = '../login.html';
+});
+
+// Layout responsivo simples: uma coluna no celular
+function ajustarLayout() {
+  const grid = document.getElementById('layout-grid');
+  grid.style.gridTemplateColumns = window.innerWidth < 1000 ? '1fr' : '1fr 1fr';
+}
+ajustarLayout();
+window.addEventListener('resize', ajustarLayout);
+
+// ---------- IMAGENS ----------
+let imagens = [];
+
+async function comprimirImagem(file, maxLado = 1400, qualidade = 0.82) {
+  if (file.type === 'image/gif' || file.size < 300 * 1024) return file;
+  try {
+    const bitmap = await createImageBitmap(file);
+    const escala = Math.min(1, maxLado / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(bitmap.width * escala);
+    canvas.height = Math.round(bitmap.height * escala);
+    canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', qualidade));
+    if (!blob) return file;
+    return new File([blob], file.name.replace(/\.[^.]+$/, '') + '.jpg', { type: 'image/jpeg' });
+  } catch (e) { return file; }
+}
+
+window.adicionarImagens = async function(files) {
+  for (const f of files) {
+    if (!f.type.startsWith('image/')) continue;
+    const comprimida = await comprimirImagem(f);
+    const url = URL.createObjectURL(comprimida);
+    imagens.push({ file: comprimida, url });
+  }
+  renderThumbs();
+};
+
+function renderThumbs() {
+  const box = document.getElementById('thumbs');
+  box.innerHTML = imagens.map((img, i) => `
+    <div class="thumb-item">
+      <img src="${img.url}">
+      <button class="thumb-remove" onclick="removerImagem(${i})">✕</button>
+      ${i === 0 ? '<div class="thumb-principal">PRINCIPAL</div>' : ''}
+    </div>`).join('');
+}
+
+window.removerImagem = function(i) {
+  imagens.splice(i, 1);
+  renderThumbs();
+};
+
+const dz = document.getElementById('dropzone');
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('dragover'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('dragover'));
+dz.addEventListener('drop', e => {
+  e.preventDefault();
+  dz.classList.remove('dragover');
+  adicionarImagens(e.dataTransfer.files);
+});
+
+// ---------- CÁLCULO DE PREÇO ----------
+function brl(v) { return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }); }
+
+window.calcularPreco = function() {
+  const custo = parseFloat(document.getElementById('in-custo').value) || 0;
+  const margem = parseFloat(document.getElementById('in-margem').value) || 0;
+  const lucro = custo * (margem / 100);
+  const venda = custo + lucro;
+  document.getElementById('lbl-custo').textContent = brl(custo);
+  document.getElementById('lbl-lucro').textContent = brl(lucro);
+  document.getElementById('lbl-venda').textContent = brl(venda);
+  return venda;
+};
+
+// ---------- ANÁLISE COM IA ----------
+window.analisar = async function() {
+  const texto = document.getElementById('in-texto').value.trim();
+  const status = document.getElementById('status-analise');
+  const btn = document.getElementById('btn-analisar');
+
+  if (texto.length < 20) {
+    status.textContent = '⚠️ Cole o texto da página do produto primeiro.';
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = '🔄 Analisando...';
+  status.textContent = 'A IA está lendo o conteúdo...';
+
+  try {
+    const resp = await fetch('/.netlify/functions/analisar-produto-shopee', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ texto })
+    });
+    const dados = await resp.json();
+
+    if (!resp.ok || dados.erro) {
+      status.textContent = '❌ ' + (dados.erro || 'Erro ao analisar');
+      return;
+    }
+
+    document.getElementById('in-nome').value = dados.name || '';
+    document.getElementById('in-marca').value = dados.brand || '';
+    document.getElementById('in-desc').value = dados.description || '';
+    document.getElementById('in-emoji').value = dados.emoji || '📦';
+    if (dados.custo) document.getElementById('in-custo').value = dados.custo;
+    if (dados.category) document.getElementById('in-categoria').value = dados.category;
+    calcularPreco();
+
+    status.textContent = '✅ Pronto! Confira os campos ao lado antes de salvar.';
+  } catch (e) {
+    status.textContent = '❌ Erro de conexão. Tente novamente.';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '✨ Analisar com IA';
+  }
+};
+
+// ---------- UPLOAD + SALVAR ----------
+async function uploadImagem(file, nomeBase, indice) {
+  const ext = file.name.split('.').pop();
+  const seguro = nomeBase.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9]/g, '-').toLowerCase().slice(0, 40);
+  const path = `produtos/${seguro}-${Date.now()}-${indice}.${ext}`;
+  const { error } = await supabase.storage.from('Produtos').upload(path, file, { upsert: true });
+  if (error) return null;
+  const { data } = supabase.storage.from('Produtos').getPublicUrl(path);
+  return data.publicUrl;
+}
+
+window.salvarProduto = async function() {
+  const nome = document.getElementById('in-nome').value.trim();
+  const custo = parseFloat(document.getElementById('in-custo').value) || 0;
+  const status = document.getElementById('status-salvar');
+  const btn = document.getElementById('btn-salvar');
+
+  if (!nome) { status.textContent = '⚠️ O produto precisa de um nome.'; return; }
+  if (!custo) { status.textContent = '⚠️ Informe o custo na Shopee.'; return; }
+
+  btn.disabled = true;
+  btn.textContent = 'Salvando...';
+  status.textContent = 'Enviando imagens...';
+
+  const urls = [];
+  for (let i = 0; i < imagens.length; i++) {
+    const url = await uploadImagem(imagens[i].file, nome, i);
+    if (url) urls.push(url);
+  }
+
+  status.textContent = 'Cadastrando produto...';
+
+  const precoVenda = calcularPreco();
+
+  const dados = {
+    name: nome,
+    brand: document.getElementById('in-marca').value.trim(),
+    category: document.getElementById('in-categoria').value,
+    description: document.getElementById('in-desc').value.trim(),
+    emoji: document.getElementById('in-emoji').value || '📦',
+    price: Math.round(precoVenda * 100) / 100,
+    stock: parseInt(document.getElementById('in-estoque').value) || 0,
+    frete_gratis: document.getElementById('in-frete-gratis').checked,
+    link_shopee: document.getElementById('in-link').value.trim() || null,
+    custo_shopee: custo,
+    margem_percent: parseFloat(document.getElementById('in-margem').value) || 0,
+    prazo_entrega_dias: parseInt(document.getElementById('in-prazo').value) || 15,
+    ativo: true,
+    ...(urls.length ? { image_url: urls[0], imagens: urls } : {})
+  };
+
+  const { error } = await supabase.from('produtos').insert(dados);
+
+  btn.disabled = false;
+  btn.textContent = '💾 Cadastrar Produto';
+
+  if (error) {
+    status.textContent = '❌ Erro ao salvar: ' + error.message;
+    return;
+  }
+
+  status.textContent = '✅ Produto cadastrado! Limpando pro próximo...';
+  setTimeout(limparFormulario, 1200);
+};
+
+function limparFormulario() {
+  ['in-link','in-texto','in-nome','in-marca','in-desc','in-custo','in-emoji'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+  imagens = [];
+  renderThumbs();
+  calcularPreco();
+  document.getElementById('status-analise').textContent = '';
+  document.getElementById('status-salvar').textContent = '';
+  document.getElementById('in-texto').focus();
+}
+</script>
+
+<script>
+function toggleAdminMenu() {
+  const sidebar = document.querySelector('.admin-sidebar');
+  const overlay = document.getElementById('admin-overlay');
+  const btn = document.getElementById('admin-hamburger-btn');
+  const open = sidebar.classList.toggle('admin-sidebar-open');
+  overlay.classList.toggle('active', open);
+  btn.textContent = open ? '✕' : '☰';
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Analytics Admin — Zipshop</title>
+  <link rel="stylesheet" href="../css/style.css">
+
+<style>
+.admin-mobile-bar {
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 200;
+}
+.admin-hamburger {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 20px;
+  width: 38px;
+  height: 38px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.admin-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 299;
+}
+.admin-overlay.active { display: block; }
+@media (max-width: 900px) {
+  .admin-mobile-bar { display: flex; }
+  .admin-sidebar {
+    display: flex !important;
+    position: fixed;
+    top: 0;
+    left: -260px;
+    height: 100vh;
+    width: 240px;
+    z-index: 300;
+    transition: left 0.25s ease;
+    overflow-y: auto;
+  }
+  .admin-sidebar.admin-sidebar-open { left: 0; }
+}
+.kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
+@media (max-width: 700px) { .kpi-grid { grid-template-columns: repeat(2, 1fr); } }
+.kpi-box { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+.kpi-num { font-size: 24px; font-weight: 900; }
+.kpi-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; margin-top: 4px; }
+.funnel-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.funnel-bar-wrap { flex: 1; background: var(--bg-muted); border-radius: 6px; overflow: hidden; height: 26px; }
+.funnel-bar { height: 100%; background: var(--primary); display: flex; align-items: center; padding-left: 8px; font-size: 11px; font-weight: 700; color: #000; white-space: nowrap; }
+.rank-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="admin-layout">
+  <aside class="admin-sidebar">
+    <div class="admin-sidebar-logo">
+      <div class="logo"><img src="../img/logo-icon.jpeg" style="width:32px;height:32px" onerror="this.style.display='none'"><span class="logo-text"><span>ZIP</span><span>SHOP</span></span></div>
+      <div class="admin-sidebar-subtitle">Painel Administrativo</div>
+    </div>
+    <nav class="admin-nav">
+      <a href="index.html" class="admin-nav-item">📊 Dashboard</a>
+      <a href="produtos.html" class="admin-nav-item">📦 Produtos</a>
+      <a href="importar.html" class="admin-nav-item">🛍️ Importar da Shopee</a>
+      <a href="pedidos.html" class="admin-nav-item">🛒 Pedidos</a>
+      <a href="clientes.html" class="admin-nav-item">👥 Clientes</a>
+      <a href="categorias.html" class="admin-nav-item">🏷️ Categorias</a>
+      <a href="banners.html" class="admin-nav-item">🖼️ Banners</a>
+      <a href="textos.html" class="admin-nav-item">📝 Textos do Site</a>
+      <a href="cupons.html" class="admin-nav-item">🎟️ Cupons</a>
+      <a href="devolucoes.html" class="admin-nav-item">↩️ Devoluções</a>
+      <a href="analytics.html" class="admin-nav-item active">📈 Analytics</a>
+    </nav>
+    <div style="padding:16px;border-top:1px solid var(--border)">
+      <a href="../index.html" class="admin-nav-item" style="color:var(--text-muted)">🏪 Ver Loja</a>
+      <a href="#" id="btn-logout" class="admin-nav-item" style="color:#e53e3e">🚪 Sair</a>
+    </div>
+  </aside>
+
+  <main class="admin-main">
+  <div class="admin-mobile-bar">
+    <button class="admin-hamburger" onclick="toggleAdminMenu()" id="admin-hamburger-btn">☰</button>
+    <div class="logo" style="display:flex;align-items:center;gap:8px">
+      <img src="../img/logo-icon.jpeg" alt="Zipshop" class="logo-img" style="width:28px;height:28px" onerror="this.style.display='none'">
+      <span class="logo-text"><span>ZIP</span><span>SHOP</span></span>
+    </div>
+    <span style="font-size:11px;color:var(--text-muted)">Admin</span>
+  </div>
+  <div class="admin-overlay" id="admin-overlay" onclick="toggleAdminMenu()"></div>
+
+    <h1 class="admin-page-title">Analytics</h1>
+    <p class="admin-page-sub">Últimos 30 dias — o que está funcionando e o que precisa de atenção</p>
+
+    <div class="kpi-grid" id="kpi-grid">
+      <div class="kpi-box"><p class="kpi-num">—</p><p class="kpi-label">Carregando...</p></div>
+    </div>
+
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-body">
+        <p style="font-weight:700;margin-bottom:14px">🔻 Funil de conversão</p>
+        <div id="funil"></div>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px" id="two-col-grid">
+      <div class="card">
+        <div class="card-body">
+          <p style="font-weight:700;margin-bottom:10px">🔍 Mais buscados</p>
+          <div id="top-buscas"><p style="color:var(--text-muted);font-size:13px">Carregando...</p></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-body">
+          <p style="font-weight:700;margin-bottom:10px">👀 Vistos mas não comprados</p>
+          <div id="vistos-sem-compra"><p style="color:var(--text-muted);font-size:13px">Carregando...</p></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-body">
+        <p style="font-weight:700;margin-bottom:10px">📉 Estoque baixo</p>
+        <div id="estoque-baixo"><p style="color:var(--text-muted);font-size:13px">Carregando...</p></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script type="module">
+import { isAdmin, supabase } from '../js/admin-guard.js';
+if (!isAdmin) throw new Error('not admin');
+
+function esc(str) {
+  if (str === null || str === undefined) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+}
+function formatPrice(v) { return Number(v||0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }); }
+
+const desde = new Date();
+desde.setDate(desde.getDate() - 30);
+
+const { data: eventos } = await supabase.from('eventos_analytics').select('*').gte('criado_em', desde.toISOString());
+const { data: pedidos } = await supabase.from('pedidos').select('id, total, status, created_at').gte('created_at', desde.toISOString());
+
+const ev = eventos || [];
+const contarTipo = (tipo) => ev.filter(e => e.tipo === tipo).length;
+
+const totalVisitas = new Set(ev.map(e => e.sessao_id)).size;
+const totalViews = contarTipo('visualizacao_produto');
+const totalCarrinho = contarTipo('adicionar_carrinho');
+const totalCheckout = contarTipo('inicio_checkout');
+const totalCompras = (pedidos || []).filter(p => p.status !== 'cancelado').length;
+const receita = (pedidos || []).filter(p => p.status !== 'cancelado').reduce((s,p) => s + Number(p.total||0), 0);
+const taxaConversao = totalVisitas ? ((totalCompras / totalVisitas) * 100).toFixed(1) : '0';
+
+document.getElementById('kpi-grid').innerHTML = `
+  <div class="kpi-box"><p class="kpi-num">${totalVisitas}</p><p class="kpi-label">Visitantes (sessões)</p></div>
+  <div class="kpi-box"><p class="kpi-num">${totalCompras}</p><p class="kpi-label">Pedidos</p></div>
+  <div class="kpi-box"><p class="kpi-num">${formatPrice(receita)}</p><p class="kpi-label">Receita no período</p></div>
+  <div class="kpi-box"><p class="kpi-num">${taxaConversao}%</p><p class="kpi-label">Taxa de conversão</p></div>
+`;
+
+// Funil
+const etapas = [
+  { label: 'Visualizou produto', valor: totalViews },
+  { label: 'Adicionou ao carrinho', valor: totalCarrinho },
+  { label: 'Iniciou checkout', valor: totalCheckout },
+  { label: 'Comprou', valor: totalCompras }
+];
+const maxFunil = Math.max(...etapas.map(e => e.valor), 1);
+document.getElementById('funil').innerHTML = etapas.map(e => `
+  <div class="funnel-row">
+    <span style="width:150px;font-size:12px;color:var(--text-muted)">${e.label}</span>
+    <div class="funnel-bar-wrap"><div class="funnel-bar" style="width:${Math.max((e.valor/maxFunil)*100, e.valor?6:0)}%">${e.valor}</div></div>
+  </div>`).join('');
+
+// Top buscas
+const buscas = ev.filter(e => e.tipo === 'busca' && e.termo_busca);
+const contagemBuscas = {};
+buscas.forEach(b => { const t = b.termo_busca.toLowerCase().trim(); contagemBuscas[t] = (contagemBuscas[t]||0) + 1; });
+const topBuscas = Object.entries(contagemBuscas).sort((a,b) => b[1]-a[1]).slice(0, 8);
+document.getElementById('top-buscas').innerHTML = topBuscas.length
+  ? topBuscas.map(([termo, qtd]) => `<div class="rank-row"><span>${esc(termo)}</span><span style="font-weight:700">${qtd}×</span></div>`).join('')
+  : '<p style="color:var(--text-muted);font-size:13px">Nenhuma busca registrada ainda.</p>';
+
+// Produtos vistos mas não comprados (oportunidade)
+const viewsPorProduto = {};
+ev.filter(e => e.tipo === 'visualizacao_produto' && e.produto_id).forEach(e => { viewsPorProduto[e.produto_id] = (viewsPorProduto[e.produto_id]||0) + 1; });
+const comprasPorProduto = new Set();
+ev.filter(e => e.tipo === 'adicionar_carrinho' && e.produto_id).forEach(e => comprasPorProduto.add(e.produto_id));
+
+const idsMaisVistos = Object.entries(viewsPorProduto).sort((a,b) => b[1]-a[1]).slice(0, 15).map(([id]) => Number(id));
+let produtosInfo = {};
+if (idsMaisVistos.length) {
+  const { data: prods } = await supabase.from('produtos').select('id, name').in('id', idsMaisVistos);
+  (prods||[]).forEach(p => produtosInfo[p.id] = p.name);
+}
+const semCompra = idsMaisVistos.filter(id => !comprasPorProduto.has(id)).slice(0, 8);
+document.getElementById('vistos-sem-compra').innerHTML = semCompra.length
+  ? semCompra.map(id => `<div class="rank-row"><span>${esc(produtosInfo[id] || ('#'+id))}</span><span style="font-weight:700">${viewsPorProduto[id]} views</span></div>`).join('')
+  : '<p style="color:var(--text-muted);font-size:13px">Sem dados suficientes ainda.</p>';
+
+// Estoque baixo
+const { data: estoqueBaixo } = await supabase.from('produtos').select('id, name, stock').not('stock', 'is', null).lte('stock', 5).order('stock');
+document.getElementById('estoque-baixo').innerHTML = (estoqueBaixo && estoqueBaixo.length)
+  ? estoqueBaixo.map(p => `<div class="rank-row"><span>${esc(p.name)}</span><span style="font-weight:700;color:${p.stock === 0 ? '#ef4444' : '#f59e0b'}">${p.stock === 0 ? 'Esgotado' : p.stock + ' un.'}</span></div>`).join('')
+  : '<p style="color:var(--text-muted);font-size:13px">Nenhum produto com estoque baixo. 👍</p>';
+
+document.getElementById('btn-logout').addEventListener('click', async (e) => {
+  e.preventDefault();
+  await supabase.auth.signOut();
+  window.location.href = '../login.html';
+});
+</script>
+<script>
+function toggleAdminMenu() {
+  const sidebar = document.querySelector('.admin-sidebar');
+  const overlay = document.getElementById('admin-overlay');
+  const open = sidebar.classList.toggle('admin-sidebar-open');
+  overlay.classList.toggle('active', open);
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard Admin — Zipshop</title>
+  <link rel="stylesheet" href="../css/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+
+<style>
+.admin-mobile-bar {
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 200;
+}
+.admin-hamburger {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 20px;
+  width: 38px;
+  height: 38px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.admin-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 299;
+}
+.admin-overlay.active { display: block; }
+@media (max-width: 900px) {
+  .admin-mobile-bar { display: flex; }
+  .admin-sidebar {
+    display: flex !important;
+    position: fixed;
+    top: 0;
+    left: -260px;
+    height: 100vh;
+    width: 240px;
+    z-index: 300;
+    transition: left 0.25s ease;
+    overflow-y: auto;
+  }
+  .admin-sidebar.admin-sidebar-open { left: 0; }
+}
+</style>
+</head>
+<body>
+<div class="admin-layout">
+  <aside class="admin-sidebar">
+    <div class="admin-sidebar-logo">
+      <div class="logo">
+        <img src="../img/logo-icon.jpeg" alt="Zipshop" class="logo-img" style="width:32px;height:32px" onerror="this.style.display='none'">
+        <span class="logo-text"><span>ZIP</span><span>SHOP</span></span>
+      </div>
+      <div class="admin-sidebar-subtitle">Painel Administrativo</div>
+    </div>
+    <nav class="admin-nav">
+      <a href="index.html" class="admin-nav-item active">📊 Dashboard</a>
+      <a href="produtos.html" class="admin-nav-item">📦 Produtos</a>
+      <a href="importar.html" class="admin-nav-item">🛍️ Importar da Shopee</a>
+      <a href="pedidos.html" class="admin-nav-item">🛒 Pedidos</a>
+      <a href="clientes.html" class="admin-nav-item">👥 Clientes</a>
+      <a href="categorias.html" class="admin-nav-item">🏷️ Categorias</a>
+      <a href="banners.html" class="admin-nav-item">🖼️ Banners</a>
+      <a href="textos.html" class="admin-nav-item">📝 Textos do Site</a>
+      <a href="cupons.html" class="admin-nav-item">🎟️ Cupons</a>
+      <a href="devolucoes.html" class="admin-nav-item">↩️ Devoluções</a>
+      <a href="analytics.html" class="admin-nav-item">📈 Analytics</a>
+    </nav>
+    <div style="padding:16px;border-top:1px solid var(--border)">
+      <a href="../index.html" class="admin-nav-item" style="color:var(--text-muted)">🏪 Ver Loja</a>
+      <a href="#" id="btn-logout" class="admin-nav-item" style="color:#e53e3e">🚪 Sair</a>
+    </div>
+  </aside>
+
+  <main class="admin-main">
+  <!-- MOBILE MENU BAR -->
+  <div class="admin-mobile-bar">
+    <button class="admin-hamburger" onclick="toggleAdminMenu()" id="admin-hamburger-btn">☰</button>
+    <div class="logo" style="display:flex;align-items:center;gap:8px">
+      <img src="../img/logo-icon.jpeg" alt="Zipshop" class="logo-img" style="width:28px;height:28px" onerror="this.style.display='none'">
+      <span class="logo-text"><span>ZIP</span><span>SHOP</span></span>
+    </div>
+    <span style="font-size:11px;color:var(--text-muted)">Admin</span>
+  </div>
+  <!-- OVERLAY -->
+  <div class="admin-overlay" id="admin-overlay" onclick="toggleAdminMenu()"></div>
+
+    <h1 class="admin-page-title">Dashboard</h1>
+    <p class="admin-page-sub" id="admin-sub">Carregando dados...</p>
+
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <span class="kpi-icon">💰</span>
+        <div class="kpi-label">Receita Total</div>
+        <div class="kpi-value" id="kpi-receita">—</div>
+        <div class="kpi-change" id="kpi-receita-sub">carregando...</div>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi-icon">🛒</span>
+        <div class="kpi-label">Pedidos</div>
+        <div class="kpi-value" id="kpi-pedidos">—</div>
+        <div class="kpi-change" id="kpi-pedidos-sub">carregando...</div>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi-icon">👥</span>
+        <div class="kpi-label">Clientes</div>
+        <div class="kpi-value" id="kpi-clientes">—</div>
+        <div class="kpi-change" id="kpi-clientes-sub">carregando...</div>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi-icon">📦</span>
+        <div class="kpi-label">Produtos</div>
+        <div class="kpi-value" id="kpi-produtos">—</div>
+        <div class="kpi-change" id="kpi-produtos-sub">carregando...</div>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:2fr 1fr;gap:16px;margin-bottom:20px">
+      <div class="card">
+        <div class="card-body">
+          <p style="font-weight:900;font-size:15px;margin-bottom:16px">Receita por Mês</p>
+          <canvas id="revenue-chart" height="180"></canvas>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-body">
+          <p style="font-weight:900;font-size:15px;margin-bottom:16px">Pedidos por Status</p>
+          <div id="status-list"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-body" style="padding-bottom:0">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+          <p style="font-weight:900;font-size:15px">Pedidos Recentes</p>
+          <a href="pedidos.html" style="color:var(--primary);font-size:13px;font-weight:700">Ver todos →</a>
+        </div>
+      </div>
+      <div class="table-wrap" style="border:none;border-radius:0">
+        <table>
+          <thead><tr><th>Pedido</th><th>Cliente</th><th>Data</th><th>Status</th><th>Total</th><th>Ação</th></tr></thead>
+          <tbody id="orders-table"><tr><td colspan="6" style="text-align:center;padding:24px;color:var(--text-muted)">Carregando...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script type="module">
+import { isAdmin, supabase } from '../js/admin-guard.js';
+if (!isAdmin) throw new Error('not admin');
+
+
+function esc(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+}
+
+function formatPrice(v) {
+  return Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+function formatDate(d) {
+  return new Date(d).toLocaleDateString('pt-BR');
+}
+function statusBadge(s) {
+  const map = { 'pendente': 'badge-yellow', 'pago': 'badge-blue', 'enviado': 'badge-blue', 'entregue': 'badge-green', 'cancelado': 'badge-red' };
+  const labels = { 'pendente': 'Recebido', 'pago': 'Pagamento OK', 'enviado': 'Saiu p/ entrega', 'entregue': 'Entregue', 'cancelado': 'Cancelado' };
+  return `<span class="badge ${map[s] || 'badge-muted'}">${labels[s] || s}</span>`;
+}
+
+// Logout
+document.getElementById('btn-logout').addEventListener('click', async (e) => {
+  e.preventDefault();
+  await supabase.auth.signOut();
+  window.location.href = '../login.html';
+});
+
+// Busca dados
+const [{ data: pedidos }, { data: produtos }, { data: clientes }] = await Promise.all([
+  supabase.from('pedidos').select('*').order('created_at', { ascending: false }),
+  supabase.from('produtos').select('*'),
+  supabase.from('usuarios').select('*')
+]);
+
+const totalReceita = (pedidos || []).reduce((s, p) => s + Number(p.total || 0), 0);
+const pendentes = (pedidos || []).filter(p => p.status === 'pendente').length;
+
+// KPIs
+document.getElementById('kpi-receita').textContent = formatPrice(totalReceita);
+document.getElementById('kpi-receita-sub').textContent = `${(pedidos||[]).length} pedidos no total`;
+document.getElementById('kpi-pedidos').textContent = (pedidos||[]).length;
+document.getElementById('kpi-pedidos-sub').innerHTML = `<span style="color:#f59e0b">${pendentes} pendentes</span>`;
+document.getElementById('kpi-clientes').textContent = (clientes||[]).length;
+document.getElementById('kpi-clientes-sub').textContent = 'cadastrados';
+document.getElementById('kpi-produtos').textContent = (produtos||[]).length;
+document.getElementById('kpi-produtos-sub').textContent = 'ativos no catálogo';
+document.getElementById('admin-sub').textContent = 'Bem-vindo ao painel administrativo do Zipshop';
+
+// Gráfico receita por mês
+const meses = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+const receitaMes = Array(12).fill(0);
+(pedidos||[]).forEach(p => {
+  const mes = new Date(p.created_at).getMonth();
+  receitaMes[mes] += Number(p.total || 0);
+});
+const ctx = document.getElementById('revenue-chart').getContext('2d');
+new Chart(ctx, {
+  type: 'bar',
+  data: {
+    labels: meses,
+    datasets: [{ data: receitaMes, backgroundColor: '#AAEF00', borderRadius: 6 }]
+  },
+  options: {
+    responsive: true,
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { grid: { display: false }, ticks: { color: '#888' } },
+      y: { grid: { color: '#2A2A2A' }, ticks: { color: '#888', callback: v => 'R$ ' + (v/1000).toFixed(0) + 'k' } }
+    }
+  }
+});
+
+// Status dos pedidos
+const statusCount = {};
+(pedidos||[]).forEach(p => { statusCount[p.status] = (statusCount[p.status] || 0) + 1; });
+const statusColors2 = { 'pendente': '#f59e0b', 'pago': '#3b82f6', 'enviado': '#8b5cf6', 'entregue': '#22c55e', 'cancelado': '#ef4444' };
+document.getElementById('status-list').innerHTML = Object.entries(statusCount).map(([s, n]) => `
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)">
+    <div style="display:flex;align-items:center;gap:8px">
+      <span style="width:10px;height:10px;border-radius:50%;background:${statusColors2[s]||'#888'};display:inline-block"></span>
+      <span style="font-size:13px;text-transform:capitalize">${s}</span>
+    </div>
+    <span style="font-weight:700">${n}</span>
+  </div>`).join('') || '<p style="color:var(--text-muted);text-align:center;padding:20px">Nenhum pedido</p>';
+
+// Tabela de pedidos recentes
+document.getElementById('orders-table').innerHTML = (pedidos||[]).slice(0,10).map(p => `
+  <tr>
+    <td style="font-weight:700">
+      #${p.id.slice(0,8).toUpperCase()}
+      <a href="pedidos.html" style="display:block;margin-top:4px;color:var(--primary);font-size:11px;font-weight:700">👁 Ver detalhes</a>
+    </td>
+    <td>${esc(p.usuario_nome || p.usuario_email || 'Visitante')}</td>
+    <td style="color:var(--text-muted)">${formatDate(p.created_at)}</td>
+    <td>${statusBadge(p.status)}</td>
+    <td style="font-weight:700">${formatPrice(p.total)}</td>
+    <td>
+      <select onchange="updateStatus('${p.id}', this.value)" style="background:var(--bg-muted);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:4px 8px;font-size:12px">
+        <option value="pendente" ${p.status==='pendente'?'selected':''}>Recebido</option>
+        <option value="pago" ${p.status==='pago'?'selected':''}>Pagamento confirmado</option>
+        <option value="enviado" ${p.status==='enviado'?'selected':''}>Saiu para entrega</option>
+        <option value="entregue" ${p.status==='entregue'?'selected':''}>Entregue</option>
+        <option value="cancelado" ${p.status==='cancelado'?'selected':''}>Cancelado</option>
+      </select>
+    </td>
+  </tr>`).join('') || '<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--text-muted)">Nenhum pedido ainda</td></tr>';
+
+// Atualizar status do pedido
+window.updateStatus = async (id, status) => {
+  const { error } = await supabase.from('pedidos').update({ status }).eq('id', id);
+  if (error) { alert('Erro ao atualizar status'); return; }
+  const toast = document.createElement('div');
+  toast.className = 'toast success show';
+  toast.textContent = 'Status atualizado!';
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 2500);
+
+  if (status === 'enviado' || status === 'entregue') {
+    const { data: pedidoAtualizado } = await supabase.from('pedidos').select('*').eq('id', id).single();
+    if (pedidoAtualizado) {
+      fetch('/.netlify/functions/enviar-email-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pedido: pedidoAtualizado, tipo: status })
+      }).catch(() => {});
+    }
+  }
+};
+</script>
+
+<script>
+function toggleAdminMenu() {
+  const sidebar = document.querySelector('.admin-sidebar');
+  const overlay = document.getElementById('admin-overlay');
+  const btn = document.getElementById('admin-hamburger-btn');
+  const open = sidebar.classList.toggle('admin-sidebar-open');
+  overlay.classList.toggle('active', open);
+  btn.textContent = open ? '✕' : '☰';
+}
+</script>
+</body>
+</html>

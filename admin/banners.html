@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Banners Admin — Zipshop</title>
+  <link rel="stylesheet" href="../css/style.css">
+
+<style>
+.admin-mobile-bar {
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 200;
+}
+.admin-hamburger {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 20px;
+  width: 38px;
+  height: 38px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.admin-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 299;
+}
+.admin-overlay.active { display: block; }
+@media (max-width: 900px) {
+  .admin-mobile-bar { display: flex; }
+  .admin-sidebar {
+    display: flex !important;
+    position: fixed;
+    top: 0;
+    left: -260px;
+    height: 100vh;
+    width: 240px;
+    z-index: 300;
+    transition: left 0.25s ease;
+    overflow-y: auto;
+  }
+  .admin-sidebar.admin-sidebar-open { left: 0; }
+}
+</style>
+</head>
+<body>
+<div class="admin-layout">
+  <aside class="admin-sidebar">
+    <div class="admin-sidebar-logo">
+      <div class="logo">
+        <img src="../img/logo-icon.jpeg" alt="Zipshop" class="logo-img" style="width:32px;height:32px" onerror="this.style.display='none'">
+        <span class="logo-text"><span>ZIP</span><span>SHOP</span></span>
+      </div>
+      <div class="admin-sidebar-subtitle">Painel Administrativo</div>
+    </div>
+    <nav class="admin-nav">
+      <a href="index.html" class="admin-nav-item">📊 Dashboard</a>
+      <a href="produtos.html" class="admin-nav-item">📦 Produtos</a>
+      <a href="importar.html" class="admin-nav-item">🛍️ Importar da Shopee</a>
+      <a href="pedidos.html" class="admin-nav-item">🛒 Pedidos</a>
+      <a href="clientes.html" class="admin-nav-item">👥 Clientes</a>
+      <a href="categorias.html" class="admin-nav-item">🏷️ Categorias</a>
+      <a href="banners.html" class="admin-nav-item active">🖼️ Banners</a>
+      <a href="cupons.html" class="admin-nav-item">🎟️ Cupons</a>
+      <a href="devolucoes.html" class="admin-nav-item">↩️ Devoluções</a>
+      <a href="analytics.html" class="admin-nav-item">📈 Analytics</a>
+    </nav>
+    <div style="padding:16px;border-top:1px solid var(--border)">
+      <a href="../index.html" class="admin-nav-item" style="color:var(--text-muted)">🏪 Ver Loja</a>
+      <a href="#" id="btn-logout" class="admin-nav-item" style="color:#e53e3e">🚪 Sair</a>
+    </div>
+  </aside>
+
+  <main class="admin-main">
+  <!-- MOBILE MENU BAR -->
+  <div class="admin-mobile-bar">
+    <button class="admin-hamburger" onclick="toggleAdminMenu()" id="admin-hamburger-btn">☰</button>
+    <div class="logo" style="display:flex;align-items:center;gap:8px">
+      <img src="../img/logo-icon.jpeg" alt="Zipshop" class="logo-img" style="width:28px;height:28px" onerror="this.style.display='none'">
+      <span class="logo-text"><span>ZIP</span><span>SHOP</span></span>
+    </div>
+    <span style="font-size:11px;color:var(--text-muted)">Admin</span>
+  </div>
+  <!-- OVERLAY -->
+  <div class="admin-overlay" id="admin-overlay" onclick="toggleAdminMenu()"></div>
+
+    <h1 class="admin-page-title">🖼️ Banners do Site</h1>
+    <p class="admin-page-sub">Gerencie os slides que aparecem na página inicial</p>
+
+    <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
+      <button class="btn btn-primary" onclick="abrirModal()">+ Novo Banner</button>
+    </div>
+
+    <div class="card">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Ordem</th>
+              <th>Imagem</th>
+              <th>Link</th>
+              <th>Status</th>
+              <th>Ações</th>
+            </tr>
+          </thead>
+          <tbody id="banners-table">
+            <tr><td colspan="5" style="text-align:center;padding:24px;color:var(--text-muted)">Carregando...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- MODAL -->
+<div id="modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:1000;overflow-y:auto;padding:20px">
+  <div style="background:var(--bg-card);border-radius:16px;max-width:560px;margin:0 auto;padding:24px;position:relative">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+      <h2 style="font-size:18px;font-weight:800" id="modal-title">Novo Banner</h2>
+      <button onclick="fecharModal()" style="background:none;border:none;color:var(--text-muted);font-size:20px;cursor:pointer">✕</button>
+    </div>
+
+    <input type="hidden" id="edit-id">
+
+    <!-- Preview da imagem -->
+    <div class="form-group">
+      <label class="form-label">Imagem do Banner</label>
+      <div id="foto-preview" onclick="document.getElementById('foto-input').click()"
+        style="width:100%;height:160px;border:2px dashed var(--border);border-radius:12px;
+               display:flex;align-items:center;justify-content:center;cursor:pointer;
+               margin-bottom:8px;overflow:hidden;background:var(--bg-muted)">
+        <span style="color:var(--text-muted);font-size:13px">📷 Clique para escolher imagem</span>
+      </div>
+      <p style="font-size:11px;color:var(--text-muted)">JPG, PNG ou WebP. Tamanho recomendado: 800x400px</p>
+      <input type="file" id="foto-input" accept="image/*" style="display:none" onchange="previewFoto(this)">
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Link (ao clicar no banner)</label>
+      <input type="text" class="form-input" id="edit-link" placeholder="Ex: produto.html?id=1 ou https://...">
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="form-group">
+        <label class="form-label">Ordem (posição no slider)</label>
+        <input type="number" class="form-input" id="edit-ordem" value="1" min="1">
+      </div>
+      <div class="form-group" style="display:flex;align-items:flex-end;padding-bottom:4px">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+          <input type="checkbox" id="edit-ativo" checked style="width:16px;height:16px;accent-color:var(--primary)">
+          <span style="font-size:13px;font-weight:600">Banner ativo</span>
+        </label>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:10px;margin-top:8px">
+      <button class="btn btn-outline" onclick="fecharModal()" style="flex:1">Cancelar</button>
+      <button class="btn btn-primary" id="btn-salvar" onclick="salvarBanner()" style="flex:2">Salvar Banner</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { isAdmin, supabase } from '../js/admin-guard.js';
+if (!isAdmin) throw new Error('not admin');
+
+let fotoFile = null;
+
+// Reduz o tamanho da imagem no navegador ANTES de enviar pro Supabase.
+// Fotos direto do celular costumam vir com vários MB — sem isso, o
+// banner inteiro do site fica lento pra carregar pra qualquer visitante.
+// Gifs não são recomprimidos (perderiam a animação) e imagens já
+// pequenas (<300KB) também são ignoradas.
+async function comprimirImagem(file, maxLado = 1600, qualidade = 0.82) {
+  if (file.type === 'image/gif' || file.size < 300 * 1024) return file;
+
+  try {
+    const bitmap = await createImageBitmap(file);
+    const escala = Math.min(1, maxLado / Math.max(bitmap.width, bitmap.height));
+    const largura = Math.round(bitmap.width * escala);
+    const altura = Math.round(bitmap.height * escala);
+
+    const canvas = document.createElement('canvas');
+    canvas.width = largura;
+    canvas.height = altura;
+    canvas.getContext('2d').drawImage(bitmap, 0, 0, largura, altura);
+
+    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', qualidade));
+    if (!blob) return file;
+
+    const nomeBase = file.name.replace(/\.[^.]+$/, '');
+    return new File([blob], `${nomeBase}.jpg`, { type: 'image/jpeg' });
+  } catch (e) {
+    return file; // se algo der errado, manda o arquivo original em vez de travar
+  }
+}
+
+document.getElementById('btn-logout').addEventListener('click', async (e) => {
+  e.preventDefault();
+  await supabase.auth.signOut();
+  window.location.href = '../login.html';
+});
+
+window.previewFoto = async function(input) {
+  const original = input.files[0];
+  if (!original) return;
+  fotoFile = await comprimirImagem(original);
+  const reader = new FileReader();
+  reader.onload = e => {
+    const preview = document.getElementById('foto-preview');
+    preview.innerHTML = `<img src="${e.target.result}" style="width:100%;height:100%;object-fit:cover">`;
+  };
+  reader.readAsDataURL(fotoFile);
+};
+
+async function uploadFoto(file, titulo) {
+  const ext = file.name.split('.').pop();
+  // Remove acentos e caracteres especiais
+  const nomeSeguro = titulo
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9]/g, '-')
+    .toLowerCase();
+  const fileName = `banners/${nomeSeguro}-${Date.now()}.${ext}`;
+  const { data, error } = await supabase.storage.from('Produtos').upload(fileName, file, { upsert: true });
+  if (error) { alert('Erro no upload: ' + error.message); return null; }
+  const { data: urlData } = supabase.storage.from('Produtos').getPublicUrl(fileName);
+  return urlData.publicUrl;
+}
+
+async function carregar() {
+  const { data: banners } = await supabase.from('banners').select('*').order('ordem');
+  const tbody = document.getElementById('banners-table');
+
+  if (!banners || banners.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--text-muted)">Nenhum banner cadastrado</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = banners.map(b => `
+    <tr>
+      <td style="font-weight:700;text-align:center">${b.ordem}</td>
+      <td>
+        ${b.image_url
+          ? `<img src="${b.image_url}" style="width:80px;height:45px;object-fit:cover;border-radius:6px">`
+          : '<span style="color:var(--text-muted);font-size:12px">Sem imagem</span>'}
+      </td>
+      <td style="font-weight:700">${b.link ? `<span style="font-size:12px;color:var(--text-muted)">${b.link}</span>` : '—'}</td>
+      <td>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+          <input type="checkbox" ${b.ativo ? 'checked' : ''} onchange="toggleAtivo(${b.id}, this.checked)">
+          <span style="font-size:12px">${b.ativo ? 'Ativo' : 'Inativo'}</span>
+        </label>
+      </td>
+      <td>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-outline btn-sm" onclick="openEdit(${b.id})">✏️ Editar</button>
+          <button class="btn btn-sm" style="background:#e53e3e;color:#fff" onclick="deletar(${b.id})">🗑️</button>
+        </div>
+      </td>
+    </tr>`).join('');
+}
+
+window.toggleAtivo = async (id, ativo) => {
+  await supabase.from('banners').update({ ativo }).eq('id', id);
+  await carregar();
+};
+
+window.abrirModal = function() {
+  document.getElementById('modal-title').textContent = 'Novo Banner';
+  document.getElementById('edit-id').value = '';
+  document.getElementById('edit-link').value = '';
+  document.getElementById('edit-ordem').value = '1';
+  document.getElementById('edit-ativo').checked = true;
+  document.getElementById('foto-preview').innerHTML = '<span style="color:var(--text-muted);font-size:13px">📷 Clique para escolher imagem</span>';
+  fotoFile = null;
+  document.getElementById('modal').style.display = 'block';
+};
+
+window.fecharModal = function() {
+  document.getElementById('modal').style.display = 'none';
+  fotoFile = null;
+};
+
+window.openEdit = async function(id) {
+  const { data: b } = await supabase.from('banners').select('*').eq('id', id).single();
+  if (!b) return;
+  document.getElementById('modal-title').textContent = 'Editar Banner';
+  document.getElementById('edit-id').value = b.id;
+  document.getElementById('edit-link').value = b.link || '';
+  document.getElementById('edit-ordem').value = b.ordem || 1;
+  document.getElementById('edit-ativo').checked = b.ativo;
+  const preview = document.getElementById('foto-preview');
+  preview.innerHTML = b.image_url
+    ? `<img src="${b.image_url}" style="width:100%;height:100%;object-fit:cover">`
+    : '<span style="color:var(--text-muted);font-size:13px">📷 Clique para escolher imagem</span>';
+  fotoFile = null;
+  document.getElementById('modal').style.display = 'block';
+};
+
+window.salvarBanner = async function() {
+  const id = document.getElementById('edit-id').value;
+  if (!fotoFile && !id) { alert('Escolha a imagem do banner'); return; }
+
+  const btn = document.getElementById('btn-salvar');
+  btn.disabled = true; btn.textContent = 'Salvando...';
+
+  let imageUrl = null;
+  if (fotoFile) imageUrl = await uploadFoto(fotoFile, 'banner');
+
+  const dados = {
+    link: document.getElementById('edit-link').value,
+    ordem: parseInt(document.getElementById('edit-ordem').value) || 1,
+    ativo: document.getElementById('edit-ativo').checked,
+    ...(imageUrl ? { image_url: imageUrl } : {})
+  };
+
+  let error;
+  if (id) {
+    ({ error } = await supabase.from('banners').update(dados).eq('id', id));
+  } else {
+    ({ error } = await supabase.from('banners').insert(dados));
+  }
+
+  btn.disabled = false; btn.textContent = 'Salvar Banner';
+  if (error) { alert('Erro ao salvar: ' + error.message); return; }
+
+  fecharModal();
+  await carregar();
+
+  const toast = document.createElement('div');
+  toast.className = 'toast success show';
+  toast.textContent = 'Banner salvo!';
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 2500);
+};
+
+window.deletar = async function(id) {
+  if (!confirm('Deletar este banner?')) return;
+  await supabase.from('banners').delete().eq('id', id);
+  await carregar();
+};
+
+await carregar();
+</script>
+
+<script>
+function toggleAdminMenu() {
+  const sidebar = document.querySelector('.admin-sidebar');
+  const overlay = document.getElementById('admin-overlay');
+  const btn = document.getElementById('admin-hamburger-btn');
+  const open = sidebar.classList.toggle('admin-sidebar-open');
+  overlay.classList.toggle('active', open);
+  btn.textContent = open ? '✕' : '☰';
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="base" content="">
+  <title>Meus Favoritos — Zipshop</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="navbar"></div>
+
+<div class="page-hero">
+  <div class="container">
+    <div class="breadcrumb"><a href="index.html">Home</a><span>/</span><span>Meus Favoritos</span></div>
+    <h1>💚 Meus Favoritos</h1>
+  </div>
+</div>
+
+<div class="container" style="padding:24px 16px 64px">
+  <div class="product-grid" id="fav-grid"></div>
+  <div id="fav-empty" style="display:none;text-align:center;padding:60px 20px">
+    <p style="font-size:48px;margin-bottom:12px">🤍</p>
+    <p style="font-weight:700;margin-bottom:8px">Nenhum favorito ainda</p>
+    <p style="color:var(--text-muted);margin-bottom:20px">Toque no coração de um produto pra guardar aqui.</p>
+    <a href="produtos.html" class="btn btn-primary">Ver Produtos</a>
+  </div>
+</div>
+
+<div id="footer"></div>
+<script src="js/cart.js"></script>
+<script src="js/main.js"></script>
+<script type="module">
+import { supabase } from './js/supabase-config.js';
+import { formatPrice } from './js/data.js';
+
+const { data: { session } } = await supabase.auth.getSession();
+const user = session?.user || null;
+if (!user) window.location.href = 'login.html?redirect=favoritos.html';
+
+const { data: favoritos } = await supabase
+  .from('favoritos')
+  .select('produto_id, produtos(*)')
+  .eq('usuario_id', user.id)
+  .order('criado_em', { ascending: false });
+
+const grid = document.getElementById('fav-grid');
+const lista = (favoritos || []).map(f => f.produtos).filter(Boolean);
+
+if (!lista.length) {
+  document.getElementById('fav-empty').style.display = 'block';
+} else {
+  grid.innerHTML = lista.map(p => `
+    <a href="produto.html?id=${p.id}" class="product-card">
+      <div class="product-card-img" style="background:linear-gradient(135deg,#1e3a6e,#2563eb)">
+        <button onclick="event.preventDefault(); removerFavorito(${p.id}, this)" class="fav-btn" aria-label="Remover">💚</button>
+        ${p.image_url ? `<img src="${p.image_thumb_url || p.image_url}" loading="lazy" style="width:100%;height:100%;object-fit:cover">` : `<span style="font-size:64px">${p.emoji||'📦'}</span>`}
+      </div>
+      <div class="product-card-body">
+        <div class="product-brand">${p.brand||''}</div>
+        <div class="product-name">${p.name}</div>
+        <div class="product-price">${formatPrice(p.price)}</div>
+      </div>
+      <div class="product-card-footer">
+        <button class="btn btn-primary btn-full btn-sm" onclick="event.preventDefault(); addToCart(${p.id}, 1, ${JSON.stringify(p).replace(/"/g,'&quot;')})">🛒 Adicionar</button>
+      </div>
+    </a>`).join('');
+}
+
+window.removerFavorito = async function(produtoId, btn) {
+  await supabase.from('favoritos').delete().eq('usuario_id', user.id).eq('produto_id', produtoId);
+  btn.closest('.product-card').remove();
+  if (!document.querySelectorAll('#fav-grid .product-card').length) {
+    document.getElementById('fav-empty').style.display = 'block';
+  }
+};
+</script>
+</body>
+</html>

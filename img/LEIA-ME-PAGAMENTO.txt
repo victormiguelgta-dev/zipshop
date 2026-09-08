@@ -1,0 +1,11 @@
+Coloque aqui as imagens de pagamento com esses nomes exatos:
+
+pay-pix.png        → logo do PIX
+pay-boleto.png     → logo do Boleto
+pay-visa.png       → logo da Visa
+pay-mastercard.png → logo da Mastercard
+
+Tamanho recomendado: altura de 28px, fundo transparente (PNG)
+Onde baixar logos oficiais:
+- PIX: https://www.bcb.gov.br/estabilidadefinanceira/pix (seção de identidade visual)
+- Visa/Mastercard: busque "visa logo png transparent" no Google Imagens

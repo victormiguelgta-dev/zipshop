@@ -1,0 +1,83 @@
+Ótima pergunta! Deixa eu fazer um raio-x completo do seu projeto:
+
+---
+
+## ✅ O que você JÁ tem funcionando
+
+- Login e-mail/senha e Google
+- Cadastro de usuários
+- Produtos vindo do Supabase
+- Carrinho funcionando
+- Pedidos salvando no banco
+
+---
+
+## 🔴 O que ainda falta para vender de verdade
+
+### Essencial — sem isso não vende
+**1. Pagamento real** — Mercado Pago ou Stripe
+Hoje o checkout é simulado. Precisa integrar um gateway para cobrar de verdade.
+
+**2. Página do produto funcionando**
+Clicar num produto e ver os detalhes, specs, fotos.
+
+**3. Página "Minha Conta"**
+Usuário logado ver seus pedidos, endereços salvos.
+
+**4. E-mail de confirmação**
+Quando o pedido é feito, cliente recebe e-mail automático.
+
+---
+
+### Painel Admin — o que precisa funcionar
+**Dashboard**
+- Total de vendas do dia/mês
+- Pedidos recentes
+- Produtos mais vendidos
+- Clientes novos
+
+**Gestão de Pedidos**
+- Ver todos os pedidos
+- Mudar status: pendente → pago → enviado → entregue
+- Ver detalhes de cada pedido
+
+**Gestão de Produtos**
+- Adicionar novo produto
+- Editar preço, estoque, descrição
+- Ativar/desativar produto
+- Upload de foto
+
+**Gestão de Clientes**
+- Ver lista de clientes cadastrados
+- Ver histórico de compras por cliente
+
+---
+
+## 📊 Raio-X completo
+
+| Funcionalidade | Status |
+|---|---|
+| Login/Cadastro | ✅ Pronto |
+| Produtos no banco | ✅ Pronto |
+| Carrinho | ✅ Pronto |
+| Pedidos salvando | ✅ Pronto |
+| Página do produto | ⚠️ Quase |
+| Minha conta/pedidos | ❌ Falta |
+| Pagamento real | ❌ Falta |
+| E-mail automático | ❌ Falta |
+| Admin — Dashboard | ❌ Falta |
+| Admin — Pedidos | ❌ Falta |
+| Admin — Produtos | ❌ Falta |
+| Admin — Clientes | ❌ Falta |
+| Site publicado | ❌ Falta |
+
+---
+
+## Ordem recomendada para fazer
+
+1. **Página do produto** — rápido de corrigir
+2. **Minha conta** — usuário ver seus pedidos
+3. **Admin conectado** — você gerenciar tudo
+4. **Publicar no Netlify** — site no ar
+5. **Pagamento real** — Mercado Pago (último pois exige CNPJ)
+

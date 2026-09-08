@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Devoluções Admin — Zipshop</title>
+  <link rel="stylesheet" href="../css/style.css">
+
+<style>
+.admin-mobile-bar {
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 200;
+}
+.admin-hamburger {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 20px;
+  width: 38px;
+  height: 38px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.admin-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 299;
+}
+.admin-overlay.active { display: block; }
+@media (max-width: 900px) {
+  .admin-mobile-bar { display: flex; }
+  .admin-sidebar {
+    display: flex !important;
+    position: fixed;
+    top: 0;
+    left: -260px;
+    height: 100vh;
+    width: 240px;
+    z-index: 300;
+    transition: left 0.25s ease;
+    overflow-y: auto;
+  }
+  .admin-sidebar.admin-sidebar-open { left: 0; }
+}
+</style>
+</head>
+<body>
+<div class="admin-layout">
+  <aside class="admin-sidebar">
+    <div class="admin-sidebar-logo">
+      <div class="logo"><img src="../img/logo-icon.jpeg" style="width:32px;height:32px" onerror="this.style.display='none'"><span class="logo-text"><span>ZIP</span><span>SHOP</span></span></div>
+      <div class="admin-sidebar-subtitle">Painel Administrativo</div>
+    </div>
+    <nav class="admin-nav">
+      <a href="index.html" class="admin-nav-item">📊 Dashboard</a>
+      <a href="produtos.html" class="admin-nav-item">📦 Produtos</a>
+      <a href="importar.html" class="admin-nav-item">🛍️ Importar da Shopee</a>
+      <a href="pedidos.html" class="admin-nav-item">🛒 Pedidos</a>
+      <a href="clientes.html" class="admin-nav-item">👥 Clientes</a>
+      <a href="categorias.html" class="admin-nav-item">🏷️ Categorias</a>
+      <a href="banners.html" class="admin-nav-item">🖼️ Banners</a>
+      <a href="textos.html" class="admin-nav-item">📝 Textos do Site</a>
+      <a href="cupons.html" class="admin-nav-item">🎟️ Cupons</a>
+      <a href="devolucoes.html" class="admin-nav-item active">↩️ Devoluções</a>
+      <a href="analytics.html" class="admin-nav-item">📈 Analytics</a>
+    </nav>
+    <div style="padding:16px;border-top:1px solid var(--border)">
+      <a href="../index.html" class="admin-nav-item" style="color:var(--text-muted)">🏪 Ver Loja</a>
+      <a href="#" id="btn-logout" class="admin-nav-item" style="color:#e53e3e">🚪 Sair</a>
+    </div>
+  </aside>
+
+  <main class="admin-main">
+  <div class="admin-mobile-bar">
+    <button class="admin-hamburger" onclick="toggleAdminMenu()" id="admin-hamburger-btn">☰</button>
+    <div class="logo" style="display:flex;align-items:center;gap:8px">
+      <img src="../img/logo-icon.jpeg" alt="Zipshop" class="logo-img" style="width:28px;height:28px" onerror="this.style.display='none'">
+      <span class="logo-text"><span>ZIP</span><span>SHOP</span></span>
+    </div>
+    <span style="font-size:11px;color:var(--text-muted)">Admin</span>
+  </div>
+  <div class="admin-overlay" id="admin-overlay" onclick="toggleAdminMenu()"></div>
+
+    <h1 class="admin-page-title">Devoluções</h1>
+    <p class="admin-page-sub">Analise e responda pedidos de troca/devolução dos clientes</p>
+
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-body" style="display:flex;gap:12px;flex-wrap:wrap">
+        <select class="form-input" id="filtro-status" style="width:100%;max-width:220px" onchange="filtrar()">
+          <option value="">Todos os status</option>
+          <option value="solicitado">Em análise</option>
+          <option value="aprovado">Aprovado</option>
+          <option value="rejeitado">Rejeitado</option>
+          <option value="reembolsado">Reembolsado</option>
+        </select>
+      </div>
+    </div>
+
+    <div id="lista-devolucoes">
+      <p style="text-align:center;padding:40px;color:var(--text-muted)">Carregando...</p>
+    </div>
+  </main>
+</div>
+
+<script type="module">
+import { isAdmin, supabase } from '../js/admin-guard.js';
+if (!isAdmin) throw new Error('not admin');
+
+function esc(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+}
+function formatPrice(v) { return Number(v||0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }); }
+function formatDate(d) { return new Date(d).toLocaleDateString('pt-BR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' }); }
+
+let devolucoes = [];
+
+async function carregar() {
+  const { data } = await supabase
+    .from('solicitacoes_devolucao')
+    .select('*, pedidos(id, usuario_nome, usuario_email, total)')
+    .order('criado_em', { ascending: false });
+  devolucoes = data || [];
+  filtrar();
+}
+
+window.filtrar = function() {
+  const status = document.getElementById('filtro-status').value;
+  const lista = status ? devolucoes.filter(d => d.status === status) : devolucoes;
+  renderLista(lista);
+};
+
+const badges = {
+  solicitado: 'badge-yellow',
+  aprovado: 'badge-blue',
+  rejeitado: 'badge-red',
+  reembolsado: 'badge-green'
+};
+const labels = {
+  solicitado: 'Em análise',
+  aprovado: 'Aprovado',
+  rejeitado: 'Rejeitado',
+  reembolsado: 'Reembolsado'
+};
+
+function renderLista(lista) {
+  const container = document.getElementById('lista-devolucoes');
+  if (!lista.length) {
+    container.innerHTML = '<p style="text-align:center;padding:40px;color:var(--text-muted)">Nenhuma solicitação encontrada.</p>';
+    return;
+  }
+  container.innerHTML = lista.map(d => `
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-body">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;margin-bottom:10px">
+          <div>
+            <p style="font-weight:700">Pedido #${(d.pedidos?.id||'').slice(0,8).toUpperCase()}</p>
+            <p style="font-size:12px;color:var(--text-muted)">${esc(d.pedidos?.usuario_nome||'')} · ${esc(d.pedidos?.usuario_email||'')}</p>
+            <p style="font-size:12px;color:var(--text-muted)">${formatDate(d.criado_em)}</p>
+          </div>
+          <div style="text-align:right">
+            <span class="badge ${badges[d.status]||'badge-muted'}">${labels[d.status]||d.status}</span>
+            <p style="font-weight:900;color:var(--primary);margin-top:6px">${formatPrice(d.pedidos?.total)}</p>
+          </div>
+        </div>
+        <p style="font-size:13px;margin-bottom:4px"><strong>Motivo:</strong> ${esc(d.motivo)}</p>
+        ${d.detalhes ? `<p style="font-size:13px;color:var(--text-muted);margin-bottom:10px">${esc(d.detalhes)}</p>` : ''}
+        ${d.status === 'solicitado' ? `
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
+          <button onclick="responder('${d.id}', 'aprovado')" class="btn btn-outline btn-sm">✅ Aprovar</button>
+          <button onclick="responder('${d.id}', 'rejeitado')" class="btn btn-sm" style="background:#fee2e2;color:#b91c1c;border:none">❌ Rejeitar</button>
+        </div>` : ''}
+        ${d.status === 'aprovado' ? `
+        <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
+          <button onclick="responder('${d.id}', 'reembolsado')" class="btn btn-primary btn-sm">💰 Marcar como Reembolsado (credita saldo do cliente)</button>
+        </div>` : ''}
+      </div>
+    </div>`).join('');
+}
+
+window.responder = async function(id, novoStatus) {
+  if (novoStatus === 'reembolsado' && !confirm('Isso credita o valor total do pedido como saldo pro cliente. Confirmar?')) return;
+  const { error } = await supabase.from('solicitacoes_devolucao').update({ status: novoStatus }).eq('id', id);
+  if (error) { alert('Erro ao atualizar: ' + error.message); return; }
+
+  const d = devolucoes.find(x => x.id === id);
+  if (d) {
+    fetch('/.netlify/functions/enviar-email-status', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ devolucao: d, pedido: d.pedidos, tipo: novoStatus })
+    }).catch(() => {});
+  }
+  carregar();
+};
+
+document.getElementById('btn-logout').addEventListener('click', async (e) => {
+  e.preventDefault();
+  await supabase.auth.signOut();
+  window.location.href = '../login.html';
+});
+
+carregar();
+</script>
+<script>
+function toggleAdminMenu() {
+  const sidebar = document.querySelector('.admin-sidebar');
+  const overlay = document.getElementById('admin-overlay');
+  const open = sidebar.classList.toggle('admin-sidebar-open');
+  overlay.classList.toggle('active', open);
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Textos do Site — Zipshop Admin</title>
+  <link rel="stylesheet" href="../css/style.css">
+
+<style>
+.admin-mobile-bar {
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 200;
+}
+.admin-hamburger {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 20px;
+  width: 38px;
+  height: 38px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.admin-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 299;
+}
+.admin-overlay.active { display: block; }
+@media (max-width: 900px) {
+  .admin-mobile-bar { display: flex; }
+  .admin-sidebar {
+    display: flex !important;
+    position: fixed;
+    top: 0;
+    left: -260px;
+    height: 100vh;
+    width: 240px;
+    z-index: 300;
+    transition: left 0.25s ease;
+    overflow-y: auto;
+  }
+  .admin-sidebar.admin-sidebar-open { left: 0; }
+}
+.secao-badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: var(--bg-muted);
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+.texto-row-valor {
+  font-family: monospace;
+  font-size: 13px;
+}
+</style>
+</head>
+<body>
+<div class="admin-layout">
+  <aside class="admin-sidebar">
+    <div class="admin-sidebar-logo">
+      <div class="logo">
+        <img src="../img/logo-icon.jpeg" alt="Zipshop" class="logo-img" style="width:32px;height:32px" onerror="this.style.display='none'">
+        <span class="logo-text"><span>ZIP</span><span>SHOP</span></span>
+      </div>
+      <div class="admin-sidebar-subtitle">Painel Administrativo</div>
+    </div>
+    <nav class="admin-nav">
+      <a href="index.html" class="admin-nav-item">📊 Dashboard</a>
+      <a href="produtos.html" class="admin-nav-item">📦 Produtos</a>
+      <a href="importar.html" class="admin-nav-item">🛍️ Importar da Shopee</a>
+      <a href="pedidos.html" class="admin-nav-item">🛒 Pedidos</a>
+      <a href="clientes.html" class="admin-nav-item">👥 Clientes</a>
+      <a href="categorias.html" class="admin-nav-item">🏷️ Categorias</a>
+      <a href="banners.html" class="admin-nav-item">🖼️ Banners</a>
+      <a href="textos.html" class="admin-nav-item active">📝 Textos do Site</a>
+      <a href="cupons.html" class="admin-nav-item">🎟️ Cupons</a>
+      <a href="devolucoes.html" class="admin-nav-item">↩️ Devoluções</a>
+      <a href="analytics.html" class="admin-nav-item">📈 Analytics</a>
+    </nav>
+    <div style="padding:16px;border-top:1px solid var(--border)">
+      <a href="../index.html" class="admin-nav-item" style="color:var(--text-muted)">🏪 Ver Loja</a>
+      <a href="#" id="btn-logout" class="admin-nav-item" style="color:#e53e3e">🚪 Sair</a>
+    </div>
+  </aside>
+
+  <main class="admin-main">
+  <!-- MOBILE MENU BAR -->
+  <div class="admin-mobile-bar">
+    <button class="admin-hamburger" onclick="toggleAdminMenu()" id="admin-hamburger-btn">☰</button>
+    <div class="logo" style="display:flex;align-items:center;gap:8px">
+      <img src="../img/logo-icon.jpeg" alt="Zipshop" class="logo-img" style="width:28px;height:28px" onerror="this.style.display='none'">
+      <span class="logo-text"><span>ZIP</span><span>SHOP</span></span>
+    </div>
+    <span style="font-size:11px;color:var(--text-muted)">Admin</span>
+  </div>
+  <!-- OVERLAY -->
+  <div class="admin-overlay" id="admin-overlay" onclick="toggleAdminMenu()"></div>
+
+    <h1 class="admin-page-title">📝 Textos do Site</h1>
+    <p class="admin-page-sub">Edite títulos, emojis e textos que aparecem nas páginas — sem precisar mexer em código.</p>
+
+    <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:space-between;margin-bottom:16px;align-items:center">
+      <select id="filtro-secao" class="form-input" style="max-width:220px" onchange="carregar()">
+        <option value="">Todas as seções</option>
+      </select>
+      <button class="btn btn-primary" onclick="abrirModal()">+ Novo Texto</button>
+    </div>
+
+    <div class="card">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Seção</th>
+              <th>Chave</th>
+              <th>Valor atual</th>
+              <th>Descrição</th>
+              <th>Ações</th>
+            </tr>
+          </thead>
+          <tbody id="textos-table">
+            <tr><td colspan="5" style="text-align:center;padding:24px;color:var(--text-muted)">Carregando...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- MODAL -->
+<div id="modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:1000;overflow-y:auto;padding:20px">
+  <div style="background:var(--bg-card);border-radius:16px;max-width:560px;margin:0 auto;padding:24px;position:relative">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+      <h2 style="font-size:18px;font-weight:800" id="modal-title">Novo Texto</h2>
+      <button onclick="fecharModal()" style="background:none;border:none;color:var(--text-muted);font-size:20px;cursor:pointer">✕</button>
+    </div>
+
+    <input type="hidden" id="edit-id">
+
+    <div class="form-group">
+      <label class="form-label">Chave (identificador único, sem espaços)</label>
+      <input type="text" class="form-input" id="edit-chave" placeholder="Ex: home_titulo_ofertas">
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Valor (o texto/emoji que aparece no site)</label>
+      <textarea class="form-input" id="edit-valor" rows="3" placeholder="Ex: ⚡ Ofertas do Dia"></textarea>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="form-group">
+        <label class="form-label">Seção</label>
+        <input type="text" class="form-input" id="edit-secao" placeholder="Ex: home, login, navbar">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Descrição (opcional)</label>
+        <input type="text" class="form-input" id="edit-descricao" placeholder="Onde isso aparece?">
+      </div>
+    </div>
+
+    <div style="display:flex;gap:10px;margin-top:8px">
+      <button class="btn btn-outline" onclick="fecharModal()" style="flex:1">Cancelar</button>
+      <button class="btn btn-primary" id="btn-salvar" onclick="salvarTexto()" style="flex:2">Salvar Texto</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { isAdmin, supabase } from '../js/admin-guard.js';
+if (!isAdmin) throw new Error('not admin');
+
+document.getElementById('btn-logout').addEventListener('click', async (e) => {
+  e.preventDefault();
+  await supabase.auth.signOut();
+  window.location.href = '../login.html';
+});
+
+function esc(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;');
+}
+
+async function carregarSecoes(textos) {
+  const select = document.getElementById('filtro-secao');
+  const atual = select.value;
+  const secoes = [...new Set(textos.map(t => t.secao || 'geral'))].sort();
+  select.innerHTML = '<option value="">Todas as seções</option>' +
+    secoes.map(s => `<option value="${esc(s)}">${esc(s)}</option>`).join('');
+  select.value = atual;
+}
+
+async function carregar() {
+  const { data: textos, error } = await supabase.from('textos_site').select('*').order('secao').order('chave');
+  const tbody = document.getElementById('textos-table');
+
+  if (error) {
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:24px;color:#e53e3e">Erro ao carregar: ${esc(error.message)}<br><span style="font-size:12px;color:var(--text-muted)">A tabela "textos_site" existe no Supabase? Rode o SQL primeiro.</span></td></tr>`;
+    return;
+  }
+
+  await carregarSecoes(textos || []);
+  const filtro = document.getElementById('filtro-secao').value;
+  const lista = filtro ? textos.filter(t => (t.secao || 'geral') === filtro) : textos;
+
+  if (!lista || lista.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--text-muted)">Nenhum texto cadastrado</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = lista.map(t => `
+    <tr>
+      <td><span class="secao-badge">${esc(t.secao || 'geral')}</span></td>
+      <td style="font-weight:700;font-size:12px">${esc(t.chave)}</td>
+      <td class="texto-row-valor">${esc(t.valor).slice(0, 60)}${t.valor && t.valor.length > 60 ? '…' : ''}</td>
+      <td style="font-size:12px;color:var(--text-muted)">${esc(t.descricao) || '—'}</td>
+      <td>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-outline btn-sm" onclick="openEdit(${t.id})">✏️ Editar</button>
+          <button class="btn btn-sm" style="background:#e53e3e;color:#fff" onclick="deletar(${t.id})">🗑️</button>
+        </div>
+      </td>
+    </tr>`).join('');
+}
+window.carregar = carregar;
+
+window.abrirModal = function() {
+  document.getElementById('modal-title').textContent = 'Novo Texto';
+  document.getElementById('edit-id').value = '';
+  document.getElementById('edit-chave').value = '';
+  document.getElementById('edit-chave').disabled = false;
+  document.getElementById('edit-valor').value = '';
+  document.getElementById('edit-secao').value = '';
+  document.getElementById('edit-descricao').value = '';
+  document.getElementById('modal').style.display = 'block';
+};
+
+window.fecharModal = function() {
+  document.getElementById('modal').style.display = 'none';
+};
+
+window.openEdit = async function(id) {
+  const { data: t } = await supabase.from('textos_site').select('*').eq('id', id).single();
+  if (!t) return;
+  document.getElementById('modal-title').textContent = 'Editar Texto';
+  document.getElementById('edit-id').value = t.id;
+  document.getElementById('edit-chave').value = t.chave;
+  document.getElementById('edit-chave').disabled = true; // chave não muda depois de criada
+  document.getElementById('edit-valor').value = t.valor || '';
+  document.getElementById('edit-secao').value = t.secao || '';
+  document.getElementById('edit-descricao').value = t.descricao || '';
+  document.getElementById('modal').style.display = 'block';
+};
+
+window.salvarTexto = async function() {
+  const id = document.getElementById('edit-id').value;
+  const chave = document.getElementById('edit-chave').value.trim();
+  if (!chave) { alert('Preencha a chave'); return; }
+
+  const btn = document.getElementById('btn-salvar');
+  btn.disabled = true; btn.textContent = 'Salvando...';
+
+  const dados = {
+    chave,
+    valor: document.getElementById('edit-valor').value,
+    secao: document.getElementById('edit-secao').value.trim() || 'geral',
+    descricao: document.getElementById('edit-descricao').value.trim(),
+  };
+
+  let error;
+  if (id) {
+    ({ error } = await supabase.from('textos_site').update(dados).eq('id', id));
+  } else {
+    ({ error } = await supabase.from('textos_site').insert(dados));
+  }
+
+  btn.disabled = false; btn.textContent = 'Salvar Texto';
+  if (error) { alert('Erro ao salvar: ' + error.message); return; }
+
+  fecharModal();
+  await carregar();
+
+  const toast = document.createElement('div');
+  toast.className = 'toast success show';
+  toast.textContent = 'Texto salvo!';
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 2500);
+};
+
+window.deletar = async function(id) {
+  if (!confirm('Deletar este texto? Se ele estiver em uso em alguma página, o texto padrão pode sumir do site.')) return;
+  await supabase.from('textos_site').delete().eq('id', id);
+  await carregar();
+};
+
+await carregar();
+</script>
+
+<script>
+function toggleAdminMenu() {
+  const sidebar = document.querySelector('.admin-sidebar');
+  const overlay = document.getElementById('admin-overlay');
+  const btn = document.getElementById('admin-hamburger-btn');
+  const open = sidebar.classList.toggle('admin-sidebar-open');
+  overlay.classList.toggle('active', open);
+  btn.textContent = open ? '✕' : '☰';
+}
+</script>
+</body>
+</html>

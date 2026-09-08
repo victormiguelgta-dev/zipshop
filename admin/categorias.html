@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Categorias Admin — Zipshop</title>
+  <link rel="stylesheet" href="../css/style.css">
+
+<style>
+.admin-mobile-bar {
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 200;
+}
+.admin-hamburger {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 20px;
+  width: 38px;
+  height: 38px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.admin-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 299;
+}
+.admin-overlay.active { display: block; }
+@media (max-width: 900px) {
+  .admin-mobile-bar { display: flex; }
+  .admin-sidebar {
+    display: flex !important;
+    position: fixed;
+    top: 0;
+    left: -260px;
+    height: 100vh;
+    width: 240px;
+    z-index: 300;
+    transition: left 0.25s ease;
+    overflow-y: auto;
+  }
+  .admin-sidebar.admin-sidebar-open { left: 0; }
+}
+</style>
+</head>
+<body>
+<div class="admin-layout">
+  <aside class="admin-sidebar">
+    <div class="admin-sidebar-logo">
+      <div class="logo"><img src="../img/logo-icon.jpeg" style="width:32px;height:32px" onerror="this.style.display='none'"><span class="logo-text"><span>ZIP</span><span>SHOP</span></span></div>
+      <div class="admin-sidebar-subtitle">Painel Administrativo</div>
+    </div>
+    <nav class="admin-nav">
+      <a href="index.html" class="admin-nav-item">📊 Dashboard</a>
+      <a href="produtos.html" class="admin-nav-item">📦 Produtos</a>
+      <a href="importar.html" class="admin-nav-item">🛍️ Importar da Shopee</a>
+      <a href="pedidos.html" class="admin-nav-item">🛒 Pedidos</a>
+      <a href="clientes.html" class="admin-nav-item">👥 Clientes</a>
+      <a href="categorias.html" class="admin-nav-item active">🏷️ Categorias</a>
+      <a href="banners.html" class="admin-nav-item">🖼️ Banners</a>
+      <a href="textos.html" class="admin-nav-item">📝 Textos do Site</a>
+      <a href="cupons.html" class="admin-nav-item">🎟️ Cupons</a>
+      <a href="devolucoes.html" class="admin-nav-item">↩️ Devoluções</a>
+      <a href="analytics.html" class="admin-nav-item">📈 Analytics</a>
+    </nav>
+    <div style="padding:16px;border-top:1px solid var(--border)">
+      <a href="../index.html" class="admin-nav-item" style="color:var(--text-muted)">🏪 Ver Loja</a>
+    </div>
+  </aside>
+
+  <main class="admin-main">
+  <!-- MOBILE MENU BAR -->
+  <div class="admin-mobile-bar">
+    <button class="admin-hamburger" onclick="toggleAdminMenu()" id="admin-hamburger-btn">☰</button>
+    <div class="logo" style="display:flex;align-items:center;gap:8px">
+      <img src="../img/logo-icon.jpeg" alt="Zipshop" class="logo-img" style="width:28px;height:28px" onerror="this.style.display='none'">
+      <span class="logo-text"><span>ZIP</span><span>SHOP</span></span>
+    </div>
+    <span style="font-size:11px;color:var(--text-muted)">Admin</span>
+  </div>
+  <!-- OVERLAY -->
+  <div class="admin-overlay" id="admin-overlay" onclick="toggleAdminMenu()"></div>
+
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px">
+      <div>
+        <h1 class="admin-page-title">Categorias</h1>
+        <p class="admin-page-sub">Gerencie as categorias de produtos</p>
+      </div>
+      <button class="btn btn-primary" onclick="abrirModal()">+ Nova Categoria</button>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:16px" id="cat-grid">
+      <div style="text-align:center;padding:40px;color:var(--text-muted);grid-column:1/-1">Carregando...</div>
+    </div>
+  </main>
+</div>
+
+<!-- MODAL -->
+<div id="modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;align-items:center;justify-content:center;padding:16px">
+  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:20px;padding:28px;width:100%;max-width:440px;max-height:90vh;overflow-y:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+      <h2 id="modal-title" style="font-size:18px;font-weight:900">Nova Categoria</h2>
+      <button onclick="fecharModal()" style="background:none;border:none;color:var(--text-muted);font-size:20px;cursor:pointer">✕</button>
+    </div>
+    <input type="hidden" id="edit-id">
+
+    <!-- FOTO -->
+    <div class="form-group">
+      <label class="form-label">Foto da Categoria</label>
+      <div id="foto-preview" onclick="document.getElementById('foto-input').click()"
+        style="width:100%;height:140px;border:2px dashed var(--border);border-radius:12px;display:flex;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;background:var(--bg-muted);margin-bottom:6px">
+        <span id="foto-placeholder" style="color:var(--text-muted);font-size:13px;text-align:center">📷<br>Clique para adicionar foto</span>
+        <img id="foto-img" src="" style="display:none;width:100%;height:100%;object-fit:cover">
+      </div>
+      <input type="file" id="foto-input" accept="image/*" style="display:none" onchange="previewFoto(this)">
+      <p style="font-size:12px;color:var(--text-muted)">Recomendado: 400x300px, JPG ou PNG</p>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Nome *</label>
+      <input type="text" class="form-input" id="edit-name" placeholder="Ex: Smartphones">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Emoji</label>
+      <input type="text" class="form-input" id="edit-emoji" placeholder="📱" maxlength="4">
+    </div>
+
+    <div id="upload-progress" style="display:none;margin-bottom:12px">
+      <p style="font-size:13px;color:var(--primary)">Enviando foto...</p>
+      <div style="background:var(--bg-muted);border-radius:4px;height:6px">
+        <div id="progress-bar" style="background:var(--primary);height:6px;border-radius:4px;width:0%;transition:width 0.3s"></div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:10px">
+      <button class="btn btn-outline" onclick="fecharModal()" style="flex:1">Cancelar</button>
+      <button class="btn btn-primary" id="btn-salvar" onclick="salvar()" style="flex:1">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { isAdmin, supabase } from '../js/admin-guard.js';
+if (!isAdmin) throw new Error('acesso negado');
+
+let fotoFile = null;
+
+window.previewFoto = function(input) {
+  fotoFile = input.files[0];
+  if (!fotoFile) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    document.getElementById('foto-img').src = e.target.result;
+    document.getElementById('foto-img').style.display = 'block';
+    document.getElementById('foto-placeholder').style.display = 'none';
+  };
+  reader.readAsDataURL(fotoFile);
+};
+
+async function uploadFoto(file, nome) {
+  document.getElementById('upload-progress').style.display = 'block';
+  document.getElementById('progress-bar').style.width = '40%';
+  const ext = file.name.split('.').pop();
+  const nomeSeguro = nome.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9]/g, '-').toLowerCase();
+  const fileName = `categorias/${nomeSeguro}-${Date.now()}.${ext}`;
+  const { error } = await supabase.storage.from('Produtos').upload(fileName, file, { upsert: true });
+  document.getElementById('progress-bar').style.width = '100%';
+  setTimeout(() => document.getElementById('upload-progress').style.display = 'none', 500);
+  if (error) { alert('Erro no upload: ' + error.message); return null; }
+  const { data } = supabase.storage.from('Produtos').getPublicUrl(fileName);
+  return data.publicUrl;
+}
+
+async function carregar() {
+  const { data: cats } = await supabase.from('categorias').select('*').order('name');
+  const { data: produtos } = await supabase.from('produtos').select('category');
+
+  const contagem = {};
+  (produtos||[]).forEach(p => { contagem[p.category] = (contagem[p.category]||0) + 1; });
+
+  const grid = document.getElementById('cat-grid');
+  if (!cats?.length) {
+    grid.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-muted);grid-column:1/-1">Nenhuma categoria cadastrada</div>';
+    return;
+  }
+
+  grid.innerHTML = cats.map(c => `
+    <div class="card" style="overflow:hidden">
+      <div style="height:140px;overflow:hidden;position:relative;background:linear-gradient(135deg,#1e3a6e,#2563eb)">
+        ${c.image_url
+          ? `<img src="${c.image_url}" style="width:100%;height:100%;object-fit:cover">`
+          : `<div style="display:flex;align-items:center;justify-content:center;height:100%;font-size:52px">${c.emoji||'📦'}</div>`
+        }
+        <span class="badge ${c.ativo ? 'badge-green' : 'badge-muted'}" style="position:absolute;top:10px;right:10px">${c.ativo ? 'Ativa' : 'Inativa'}</span>
+      </div>
+      <div class="card-body">
+        <div style="font-size:16px;font-weight:900;margin-bottom:4px">${c.name}</div>
+        <div style="font-size:13px;color:var(--text-muted);margin-bottom:16px">${contagem[c.name]||0} produto(s)</div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-outline btn-sm" onclick="editar(${c.id})">✏️ Editar</button>
+          <button class="btn btn-sm" style="background:#fee2e2;color:#b91c1c;border:none" onclick="deletar(${c.id})">🗑️</button>
+          <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;margin-left:auto">
+            <input type="checkbox" ${c.ativo?'checked':''} onchange="toggleAtivo(${c.id}, this.checked)">
+            Ativa
+          </label>
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+window.abrirModal = function() {
+  document.getElementById('modal-title').textContent = 'Nova Categoria';
+  document.getElementById('edit-id').value = '';
+  document.getElementById('edit-name').value = '';
+  document.getElementById('edit-emoji').value = '';
+  document.getElementById('foto-img').style.display = 'none';
+  document.getElementById('foto-placeholder').style.display = 'block';
+  document.getElementById('foto-input').value = '';
+  fotoFile = null;
+  document.getElementById('modal').style.display = 'flex';
+};
+
+window.fecharModal = function() {
+  document.getElementById('modal').style.display = 'none';
+};
+
+window.editar = async function(id) {
+  const { data: c } = await supabase.from('categorias').select('*').eq('id', id).single();
+  if (!c) return;
+  document.getElementById('modal-title').textContent = 'Editar Categoria';
+  document.getElementById('edit-id').value = c.id;
+  document.getElementById('edit-name').value = c.name;
+  document.getElementById('edit-emoji').value = c.emoji||'';
+  if (c.image_url) {
+    document.getElementById('foto-img').src = c.image_url;
+    document.getElementById('foto-img').style.display = 'block';
+    document.getElementById('foto-placeholder').style.display = 'none';
+  } else {
+    document.getElementById('foto-img').style.display = 'none';
+    document.getElementById('foto-placeholder').style.display = 'block';
+  }
+  fotoFile = null;
+  document.getElementById('modal').style.display = 'flex';
+};
+
+window.salvar = async function() {
+  const nome = document.getElementById('edit-name').value.trim();
+  if (!nome) { alert('Digite o nome da categoria'); return; }
+  const btn = document.getElementById('btn-salvar');
+  btn.disabled = true; btn.textContent = 'Salvando...';
+
+  let imageUrl = null;
+  if (fotoFile) imageUrl = await uploadFoto(fotoFile, nome);
+
+  const dados = {
+    name: nome,
+    emoji: document.getElementById('edit-emoji').value || '📦',
+    ativo: true,
+    ...(imageUrl ? { image_url: imageUrl } : {})
+  };
+
+  const id = document.getElementById('edit-id').value;
+  let error;
+  if (id) {
+    ({ error } = await supabase.from('categorias').update(dados).eq('id', id));
+  } else {
+    ({ error } = await supabase.from('categorias').insert(dados));
+  }
+
+  btn.disabled = false; btn.textContent = 'Salvar';
+  if (error) { alert('Erro: ' + error.message); return; }
+  fecharModal();
+  await carregar();
+  const t = document.createElement('div');
+  t.className = 'toast success show';
+  t.textContent = 'Categoria salva!';
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 2500);
+};
+
+window.toggleAtivo = async (id, ativo) => {
+  await supabase.from('categorias').update({ ativo }).eq('id', id);
+  await carregar();
+};
+
+window.deletar = async (id) => {
+  if (!confirm('Deletar esta categoria?')) return;
+  await supabase.from('categorias').delete().eq('id', id);
+  await carregar();
+};
+
+carregar();
+</script>
+
+<script>
+function toggleAdminMenu() {
+  const sidebar = document.querySelector('.admin-sidebar');
+  const overlay = document.getElementById('admin-overlay');
+  const btn = document.getElementById('admin-hamburger-btn');
+  const open = sidebar.classList.toggle('admin-sidebar-open');
+  overlay.classList.toggle('active', open);
+  btn.textContent = open ? '✕' : '☰';
+}
+</script>
+</body>
+</html>

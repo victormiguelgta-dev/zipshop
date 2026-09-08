@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<link rel="preconnect" href="https://kkliwdphrdbguclsvxcw.supabase.co">
+<link rel="dns-prefetch" href="https://kkliwdphrdbguclsvxcw.supabase.co">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="base" content="">
+  <title>Produto — Zipshop</title>
+  <meta name="description" content="Confira esse produto na Zipshop, a loja de eletrônicos mais rápida do Brasil.">
+  <meta property="og:type" content="product">
+  <meta property="og:site_name" content="Zipshop">
+  <meta property="og:image" content="https://zipshop01.netlify.app/img/logo-icon.jpeg">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="navbar"></div>
+<div id="content"></div>
+<div id="footer"></div>
+
+<script src="js/cart.js"></script>
+<script src="js/main.js"></script>
+<script type="module">
+function esc(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+import { supabase } from './js/supabase-config.js';
+import { getProduct, formatPrice, starsHTML } from './js/data.js';
+import { getFavoritosIds, toggleFavorito } from './js/favoritos.js';
+import { registrarEvento } from './js/analytics.js';
+
+const id = new URLSearchParams(location.search).get('id');
+let qty = 1;
+let _corSelecionada = null;
+
+async function render() {
+  const p = await getProduct(id);
+  window._produto = p;
+  registrarEvento('visualizacao_produto', { produtoId: p.id });
+  if (!p) {
+    document.getElementById('content').innerHTML = `<div style="text-align:center;padding:80px 16px"><p style="font-size:48px">😕</p><h2 style="margin:16px 0 8px">Produto não encontrado</h2><a href="produtos.html" class="btn btn-primary">Ver Produtos</a></div>`;
+    return;
+  }
+  document.title = p.name + ' — Zipshop';
+  const specs = Object.entries(p.specs || {}).map(([k, v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join('');
+
+  // Cores (se o produto tiver variações)
+  const cores = p.cores || [];
+
+  // Galeria: imagem de capa (image_url) + fotos extras (imagens).
+  // Sempre mostra pelo menos a capa como primeira miniatura.
+  const galeria = [
+    ...(p.image_url ? [{ url: p.image_url, thumb: p.image_thumb_url || p.image_url }] : []),
+    ...(Array.isArray(p.imagens) ? p.imagens : [])
+  ];
+  const galeriaHTML = galeria.length > 1 ? `
+    <div style="display:flex;gap:8px;margin-top:10px;overflow-x:auto;padding-bottom:4px">
+      ${galeria.map((img, i) => `
+        <button onclick="trocarFotoGaleria('${(img.url||'').replace(/'/g,"\\'")}', this)"
+          style="flex-shrink:0;width:64px;height:64px;border-radius:10px;overflow:hidden;padding:0;cursor:pointer;background:var(--bg-muted);border:2px solid ${i===0 ? 'var(--primary)' : 'var(--border)'}">
+          <img src="${img.thumb || img.url}" loading="lazy" style="width:100%;height:100%;object-fit:cover">
+        </button>`).join('')}
+    </div>` : '';
+
+  const temControleEstoque = p.stock !== null && p.stock !== undefined;
+  const semEstoque = temControleEstoque && p.stock <= 0;
+  let estoqueHTML = '';
+  if (semEstoque) {
+    estoqueHTML = `<p style="font-size:13px;color:#ef4444;font-weight:700;margin-bottom:16px">❌ Fora de estoque no momento</p>`;
+  } else if (temControleEstoque && p.stock <= 5) {
+    estoqueHTML = `<p style="font-size:13px;color:#f59e0b;font-weight:700;margin-bottom:16px">⚠️ Últimas ${p.stock} unidades!</p>`;
+  } else {
+    estoqueHTML = `<div style="margin-bottom:16px"></div>`;
+  }
+
+  const coresHTML = cores.length ? `
+    <div style="margin-bottom:20px">
+      <div class="detail-label" style="margin-bottom:8px">Cor</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap" id="cores-container">
+        ${cores.map((c, i) => `
+          <button onclick="selecionarCor('${esc(c.nome)}', this)"
+            style="display:flex;align-items:center;gap:6px;padding:6px 14px;border:2px solid var(--border);border-radius:20px;background:none;cursor:pointer;font-size:13px;color:var(--text);transition:border-color .2s"
+            id="cor-${i}">
+            ${c.hex ? `<span style="width:14px;height:14px;border-radius:50%;background:${c.hex};border:1px solid rgba(255,255,255,.2);flex-shrink:0"></span>` : ''}
+            ${esc(c.nome)}
+          </button>`).join('')}
+      </div>
+    </div>` : '';
+
+  document.getElementById('content').innerHTML = `
+    <div class="page-hero" style="padding:16px">
+      <div class="container">
+        <div class="breadcrumb">
+          <a href="index.html">Home</a><span>/</span>
+          <a href="produtos.html">Produtos</a><span>/</span>
+          <a href="produtos.html?cat=${encodeURIComponent(p.category)}">${p.category}</a><span>/</span>
+          <span>${p.name}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="detail-layout">
+      <div>
+        <div class="detail-img" id="detail-img-wrap" style="background:linear-gradient(135deg,#1e3a6e,#2563eb);${p.image_url ? 'cursor:zoom-in' : ''}" ${p.image_url ? `onclick="abrirImagemCheia(document.getElementById('detail-main-img').src)"` : ''}>
+          ${p.image_url ? `<img id="detail-main-img" src="${p.image_url}" style="width:100%;height:100%;object-fit:cover;border-radius:12px">` : `<span style="font-size:140px">${p.emoji}</span>`}
+        </div>
+        ${galeriaHTML}
+        <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+          <div style="background:var(--bg-card);border:2px solid var(--primary);border-radius:10px;padding:8px;width:70px;height:70px;display:flex;align-items:center;justify-content:center;font-size:32px;overflow:hidden">${p.image_url ? `<img src="${p.image_url}" style="width:100%;height:100%;object-fit:cover;border-radius:6px">` : p.emoji}</div>
+        </div>
+      </div>
+      <div>
+        <div style="font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">${p.brand}</div>
+        <h1 class="detail-title">${p.name}</h1>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
+          <span class="stars">${starsHTML(p.rating)}</span>
+          <span class="stars-count">(${p.reviews} avaliações)</span>
+          ${p.discount ? `<span class="badge badge-red">-${p.discount}%</span>` : ''}
+        </div>
+        ${p.oldPrice ? `<div class="detail-price-old">${formatPrice(p.oldPrice)}</div>` : ''}
+        <div class="detail-price">${formatPrice(p.price)}</div>
+        <div class="detail-installment">ou 12x de ${formatPrice(p.price/12)} sem juros</div>
+        ${p.cashback_percentual > 0 ? `<div style="display:inline-flex;align-items:center;gap:6px;background:rgba(170,239,0,0.12);border:1px solid var(--primary);color:var(--primary);font-size:12px;font-weight:700;padding:5px 10px;border-radius:20px;margin-top:8px">💰 Receba ${formatPrice(p.price * p.cashback_percentual / 100)} de volta em saldo</div>` : ''}
+        <hr class="detail-divider">
+        <div style="background:rgba(170,239,0,.07);border:1px solid rgba(170,239,0,.2);border-radius:12px;padding:12px 16px;margin-bottom:20px;font-size:13px;display:flex;align-items:center;gap:8px">
+          ⚡ <strong>Entrega amanhã</strong> — Peça em até 3h para garantir.
+        </div>
+
+        ${coresHTML}
+
+        <div class="detail-label">Quantidade</div>
+        <div class="qty-control" style="margin-bottom:8px">
+          <button class="qty-btn" onclick="changeQty(-1)">−</button>
+          <span class="qty-num" id="qty-display">1</span>
+          <button class="qty-btn" onclick="changeQty(1)">+</button>
+        </div>
+        ${estoqueHTML}
+        <div style="display:flex;gap:12px;margin-bottom:24px;flex-wrap:wrap">
+          <button class="btn btn-primary btn-lg" style="flex:1" onclick="doAddToCart(event)" ${semEstoque ? 'disabled style="opacity:.5;cursor:not-allowed"' : ''}>🛒 Adicionar ao Carrinho</button>
+          <a href="carrinho.html" class="btn btn-outline btn-lg" onclick="${semEstoque ? 'event.preventDefault()' : 'doAddToCart(event)'}" ${semEstoque ? 'style="opacity:.5;cursor:not-allowed;pointer-events:none"' : ''}>⚡ Comprar Agora</a>
+          <button id="btn-fav-detalhe" onclick="toggleFavoritoDetalhe(${p.id})" class="btn btn-outline btn-lg" style="width:52px;flex:0" aria-label="Favoritar">🤍</button>
+        </div>
+        <div style="display:flex;gap:16px;flex-wrap:wrap">
+          <span style="font-size:13px;color:var(--text-muted)">🔒 Compra 100% segura</span>
+          <span style="font-size:13px;color:var(--text-muted)">🔄 30 dias para troca</span>
+          <span style="font-size:13px;color:var(--text-muted)">🛡️ Garantia ${p.garantia || '12 meses'}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- TABS -->
+    <div style="max-width:1200px;margin:0 auto;padding:0 16px 32px">
+      <div style="display:flex;border-bottom:1px solid var(--border);margin-bottom:24px;gap:0">
+        <button onclick="showTab('desc')" id="tab-desc" style="padding:12px 20px;background:none;border:none;border-bottom:2px solid var(--primary);color:var(--primary);font-weight:700;cursor:pointer;font-size:14px">Descrição</button>
+        <button onclick="showTab('specs')" id="tab-specs" style="padding:12px 20px;background:none;border:none;border-bottom:2px solid transparent;color:var(--text-muted);cursor:pointer;font-size:14px">Especificações</button>
+        <button onclick="showTab('avaliacoes')" id="tab-avaliacoes" style="padding:12px 20px;background:none;border:none;border-bottom:2px solid transparent;color:var(--text-muted);cursor:pointer;font-size:14px">Avaliações</button>
+      </div>
+      <div id="pane-desc">
+        <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:24px">
+          <p style="color:var(--text-muted);line-height:1.8">${p.desc}</p>
+        </div>
+      </div>
+      <div id="pane-specs" style="display:none">
+        <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:24px">
+          <table class="spec-table">${specs}</table>
+        </div>
+      </div>
+      <div id="pane-avaliacoes" style="display:none">
+        <div id="avaliacoes-content">
+          <div style="padding:40px;text-align:center;color:var(--text-muted)">Carregando avaliações...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PRODUTOS RELACIONADOS (vinculados no admin) -->
+    <div id="relacionados-section" style="max-width:1200px;margin:0 auto;padding:0 16px 32px;display:none">
+      <h2 style="font-size:18px;font-weight:900;margin-bottom:16px">🔗 Produtos Relacionados</h2>
+      <div id="relacionados-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px"></div>
+    </div>
+
+    <!-- VOCÊ TAMBÉM PODE GOSTAR (mesma categoria) -->
+    <div id="tbm-section" style="max-width:1200px;margin:0 auto;padding:0 16px 64px;display:none">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+        <div style="flex:1;height:1px;background:var(--border)"></div>
+        <h2 style="font-size:16px;font-weight:900;white-space:nowrap">Você Também Pode Gostar</h2>
+        <div style="flex:1;height:1px;background:var(--border)"></div>
+      </div>
+      <div id="tbm-grid" style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px"></div>
+    </div>`;
+
+  // Carrega avaliações, relacionados e "tbm pode gostar" em paralelo
+  carregarAvaliacoes(p);
+  carregarRelacionados(p);
+  carregarTbmPodeGostar(p);
+
+  getFavoritosIds().then(favs => {
+    const btn = document.getElementById('btn-fav-detalhe');
+    if (btn && favs.has(p.id)) btn.textContent = '💚';
+  });
+}
+
+window.toggleFavoritoDetalhe = async function(produtoId) {
+  const r = await toggleFavorito(produtoId);
+  if (r.precisaLogin) { window.location.href = 'login.html'; return; }
+  const btn = document.getElementById('btn-fav-detalhe');
+  if (btn) btn.textContent = r.favoritado ? '💚' : '🤍';
+}
+
+// ——— CORES ———
+window.trocarFotoGaleria = function(url, btn) {
+  document.getElementById('detail-main-img').src = url;
+  btn.parentElement.querySelectorAll('button').forEach(b => b.style.borderColor = 'var(--border)');
+  btn.style.borderColor = 'var(--primary)';
+};
+
+// Lightbox: abre a foto do produto em tela cheia ao clicar nela
+window.abrirImagemCheia = function(url) {
+  const overlay = document.createElement('div');
+  overlay.id = 'lightbox-overlay';
+  overlay.style = 'position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:300;display:flex;align-items:center;justify-content:center;padding:16px;cursor:zoom-out';
+  overlay.onclick = fecharImagemCheia;
+  overlay.innerHTML = `
+    <button onclick="fecharImagemCheia()" style="position:absolute;top:16px;right:16px;background:rgba(255,255,255,.1);border:none;color:#fff;width:38px;height:38px;border-radius:50%;font-size:20px;cursor:pointer;z-index:1">✕</button>
+    <img src="${url}" style="max-width:100%;max-height:100%;object-fit:contain;border-radius:8px" onclick="event.stopPropagation()">`;
+  document.body.appendChild(overlay);
+  document.body.style.overflow = 'hidden';
+};
+window.fecharImagemCheia = function() {
+  const overlay = document.getElementById('lightbox-overlay');
+  if (overlay) overlay.remove();
+  document.body.style.overflow = '';
+};
+
+window.selecionarCor = function(nome, btn) {
+  _corSelecionada = nome;
+  document.querySelectorAll('#cores-container button').forEach(b => {
+    b.style.borderColor = 'var(--border)';
+    b.style.color = 'var(--text)';
+  });
+  btn.style.borderColor = 'var(--primary)';
+  btn.style.color = 'var(--primary)';
+};
+
+// ——— AVALIAÇÕES ———
+async function carregarAvaliacoes(p) {
+  const { data: avaliacoes } = await supabase
+    .from('avaliacoes')
+    .select('*, usuarios(nome)')
+    .eq('produto_id', p.id)
+    .order('created_at', { ascending: false });
+
+  const { data: { session: _sessAval } } = await supabase.auth.getSession();
+  const user = _sessAval?.user || null;
+  const jaAvaliou = avaliacoes?.some(a => a.usuario_id === user?.id);
+
+  const totalAv = avaliacoes?.length || 0;
+  const mediaAv = totalAv ? (avaliacoes.reduce((s, a) => s + a.nota, 0) / totalAv).toFixed(1) : '-';
+
+  const formAvaliar = user && !jaAvaliou ? `
+    <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:20px">
+      <p style="font-weight:700;margin-bottom:12px">⭐ Deixe sua avaliação</p>
+      <div style="display:flex;gap:8px;margin-bottom:12px" id="estrelas-form">
+        ${[1,2,3,4,5].map(n => `<button onclick="selecionarNota(${n})" id="star-${n}"
+          style="font-size:28px;background:none;border:none;cursor:pointer;opacity:.4;transition:opacity .15s">💚</button>`).join('')}
+      </div>
+      <textarea id="av-texto" class="form-input" rows="3" placeholder="Conte sua experiência com o produto..." style="resize:vertical;margin-bottom:12px"></textarea>
+      <button class="btn btn-primary" onclick="enviarAvaliacao('${p.id}')">Enviar Avaliação</button>
+    </div>` : (user && jaAvaliou
+      ? `<div style="background:rgba(170,239,0,0.06);border:1px solid rgba(170,239,0,0.25);border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:13px">✅ Você já avaliou este produto.</div>`
+      : `<div style="background:var(--bg-muted);border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:13px;color:var(--text-muted)"><a href="login.html" style="color:var(--primary);font-weight:700">Faça login</a> para avaliar este produto.</div>`);
+
+  const listaHTML = totalAv ? avaliacoes.map(a => `
+    <div style="border-bottom:1px solid var(--border);padding:16px 0">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-weight:700;font-size:13px">${esc(a.usuarios?.nome || 'Usuário')}</span>
+          <span style="color:#facc15;font-size:16px">${'★'.repeat(a.nota)}${'☆'.repeat(5 - a.nota)}</span>
+        </div>
+        <span style="font-size:11px;color:var(--text-muted)">${new Date(a.created_at).toLocaleDateString('pt-BR')}</span>
+      </div>
+      ${a.texto ? `<p style="font-size:13px;color:var(--text-muted);line-height:1.6">${esc(a.texto)}</p>` : ''}
+    </div>`).join('')
+    : `<p style="color:var(--text-muted);font-size:13px;padding:16px 0">Nenhuma avaliação ainda. Seja o primeiro!</p>`;
+
+  document.getElementById('avaliacoes-content').innerHTML = `
+    <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:24px">
+      <div style="display:flex;align-items:center;gap:16px;margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid var(--border)">
+        <div style="text-align:center">
+          <p style="font-size:48px;font-weight:900;line-height:1;color:var(--primary)">${mediaAv}</p>
+          <p style="color:#facc15;font-size:20px">${mediaAv !== '-' ? '★'.repeat(Math.round(Number(mediaAv))) + '☆'.repeat(5 - Math.round(Number(mediaAv))) : '☆☆☆☆☆'}</p>
+          <p style="font-size:12px;color:var(--text-muted)">${totalAv} avaliação${totalAv !== 1 ? 'ões' : ''}</p>
+        </div>
+      </div>
+      ${formAvaliar}
+      ${listaHTML}
+    </div>`;
+}
+
+let _notaSelecionada = 0;
+window.selecionarNota = function(n) {
+  _notaSelecionada = n;
+  [1,2,3,4,5].forEach(i => {
+    document.getElementById('star-' + i).style.opacity = i <= n ? '1' : '.3';
+  });
+};
+
+window.enviarAvaliacao = async function(produtoId) {
+  if (!_notaSelecionada) { showToast('Selecione uma nota de 1 a 5 ★', 'error'); return; }
+  const texto = document.getElementById('av-texto').value.trim();
+  const { data: { session: _sessEnviar } } = await supabase.auth.getSession();
+  const user = _sessEnviar?.user || null;
+  if (!user) { showToast('Faça login para avaliar', 'error'); return; }
+
+  const btn = document.querySelector('#avaliacoes-content .btn-primary');
+  btn.disabled = true; btn.textContent = 'Enviando...';
+
+  const { error } = await supabase.from('avaliacoes').insert({
+    produto_id: produtoId,
+    usuario_id: user.id,
+    nota: _notaSelecionada,
+    texto
+  });
+
+  if (error) { btn.disabled = false; btn.textContent = 'Enviar Avaliação'; showToast('Erro ao enviar avaliação.', 'error'); return; }
+  showToast('Avaliação enviada! Obrigado 🙏', 'success');
+  carregarAvaliacoes(window._produto);
+};
+
+// ——— HELPER: card mini estilo AliExpress ———
+function miniCard(r) {
+  const preco = formatPrice(parseFloat(r.price));
+  const rating = r.rating ? r.rating.toFixed(1) : '5.0';
+  const vendidos = r.reviews || 0;
+  const vendidosStr = vendidos >= 1000 ? (vendidos/1000).toFixed(1)+'mil' : vendidos;
+  return `
+    <a href="produto.html?id=${r.id}" style="text-decoration:none;display:flex;flex-direction:column;background:var(--bg-card);border:1px solid var(--border);border-radius:12px;overflow:hidden;transition:border-color .2s" onmouseover="this.style.borderColor='var(--primary)'" onmouseout="this.style.borderColor='var(--border)'">
+      <div style="aspect-ratio:1;background:#fff;display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative">
+        ${r.discount ? `<div style="position:absolute;top:6px;left:6px;background:#e53e3e;color:#fff;font-size:10px;font-weight:900;padding:2px 6px;border-radius:5px">-${r.discount}%</div>` : ''}
+        ${r.image_url
+          ? `<img src="${r.image_thumb_url || r.image_url}" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:contain;padding:6px">`
+          : `<span style="font-size:52px">${r.emoji || '📦'}</span>`}
+      </div>
+      <div style="padding:8px">
+        <div style="font-size:12px;font-weight:600;color:var(--text);line-height:1.3;margin-bottom:5px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${esc(r.name)}</div>
+        <div style="display:flex;align-items:center;gap:5px;margin-bottom:5px">
+          <span style="display:inline-flex;align-items:center;gap:2px;background:#1a1a00;border:1px solid rgba(250,204,21,.25);border-radius:5px;padding:1px 6px;font-size:11px;font-weight:700;color:#facc15">★ ${rating}</span>
+          ${vendidos ? `<span style="font-size:11px;color:var(--text-muted)">${vendidosStr}+ vendido(s)</span>` : ''}
+        </div>
+        <div style="font-size:15px;font-weight:900;color:var(--primary)">${preco}</div>
+        ${r.old_price ? `<div style="font-size:11px;color:var(--text-muted);text-decoration:line-through">${formatPrice(parseFloat(r.old_price))}</div>` : ''}
+      </div>
+    </a>`;
+}
+
+// ——— PRODUTOS RELACIONADOS (vinculados no admin) ———
+async function carregarRelacionados(p) {
+  const ids = p.relacionados_ids || [];
+  if (!ids.length) return;
+
+  const { data: relacionados } = await supabase
+    .from('produtos')
+    .select('*')
+    .in('id', ids)
+    .eq('ativo', true);
+
+  if (!relacionados?.length) return;
+
+  document.getElementById('relacionados-section').style.display = 'block';
+  document.getElementById('relacionados-grid').innerHTML = relacionados.map(r => miniCard(r)).join('');
+}
+
+// ——— VOCÊ TAMBÉM PODE GOSTAR (mesma categoria, exceto o atual) ———
+async function carregarTbmPodeGostar(p) {
+  const { data: similares } = await supabase
+    .from('produtos')
+    .select('*')
+    .eq('category', p.category)
+    .eq('ativo', true)
+    .neq('id', p.id)
+    .limit(6);
+
+  if (!similares?.length) return;
+
+  document.getElementById('tbm-section').style.display = 'block';
+  document.getElementById('tbm-grid').innerHTML = similares.map(r => miniCard(r)).join('');
+}
+
+window.changeQty = function(dir) {
+  const max = (window._produto?.stock !== null && window._produto?.stock !== undefined) ? window._produto.stock : Infinity;
+  qty = Math.max(1, Math.min(qty + dir, max || 1));
+  document.getElementById('qty-display').textContent = qty;
+};
+
+window.doAddToCart = function(event) {
+  if (window._produto) {
+    const prodComCor = _corSelecionada
+      ? { ...window._produto, name: window._produto.name + ' — ' + _corSelecionada }
+      : window._produto;
+    addToCart(prodComCor.id, qty, prodComCor, event);
+  }
+};
+
+window.showTab = function(tab) {
+  ['desc','specs','avaliacoes'].forEach(t => {
+    document.getElementById('pane-' + t).style.display = t === tab ? 'block' : 'none';
+    document.getElementById('tab-' + t).style.borderBottomColor = t === tab ? 'var(--primary)' : 'transparent';
+    document.getElementById('tab-' + t).style.color = t === tab ? 'var(--primary)' : 'var(--text-muted)';
+  });
+  if (tab === 'avaliacoes') carregarAvaliacoes(window._produto);
+};
+
+render();
+</script>
+</body>
+</html>

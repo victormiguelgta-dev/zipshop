@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<link rel="preconnect" href="https://kkliwdphrdbguclsvxcw.supabase.co">
+<link rel="dns-prefetch" href="https://kkliwdphrdbguclsvxcw.supabase.co">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="base" content="">
+  <title>Produtos — Zipshop</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="navbar"></div>
+
+<div class="page-hero">
+  <div class="container">
+    <div class="breadcrumb"><a href="index.html">Home</a><span>/</span><span>Produtos</span></div>
+    <h1>Produtos</h1>
+  </div>
+</div>
+
+<div class="products-layout">
+  <!-- FILTROS -->
+  <aside>
+    <div class="filter-panel">
+      <button type="button" id="filter-toggle" onclick="toggleFiltros()" style="display:flex;align-items:center;justify-content:space-between;width:100%;background:none;border:none;color:var(--text);cursor:pointer;padding:0">
+        <span style="display:flex;align-items:center;gap:8px;font-size:14px;font-weight:900">🎛️ Filtros</span>
+        <span id="filter-chevron" style="transition:transform .2s">▾</span>
+      </button>
+      <div id="filter-body" style="display:none;margin-top:14px">
+        <div class="filter-section">
+          <p class="filter-section-title">Categorias</p>
+          <div id="cat-filters" class="filter-options-grid"></div>
+        </div>
+        <div class="filter-section">
+          <p class="filter-section-title">Marcas</p>
+          <div id="brand-filters" class="filter-options-grid"></div>
+        </div>
+        <div class="filter-section">
+          <p class="filter-section-title">Faixa de Preço</p>
+          <input type="range" id="price-range" min="0" max="15000" value="15000" style="width:100%;accent-color:var(--primary)" oninput="applyFilters()">
+          <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-muted);margin-top:4px">
+            <span>R$ 0</span><span id="max-price-label">R$ 15.000</span>
+          </div>
+        </div>
+        <button class="btn btn-outline btn-full btn-sm" onclick="clearFilters()">Limpar Filtros</button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- PRODUCTS -->
+  <div>
+    <div class="products-header">
+      <div>
+        <input type="text" id="search-prod" class="form-input" style="width:100%;max-width:280px;padding:8px 14px" placeholder="Buscar nos resultados..." oninput="applyFilters()">
+      </div>
+      <div style="display:flex;align-items:center;gap:12px">
+        <span class="products-count" id="count-label">10 produtos encontrados</span>
+        <select class="products-sort" id="sort-select" onchange="applyFilters()">
+          <option value="relevance">Mais relevantes</option>
+          <option value="price-asc">Menor preço</option>
+          <option value="price-desc">Maior preço</option>
+          <option value="rating">Melhor avaliados</option>
+        </select>
+      </div>
+    </div>
+    <div class="product-grid" id="products-grid"></div>
+    <div id="empty-msg" style="display:none;text-align:center;padding:60px 16px;color:var(--text-muted)">
+      <p style="font-size:48px">🔍</p>
+      <p style="font-size:18px;font-weight:700;margin-top:12px">Nenhum produto encontrado</p>
+      <p style="margin-top:4px">Tente outros filtros ou termos de busca.</p>
+    </div>
+  </div>
+</div>
+
+<div id="footer"></div>
+
+<script src="js/cart.js"></script>
+<script src="js/main.js"></script>
+<script type="module">
+function esc(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+import { loadProducts, formatPrice, starsHTML, loadSinonimos } from './js/data.js';
+import { getFavoritosIds, toggleFavorito } from './js/favoritos.js';
+
+// Filtros retráteis: em telas maiores já vem aberto (comportamento antigo);
+// no celular começa fechado, economizando espaço — só um ícone pra expandir.
+window.toggleFiltros = function() {
+  const body = document.getElementById('filter-body');
+  const chevron = document.getElementById('filter-chevron');
+  const aberto = body.style.display !== 'none';
+  body.style.display = aberto ? 'none' : 'block';
+  chevron.style.transform = aberto ? 'rotate(0deg)' : 'rotate(180deg)';
+};
+if (window.innerWidth > 900) toggleFiltros();
+
+const params = new URLSearchParams(location.search);
+let selectedCats = params.get('cat') ? [params.get('cat')] : [];
+let selectedBrands = [];
+let PRODUCTS = [];
+let _favoritosIds = new Set();
+let SINONIMOS = [];
+
+window.toggleFavoritoCard = async function(produtoId, btn) {
+  const r = await toggleFavorito(produtoId);
+  if (r.precisaLogin) { window.location.href = 'login.html'; return; }
+  btn.textContent = r.favoritado ? '💚' : '🤍';
+  btn.dataset.fav = r.favoritado ? '1' : '0';
+};
+const searchQuery = params.get('q') || '';
+
+// CORREÇÃO BUG 2: cache dos objetos de produto para evitar JSON.stringify no HTML
+window._produtosCache = {};
+
+const catFilters = document.getElementById('cat-filters');
+const brandFilters = document.getElementById('brand-filters');
+
+function buildFilters() {
+  const cats = [...new Set(PRODUCTS.map(p => p.category))];
+  cats.forEach(c => {
+    const checked = selectedCats.includes(c) ? 'checked' : '';
+    catFilters.innerHTML += `<label class="filter-option" title="${c}"><input type="checkbox" value="${c}" ${checked} onchange="toggleCat(this)"><span>${c}</span></label>`;
+  });
+  const brands = [...new Set(PRODUCTS.map(p => p.brand))];
+  brands.forEach(b => {
+    brandFilters.innerHTML += `<label class="filter-option" title="${b}"><input type="checkbox" value="${b}" onchange="toggleBrand(this)"><span>${b}</span></label>`;
+  });
+}
+
+window.toggleCat = (el) => {
+  if (el.checked) selectedCats.push(el.value);
+  else selectedCats = selectedCats.filter(c => c !== el.value);
+  applyFilters();
+};
+
+window.toggleBrand = (el) => {
+  if (el.checked) selectedBrands.push(el.value);
+  else selectedBrands = selectedBrands.filter(b => b !== el.value);
+  applyFilters();
+};
+
+window.clearFilters = () => {
+  selectedCats = []; selectedBrands = [];
+  document.querySelectorAll('#cat-filters input, #brand-filters input').forEach(i => i.checked = false);
+  document.getElementById('price-range').value = 15000;
+  document.getElementById('search-prod').value = '';
+  applyFilters();
+};
+
+window.applyFilters = () => {
+  const q = document.getElementById('search-prod').value.toLowerCase();
+  const maxPrice = parseInt(document.getElementById('price-range').value);
+  const sort = document.getElementById('sort-select').value;
+  document.getElementById('max-price-label').textContent = 'R$ ' + maxPrice.toLocaleString('pt-BR');
+
+  // Sinônimos: se "q" bater com um termo cadastrado (ex: "celular"),
+  // pega a(s) categoria(s) equivalente(s) (ex: "Smartphones") pra
+  // incluir na busca também, além do texto literal de sempre.
+  const categoriasSinonimo = q
+    ? SINONIMOS.filter(s => s.termo.toLowerCase() === q).map(s => s.categoria.toLowerCase())
+    : [];
+
+  let list = PRODUCTS.filter(p => {
+    if (selectedCats.length && !selectedCats.includes(p.category)) return false;
+    if (selectedBrands.length && !selectedBrands.includes(p.brand)) return false;
+    if (p.price > maxPrice) return false;
+    if (q) {
+      const bateTextoLiteral = p.name.toLowerCase().includes(q) || p.brand.toLowerCase().includes(q) || p.category.toLowerCase().includes(q) || (p.desc||'').toLowerCase().includes(q);
+      const bateSinonimo = categoriasSinonimo.includes(p.category.toLowerCase());
+      if (!bateTextoLiteral && !bateSinonimo) return false;
+    }
+    return true;
+  });
+
+  if (sort === 'price-asc') list.sort((a, b) => a.price - b.price);
+  else if (sort === 'price-desc') list.sort((a, b) => b.price - a.price);
+  else if (sort === 'rating') list.sort((a, b) => b.rating - a.rating);
+
+  document.getElementById('count-label').textContent = list.length + ' produto' + (list.length !== 1 ? 's' : '') + ' encontrado' + (list.length !== 1 ? 's' : '');
+  const grid = document.getElementById('products-grid');
+  const empty = document.getElementById('empty-msg');
+  if (list.length === 0) { grid.innerHTML = ''; empty.style.display = 'block'; return; }
+  empty.style.display = 'none';
+
+  // CORREÇÃO BUG 2: salva cada produto no cache e usa o ID no onclick
+  list.forEach(p => { window._produtosCache[p.id] = p; });
+
+  grid.innerHTML = list.map(p => `
+    <a href="produto.html?id=${p.id}" class="product-card">
+      <div class="product-card-img" style="background:linear-gradient(135deg,#1e3a6e,#2563eb)">
+        ${p.discount ? `<div class="discount-badge">-${p.discount}%</div>` : ''}
+        <button onclick="event.preventDefault(); toggleFavoritoCard(${p.id}, this)" class="fav-btn" data-fav="${_favoritosIds && _favoritosIds.has(p.id) ? '1' : '0'}" aria-label="Favoritar">${_favoritosIds && _favoritosIds.has(p.id) ? '💚' : '🤍'}</button>
+        ${p.image_url ? `<img src="${p.image_thumb_url || p.image_url}" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:cover">` : `<span style="font-size:64px">${p.emoji}</span>`}
+      </div>
+      <div class="product-card-body">
+        <div class="product-brand">${p.brand}</div>
+        <div class="product-name">${p.name}</div>
+        <div class="product-rating-row">
+          <span class="rating-pill">★ ${p.rating ? p.rating.toFixed(1) : '5.0'}</span>
+          ${p.reviews ? `<span class="product-sold">${p.reviews >= 1000 ? (p.reviews/1000).toFixed(1)+'mil' : p.reviews}+ vendido(s)</span>` : ''}
+        </div>
+        ${p.oldPrice ? `<div class="product-price-old">${formatPrice(p.oldPrice)}</div>` : ''}
+        <div class="product-price">${formatPrice(p.price)}</div>
+        <div class="product-installment">ou 10x de ${formatPrice(p.price/10)}</div>
+      </div>
+      <div class="product-card-footer">
+        <button class="btn btn-primary btn-full btn-sm" onclick="event.preventDefault(); addToCart(${p.id}, 1, window._produtosCache[${p.id}], event)">🛒 Adicionar</button>
+      </div>
+    </a>`).join('');
+};
+
+// Carrega e renderiza
+PRODUCTS = await loadProducts();
+_favoritosIds = await getFavoritosIds();
+SINONIMOS = await loadSinonimos();
+buildFilters();
+if (searchQuery) {
+  const searchInput = document.getElementById('search-prod');
+  if (searchInput) searchInput.value = searchQuery;
+  document.querySelector('.page-hero h1').textContent = `Resultados para "${searchQuery}"`;
+}
+applyFilters();
+</script>
+</body>
+</html>

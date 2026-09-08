@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cupons Admin — Zipshop</title>
+  <link rel="stylesheet" href="../css/style.css">
+
+<style>
+.admin-mobile-bar {
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 200;
+}
+.admin-hamburger {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 20px;
+  width: 38px;
+  height: 38px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.admin-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 299;
+}
+.admin-overlay.active { display: block; }
+@media (max-width: 900px) {
+  .admin-mobile-bar { display: flex; }
+  .admin-sidebar {
+    display: flex !important;
+    position: fixed;
+    top: 0;
+    left: -260px;
+    height: 100vh;
+    width: 240px;
+    z-index: 300;
+    transition: left 0.25s ease;
+    overflow-y: auto;
+  }
+  .admin-sidebar.admin-sidebar-open { left: 0; }
+}
+</style>
+</head>
+<body>
+<div class="admin-layout">
+  <aside class="admin-sidebar">
+    <div class="admin-sidebar-logo">
+      <div class="logo"><img src="../img/logo-icon.jpeg" style="width:32px;height:32px" onerror="this.style.display='none'"><span class="logo-text"><span>ZIP</span><span>SHOP</span></span></div>
+      <div class="admin-sidebar-subtitle">Painel Administrativo</div>
+    </div>
+    <nav class="admin-nav">
+      <a href="index.html" class="admin-nav-item">📊 Dashboard</a>
+      <a href="produtos.html" class="admin-nav-item">📦 Produtos</a>
+      <a href="importar.html" class="admin-nav-item">🛍️ Importar da Shopee</a>
+      <a href="pedidos.html" class="admin-nav-item">🛒 Pedidos</a>
+      <a href="clientes.html" class="admin-nav-item">👥 Clientes</a>
+      <a href="categorias.html" class="admin-nav-item">🏷️ Categorias</a>
+      <a href="banners.html" class="admin-nav-item">🖼️ Banners</a>
+      <a href="textos.html" class="admin-nav-item">📝 Textos do Site</a>
+      <a href="cupons.html" class="admin-nav-item active">🎟️ Cupons</a>
+      <a href="devolucoes.html" class="admin-nav-item">↩️ Devoluções</a>
+      <a href="analytics.html" class="admin-nav-item">📈 Analytics</a>
+    </nav>
+    <div style="padding:16px;border-top:1px solid var(--border)">
+      <a href="../index.html" class="admin-nav-item" style="color:var(--text-muted)">🏪 Ver Loja</a>
+      <a href="#" id="btn-logout" class="admin-nav-item" style="color:#e53e3e">🚪 Sair</a>
+    </div>
+  </aside>
+
+  <main class="admin-main">
+  <!-- MOBILE MENU BAR -->
+  <div class="admin-mobile-bar">
+    <button class="admin-hamburger" onclick="toggleAdminMenu()" id="admin-hamburger-btn">☰</button>
+    <div class="logo" style="display:flex;align-items:center;gap:8px">
+      <img src="../img/logo-icon.jpeg" alt="Zipshop" class="logo-img" style="width:28px;height:28px" onerror="this.style.display='none'">
+      <span class="logo-text"><span>ZIP</span><span>SHOP</span></span>
+    </div>
+    <span style="font-size:11px;color:var(--text-muted)">Admin</span>
+  </div>
+  <!-- OVERLAY -->
+  <div class="admin-overlay" id="admin-overlay" onclick="toggleAdminMenu()"></div>
+
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;flex-wrap:wrap;gap:12px">
+      <div>
+        <h1 class="admin-page-title" style="margin:0">🎟️ Cupons</h1>
+        <p class="admin-page-sub" style="margin:0">Crie e gerencie cupons de desconto</p>
+      </div>
+      <button class="btn btn-primary" onclick="abrirModal()">+ Novo Cupom</button>
+    </div>
+
+    <div id="cupons-grid"></div>
+  </main>
+</div>
+
+<!-- MODAL -->
+<div id="modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:100;align-items:center;justify-content:center;padding:16px">
+  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:20px;padding:24px;width:100%;max-width:480px;max-height:92vh;overflow-y:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+      <h2 id="modal-title" style="font-size:16px;font-weight:900">Novo Cupom</h2>
+      <button onclick="fecharModal()" style="background:none;border:none;color:var(--text-muted);font-size:20px;cursor:pointer">✕</button>
+    </div>
+
+    <input type="hidden" id="edit-id">
+
+    <div class="form-group">
+      <label class="form-label">Código do Cupom *</label>
+      <input type="text" class="form-input" id="edit-codigo" placeholder="Ex: FRETE10" style="text-transform:uppercase;font-weight:700;letter-spacing:2px">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Descrição</label>
+      <input type="text" class="form-input" id="edit-descricao" placeholder="Ex: Cupom de boas-vindas">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Tipo de Desconto *</label>
+      <select class="form-input" id="edit-tipo" onchange="atualizarCampoValor()">
+        <option value="percentual">% Percentual (ex: 10%)</option>
+        <option value="fixo">R$ Valor Fixo (ex: R$ 5,00)</option>
+        <option value="frete_gratis">🚚 Frete Grátis</option>
+      </select>
+    </div>
+    <div class="form-group" id="campo-valor-wrap">
+      <label class="form-label" id="label-valor">Valor do Desconto *</label>
+      <input type="number" class="form-input" id="edit-valor" placeholder="10" min="0" step="0.01">
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="form-group">
+        <label class="form-label">Pedido Mínimo (R$)</label>
+        <input type="number" class="form-input" id="edit-minimo" placeholder="0" min="0" step="0.01">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Uso Máximo (total)</label>
+        <input type="number" class="form-input" id="edit-uso-max" placeholder="Ilimitado" min="1">
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Validade</label>
+      <input type="datetime-local" class="form-input" id="edit-validade">
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px;padding:12px;background:var(--bg-muted);border-radius:10px;border:1px solid var(--border)">
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
+        <input type="checkbox" id="edit-publico" checked style="width:16px;height:16px;accent-color:var(--primary)">
+        <span style="font-size:13px;font-weight:600">🌍 Público (visível para todos)</span>
+      </label>
+      <p style="font-size:11px;color:var(--text-muted);margin-left:26px;margin-top:-6px">Se deixar desmarcado sem vincular a um cliente específico, o cupom nunca vai aparecer em "Meus Cupons" pra ninguém — só funciona se alguém digitar o código na mão.</p>
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
+        <input type="checkbox" id="edit-uso-unico" checked style="width:16px;height:16px;accent-color:var(--primary)">
+        <span style="font-size:13px;font-weight:600">👤 Uso único por usuário</span>
+      </label>
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
+        <input type="checkbox" id="edit-ativo" checked style="width:16px;height:16px;accent-color:var(--primary)">
+        <span style="font-size:13px;font-weight:600">✅ Ativo</span>
+      </label>
+    </div>
+
+    <div style="display:flex;gap:12px">
+      <button class="btn btn-outline" onclick="fecharModal()" style="flex:1">Cancelar</button>
+      <button class="btn btn-primary" id="btn-salvar" onclick="salvarCupom()" style="flex:1">Salvar Cupom</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { isAdmin, supabase } from '../js/admin-guard.js';
+if (!isAdmin) throw new Error('not admin');
+
+document.getElementById('btn-logout').addEventListener('click', async (e) => {
+  e.preventDefault();
+  await supabase.auth.signOut();
+  window.location.href = '../login.html';
+});
+
+function formatPrice(v) { return Number(v||0).toLocaleString('pt-BR', { style:'currency', currency:'BRL' }); }
+
+async function carregar() {
+  const { data: cupons } = await supabase.from('cupons').select('*').order('created_at', { ascending: false });
+  const grid = document.getElementById('cupons-grid');
+
+  if (!cupons?.length) {
+    grid.innerHTML = `<div class="card"><div class="card-body" style="text-align:center;padding:48px">
+      <p style="font-size:40px;margin-bottom:12px">🎟️</p>
+      <p style="font-weight:700">Nenhum cupom cadastrado</p>
+      <p style="color:var(--text-muted)">Clique em "+ Novo Cupom" para criar o primeiro.</p>
+    </div></div>`;
+    return;
+  }
+
+  grid.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px">` +
+    cupons.map(c => {
+      const expirado = c.valido_ate && new Date(c.valido_ate) < new Date();
+      const descTipo = c.tipo === 'percentual' ? `${c.valor}% OFF`
+        : c.tipo === 'fixo' ? `${formatPrice(c.valor)} OFF` : 'Frete Grátis';
+      const statusColor = !c.ativo ? '#888' : expirado ? '#f87171' : '#22c55e';
+      const statusText = !c.ativo ? 'Inativo' : expirado ? 'Expirado' : 'Ativo';
+      const usos = `${c.uso_atual || 0}${c.uso_maximo ? '/' + c.uso_maximo : ''} uso(s)`;
+      // CORREÇÃO: cupom privado (publico=false) e sem usuario_id vinculado
+      // nunca aparece na lista "Meus Cupons" de ninguém — só funciona se
+      // alguém digitar o código manualmente. Na prática, quase sempre é
+      // engano (o admin esqueceu de marcar "Público" ou de vincular a um
+      // cliente). Avisamos aqui pra não passar despercebido.
+      const orfao = !c.publico && !c.usuario_id;
+
+      return `<div class="card" style="border-left:3px solid ${statusColor}">
+        <div class="card-body">
+          ${orfao ? `<div style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:8px;padding:8px 10px;margin-bottom:10px;font-size:12px;color:#f87171">
+            ⚠️ Este cupom é <strong>privado</strong> e não está vinculado a nenhum cliente — por isso ele <strong>nunca aparece</strong> em "Meus Cupons" pra ninguém, só funciona se alguém digitar o código manualmente.
+            <button onclick="tornarPublico('${c.id}')" style="display:block;margin-top:6px;background:none;border:1px solid #f87171;border-radius:6px;padding:4px 10px;font-size:11px;color:#f87171;cursor:pointer;font-weight:700">🌍 Tornar público agora</button>
+          </div>` : ''}
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+            <div>
+              <span style="font-family:monospace;font-size:16px;font-weight:900;letter-spacing:2px">${c.codigo}</span>
+              <span style="margin-left:8px;font-size:11px;background:var(--bg-muted);padding:2px 8px;border-radius:20px;color:${statusColor};font-weight:700">${statusText}</span>
+            </div>
+            <div style="display:flex;gap:6px">
+              <button onclick="editarCupom('${c.id}')" style="background:none;border:1px solid var(--border);border-radius:8px;padding:4px 10px;font-size:12px;cursor:pointer">✏️</button>
+              <button onclick="excluirCupom('${c.id}')" style="background:none;border:1px solid rgba(239,68,68,.3);border-radius:8px;padding:4px 10px;font-size:12px;cursor:pointer;color:#ef4444">🗑️</button>
+            </div>
+          </div>
+          <p style="font-size:18px;font-weight:900;color:var(--primary);margin-bottom:4px">${descTipo}</p>
+          ${c.descricao ? `<p style="font-size:12px;color:var(--text-muted);margin-bottom:6px">${c.descricao}</p>` : ''}
+          <div style="display:flex;gap:12px;flex-wrap:wrap;font-size:11px;color:var(--text-muted)">
+            <span>📦 ${usos}</span>
+            ${c.pedido_minimo ? `<span>💰 Mín: ${formatPrice(c.pedido_minimo)}</span>` : '<span>💰 Sem mínimo</span>'}
+            ${c.valido_ate ? `<span>⏰ Até ${new Date(c.valido_ate).toLocaleDateString('pt-BR')}</span>` : '<span>⏰ Sem expiração</span>'}
+            <span>${c.publico ? '🌍 Público' : '🔒 Privado'}</span>
+          </div>
+        </div>
+      </div>`;
+    }).join('') + '</div>';
+}
+
+window.tornarPublico = async function(id) {
+  const { error } = await supabase.from('cupons').update({ publico: true }).eq('id', id);
+  if (error) { alert('Erro: ' + error.message); return; }
+  await carregar();
+};
+
+window.atualizarCampoValor = function() {
+  const tipo = document.getElementById('edit-tipo').value;
+  const wrap = document.getElementById('campo-valor-wrap');
+  const label = document.getElementById('label-valor');
+  wrap.style.display = tipo === 'frete_gratis' ? 'none' : 'block';
+  label.textContent = tipo === 'percentual' ? 'Percentual de Desconto (%)' : 'Valor do Desconto (R$)';
+};
+
+window.abrirModal = function() {
+  document.getElementById('edit-id').value = '';
+  document.getElementById('edit-codigo').value = '';
+  document.getElementById('edit-descricao').value = '';
+  document.getElementById('edit-tipo').value = 'percentual';
+  document.getElementById('edit-valor').value = '';
+  document.getElementById('edit-minimo').value = '';
+  document.getElementById('edit-uso-max').value = '';
+  document.getElementById('edit-validade').value = '';
+  document.getElementById('edit-publico').checked = true;
+  document.getElementById('edit-uso-unico').checked = true;
+  document.getElementById('edit-ativo').checked = true;
+  document.getElementById('modal-title').textContent = 'Novo Cupom';
+  atualizarCampoValor();
+  document.getElementById('modal').style.display = 'flex';
+};
+
+window.fecharModal = function() { document.getElementById('modal').style.display = 'none'; };
+
+window.editarCupom = async function(id) {
+  const { data: c } = await supabase.from('cupons').select('*').eq('id', id).single();
+  if (!c) return;
+  document.getElementById('edit-id').value = c.id;
+  document.getElementById('edit-codigo').value = c.codigo;
+  document.getElementById('edit-descricao').value = c.descricao || '';
+  document.getElementById('edit-tipo').value = c.tipo;
+  document.getElementById('edit-valor').value = c.valor || '';
+  document.getElementById('edit-minimo').value = c.pedido_minimo || '';
+  document.getElementById('edit-uso-max').value = c.uso_maximo || '';
+  document.getElementById('edit-validade').value = c.valido_ate ? c.valido_ate.slice(0,16) : '';
+  document.getElementById('edit-publico').checked = c.publico;
+  document.getElementById('edit-uso-unico').checked = c.uso_unico_por_usuario;
+  document.getElementById('edit-ativo').checked = c.ativo;
+  document.getElementById('modal-title').textContent = 'Editar Cupom';
+  atualizarCampoValor();
+  document.getElementById('modal').style.display = 'flex';
+};
+
+window.salvarCupom = async function() {
+  const codigo = (document.getElementById('edit-codigo').value || '').trim().toUpperCase();
+  const tipo = document.getElementById('edit-tipo').value;
+  const valor = parseFloat(document.getElementById('edit-valor').value) || 0;
+  if (!codigo) { alert('Digite o código do cupom'); return; }
+  if (tipo !== 'frete_gratis' && !valor) { alert('Digite o valor do desconto'); return; }
+
+  const btn = document.getElementById('btn-salvar');
+  btn.disabled = true; btn.textContent = 'Salvando...';
+
+  const validade = document.getElementById('edit-validade').value;
+  const dados = {
+    codigo, tipo, valor,
+    descricao: document.getElementById('edit-descricao').value || null,
+    pedido_minimo: parseFloat(document.getElementById('edit-minimo').value) || 0,
+    uso_maximo: parseInt(document.getElementById('edit-uso-max').value) || null,
+    valido_ate: validade ? new Date(validade).toISOString() : null,
+    publico: document.getElementById('edit-publico').checked,
+    uso_unico_por_usuario: document.getElementById('edit-uso-unico').checked,
+    ativo: document.getElementById('edit-ativo').checked
+  };
+
+  const id = document.getElementById('edit-id').value;
+  let error;
+  if (id) {
+    ({ error } = await supabase.from('cupons').update(dados).eq('id', id));
+  } else {
+    ({ error } = await supabase.from('cupons').insert(dados));
+  }
+
+  btn.disabled = false; btn.textContent = 'Salvar Cupom';
+  if (error) { alert('Erro: ' + error.message); return; }
+  fecharModal();
+  await carregar();
+  const t = document.createElement('div');
+  t.className = 'toast success show';
+  t.textContent = id ? 'Cupom atualizado!' : 'Cupom criado!';
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 2500);
+};
+
+window.excluirCupom = async function(id) {
+  if (!confirm('Excluir este cupom?')) return;
+  await supabase.from('cupons').delete().eq('id', id);
+  await carregar();
+};
+
+carregar();
+</script>
+
+<script>
+function toggleAdminMenu() {
+  const sidebar = document.querySelector('.admin-sidebar');
+  const overlay = document.getElementById('admin-overlay');
+  const btn = document.getElementById('admin-hamburger-btn');
+  const open = sidebar.classList.toggle('admin-sidebar-open');
+  overlay.classList.toggle('active', open);
+  btn.textContent = open ? '✕' : '☰';
+}
+</script>
+</body>
+</html>

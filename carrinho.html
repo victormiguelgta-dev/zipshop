@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<link rel="preconnect" href="https://kkliwdphrdbguclsvxcw.supabase.co">
+<link rel="dns-prefetch" href="https://kkliwdphrdbguclsvxcw.supabase.co">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="base" content="">
+  <title>Carrinho — Zipshop</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="navbar"></div>
+
+<div class="page-hero">
+  <div class="container">
+    <div class="breadcrumb"><a href="index.html">Home</a><span>/</span><span>Carrinho</span></div>
+    <h1>Meu Carrinho</h1>
+  </div>
+</div>
+
+<div id="cart-content"></div>
+
+<div id="footer"></div>
+
+<script src="js/cart.js"></script>
+<script src="js/main.js"></script>
+<script type="module">
+import { formatPrice } from './js/data.js';
+import { supabase } from './js/supabase-config.js';
+
+// CORREÇÃO BUG 13 (cupom sumindo/não aplicando):
+// Antes esse arquivo só reconhecia um código fixo "ZIPSHOP10" escrito
+// direto no código — nunca consultava a tabela real de cupons do banco.
+// Por isso um cupom de verdade (ex: "HEXA"), validado na tela Meus
+// Cupons, "desaparecia" ao chegar no carrinho: ele nunca tinha sido
+// aplicado de fato, só mostrado como texto lá na tela anterior.
+// Agora o carrinho consulta o Supabase de verdade (mesma lógica do
+// checkout) e guarda o cupom aplicado em localStorage, pra ele
+// continuar aplicado quando o cliente for pro checkout.
+let cupomAplicado = getCupomAplicado(); // { id, codigo, tipo, valor } | null
+
+function calcDesconto(subtotal) {
+  if (!cupomAplicado) return 0;
+  if (cupomAplicado.tipo === 'percentual') return subtotal * (cupomAplicado.valor / 100);
+  if (cupomAplicado.tipo === 'fixo') return Math.min(cupomAplicado.valor, subtotal);
+  return 0; // frete_gratis não desconta em cima do subtotal
+}
+
+function descricaoCupom(c) {
+  if (c.tipo === 'percentual') return `${c.valor}% OFF`;
+  if (c.tipo === 'fixo') return `${formatPrice(c.valor)} OFF`;
+  return 'Frete Grátis';
+}
+
+window.renderCart = async function() {
+  _cuponsCarrinhoCarregados = false;
+  const cart = getCart();
+  const el = document.getElementById('cart-content');
+
+  if (cart.length === 0) {
+    el.innerHTML = `<div class="empty-state">
+      <div class="empty-icon">🛒</div>
+      <h2>Seu carrinho está vazio</h2>
+      <p>Adicione produtos para continuar comprando.</p>
+      <a href="produtos.html" class="btn btn-primary btn-lg">Ver Produtos</a>
+    </div>`;
+    return;
+  }
+
+  const subtotal = getCartTotal();
+  const discount = calcDesconto(subtotal);
+  const freight = (cupomAplicado?.tipo === 'frete_gratis') ? 0 : (subtotal >= 14.90 ? 0 : 2.90);
+  const total = subtotal - discount + freight;
+
+  const items = cart.map(item => {
+    const nome = item.name || 'Produto';
+    const emoji = item.emoji || '📦';
+    const brand = item.brand || '';
+    const price = item.price || 0;
+    return `<div class="cart-item" id="item-${item.id}">
+      <div class="cart-item-img" style="background:linear-gradient(135deg,#1e3a6e,#2563eb);font-size:40px;display:flex;align-items:center;justify-content:center">${emoji}</div>
+      <div class="cart-item-info">
+        <div class="cart-item-brand">${brand}</div>
+        <div class="cart-item-name">${nome}</div>
+        <div class="cart-item-footer">
+          <div class="qty-control">
+            <button class="qty-btn" data-action="dec" data-id="${item.id}" data-qty="${item.qty}">−</button>
+            <span class="qty-num">${item.qty}</span>
+            <button class="qty-btn" data-action="inc" data-id="${item.id}" data-qty="${item.qty}">+</button>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px">
+            <span class="cart-item-price">${formatPrice(price * item.qty)}</span>
+            <button class="qty-btn-remove" data-action="remove" data-id="${item.id}" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:18px" title="Remover">🗑️</button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  el.innerHTML = `<div class="cart-layout">
+    <div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <p style="font-weight:700">${cart.length} item(ns) no carrinho</p>
+        <button id="btn-limpar-tudo" class="btn btn-ghost btn-sm" style="color:var(--text-muted)">Limpar tudo</button>
+      </div>
+      ${items}
+    </div>
+    <div>
+      <div class="cart-summary">
+        <p style="font-size:15px;font-weight:900;margin-bottom:16px">Resumo do Pedido</p>
+        <form class="coupon-form" onsubmit="applyCoupon(event)">
+          <input type="text" id="coupon-input" placeholder="Cupom de desconto" style="text-transform:uppercase" value="${cupomAplicado?.codigo || ''}">
+          <button type="submit" class="btn btn-outline btn-sm">Aplicar</button>
+        </form>
+        <button type="button" id="btn-ver-cupons" style="background:none;border:none;color:var(--primary);font-size:12px;font-weight:700;cursor:pointer;padding:0;margin-bottom:10px;display:flex;align-items:center;gap:4px">🎟️ Ver meus cupons disponíveis</button>
+        <div id="lista-cupons-carrinho" style="display:none;margin-bottom:12px"></div>
+        ${cupomAplicado ? `<p style="font-size:12px;color:#22c55e;margin-bottom:12px">✓ Cupom ${cupomAplicado.codigo} aplicado! ${descricaoCupom(cupomAplicado)} <a href="#" id="btn-remover-cupom" style="color:var(--text-muted);text-decoration:underline;margin-left:6px">remover</a></p>` : ''}
+        <div id="cupom-feedback" style="display:none;margin-bottom:12px;font-size:12px"></div>
+        <div class="summary-row"><span>Subtotal</span><span>${formatPrice(subtotal)}</span></div>
+        ${discount > 0 ? `<div class="summary-row" style="color:#22c55e"><span>Desconto</span><span>−${formatPrice(discount)}</span></div>` : ''}
+        <div class="summary-row"><span>Frete</span><span>${freight === 0 ? '<span style="color:#22c55e">Grátis</span>' : formatPrice(freight)}</span></div>
+        <div class="summary-total"><span>Total</span><span style="color:var(--primary)">${formatPrice(total)}</span></div>
+        <div style="margin-top:6px;font-size:12px;color:var(--text-muted);text-align:right">ou 12x de ${formatPrice(total/12)}</div>
+        <a href="checkout.html" class="btn btn-primary btn-full" style="margin-top:20px;font-size:15px">⚡ Finalizar Compra</a>
+        <a href="produtos.html" class="btn btn-ghost btn-full btn-sm" style="margin-top:8px;color:var(--text-muted)">Continuar Comprando</a>
+      </div>
+    </div>
+  </div>`;
+}
+
+function changeQty(id, qty) {
+  if (qty < 1) { removeFromCart(id); }
+  else { updateQty(id, qty); }
+  renderCart();
+}
+
+// Event delegation para mobile — evita problema com onclick em template strings
+document.addEventListener('click', function(e) {
+  const btn = e.target.closest('[data-action]');
+  if (!btn) return;
+  const action = btn.dataset.action;
+  const id = parseInt(btn.dataset.id);
+  const qty = parseInt(btn.dataset.qty);
+  if (action === 'inc') changeQty(id, qty + 1);
+  else if (action === 'dec') changeQty(id, qty - 1);
+  else if (action === 'remove') { removeFromCart(id); renderCart(); }
+});
+
+document.addEventListener('click', function(e) {
+  if (e.target.id === 'btn-limpar-tudo') { clearCart(); renderCart(); }
+});
+
+async function aplicarCupomCodigo(codigo) {
+  codigo = (codigo || '').toUpperCase().trim();
+  if (!codigo) return;
+
+  const fb = document.getElementById('cupom-feedback');
+  if (fb) { fb.style.display = 'block'; fb.style.color = 'var(--text-muted)'; fb.textContent = 'Verificando cupom...'; }
+
+  const { data: cupom, error } = await supabase.from('cupons')
+    .select('*').eq('codigo', codigo).eq('ativo', true).single();
+
+  if (error || !cupom) {
+    if (fb) { fb.style.color = '#ef4444'; fb.textContent = '❌ Cupom inválido ou não encontrado.'; }
+    else showToast('Cupom inválido.', 'error');
+    return;
+  }
+
+  if (cupom.valido_ate && new Date(cupom.valido_ate) < new Date()) {
+    if (fb) { fb.style.color = '#ef4444'; fb.textContent = '❌ Este cupom já expirou.'; }
+    return;
+  }
+
+  if (cupom.uso_maximo && cupom.uso_atual >= cupom.uso_maximo) {
+    if (fb) { fb.style.color = '#ef4444'; fb.textContent = '❌ Este cupom atingiu o limite de usos.'; }
+    return;
+  }
+
+  const { data: { session } } = await supabase.auth.getSession();
+  const user = session?.user || null;
+  if (user && cupom.uso_unico_por_usuario) {
+    const { data: usoExistente } = await supabase.from('cupons_usos')
+      .select('id').eq('cupom_id', cupom.id).eq('usuario_id', user.id).single();
+    if (usoExistente) {
+      if (fb) { fb.style.color = '#ef4444'; fb.textContent = '❌ Você já utilizou este cupom.'; }
+      return;
+    }
+  }
+
+  const subtotal = getCartTotal();
+  if (cupom.pedido_minimo && subtotal < cupom.pedido_minimo) {
+    if (fb) { fb.style.color = '#ef4444'; fb.textContent = `❌ Pedido mínimo para este cupom: ${formatPrice(cupom.pedido_minimo)}`; }
+    return;
+  }
+
+  cupomAplicado = { id: cupom.id, codigo: cupom.codigo, tipo: cupom.tipo, valor: cupom.valor };
+  setCupomAplicado(cupomAplicado);
+  showToast(`Cupom aplicado! ${descricaoCupom(cupomAplicado)}`, 'success');
+  renderCart();
+}
+
+window.applyCoupon = function(e) {
+  e.preventDefault();
+  const code = document.getElementById('coupon-input').value;
+  aplicarCupomCodigo(code);
+};
+
+// Mostra os cupons que o cliente pode escolher direto no carrinho, em vez
+// de precisar saber/digitar o código de cor.
+function getCodigosVerificados() {
+  try { return JSON.parse(localStorage.getItem('cupons_verificados') || '[]'); }
+  catch { return []; }
+}
+
+let _cuponsCarrinhoCarregados = false;
+
+async function carregarCuponsDisponiveisCarrinho() {
+  const lista = document.getElementById('lista-cupons-carrinho');
+  lista.innerHTML = '<p style="font-size:12px;color:var(--text-muted)">Carregando cupons...</p>';
+
+  const { data: { session } } = await supabase.auth.getSession();
+  const user = session?.user || null;
+
+  const { data: publicos } = await supabase
+    .from('cupons')
+    .select('*')
+    .eq('ativo', true)
+    .or('publico.eq.true,usuario_id.eq.' + (user?.id || '00000000-0000-0000-0000-000000000000'));
+
+  const codigosVerificados = getCodigosVerificados();
+  let extras = [];
+  if (codigosVerificados.length) {
+    const { data: privados } = await supabase.from('cupons').select('*').eq('ativo', true).in('codigo', codigosVerificados);
+    extras = privados || [];
+  }
+
+  const vistos = new Set();
+  const cupons = [...(publicos || []), ...extras].filter(c => {
+    if (vistos.has(c.id)) return false;
+    vistos.add(c.id);
+    return true;
+  });
+
+  if (!cupons.length) {
+    lista.innerHTML = `<p style="font-size:12px;color:var(--text-muted)">Nenhum cupom disponível no momento. <a href="cupons.html" style="color:var(--primary)">Ver Meus Cupons →</a></p>`;
+    return;
+  }
+
+  lista.innerHTML = cupons.map(c => `
+    <button type="button" class="cupom-opcao" data-codigo="${c.codigo}"
+      style="display:flex;justify-content:space-between;align-items:center;width:100%;text-align:left;background:var(--bg-muted);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:8px;cursor:pointer;color:var(--text)">
+      <span>
+        <span style="font-weight:800;letter-spacing:.02em">${c.codigo}</span>
+        <span style="display:block;font-size:11px;color:var(--text-muted);margin-top:2px">${descricaoCupom(c)}${c.pedido_minimo ? ` · mín. ${formatPrice(c.pedido_minimo)}` : ''}</span>
+      </span>
+      <span style="font-size:11px;color:var(--primary);font-weight:700">Usar</span>
+    </button>`).join('');
+}
+
+document.addEventListener('click', function(e) {
+  if (e.target.id === 'btn-ver-cupons') {
+    const lista = document.getElementById('lista-cupons-carrinho');
+    const abrindo = lista.style.display === 'none';
+    lista.style.display = abrindo ? 'block' : 'none';
+    if (abrindo && !_cuponsCarrinhoCarregados) {
+      _cuponsCarrinhoCarregados = true;
+      carregarCuponsDisponiveisCarrinho();
+    }
+    return;
+  }
+  const opcao = e.target.closest('.cupom-opcao');
+  if (opcao) {
+    document.getElementById('coupon-input').value = opcao.dataset.codigo;
+    aplicarCupomCodigo(opcao.dataset.codigo);
+    document.getElementById('lista-cupons-carrinho').style.display = 'none';
+  }
+});
+
+document.addEventListener('click', function(e) {
+  if (e.target.id === 'btn-remover-cupom') {
+    e.preventDefault();
+    cupomAplicado = null;
+    clearCupomAplicado();
+    renderCart();
+  }
+});
+
+// CORREÇÃO BUG 13: se o cliente veio da tela "Meus Cupons" (clicou em
+// "Usar agora" ou verificou um código lá), existe um cupom pendente
+// aguardando ser aplicado de verdade aqui no carrinho.
+const cupomPendente = localStorage.getItem('cupom_pre');
+if (cupomPendente) {
+  localStorage.removeItem('cupom_pre');
+  aplicarCupomCodigo(cupomPendente);
+}
+
+renderCart();
+</script>
+</body>
+</html>

@@ -1,0 +1,991 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<link rel="preconnect" href="https://kkliwdphrdbguclsvxcw.supabase.co">
+<link rel="dns-prefetch" href="https://kkliwdphrdbguclsvxcw.supabase.co">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="base" content="">
+  <title>Minha Conta — Zipshop</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="navbar"></div>
+
+<div class="page-hero">
+  <div class="container">
+    <div class="breadcrumb"><a href="index.html">Home</a><span>/</span><span>Minha Conta</span></div>
+    <h1 id="page-title">Minha Conta</h1>
+  </div>
+</div>
+
+<div class="account-layout">
+  <aside>
+    <div class="card" style="margin-bottom:16px;padding:20px;text-align:center">
+      <div style="width:64px;height:64px;border-radius:50%;background:var(--primary);display:flex;align-items:center;justify-content:center;font-size:28px;margin:0 auto 12px">👤</div>
+      <p id="user-name" style="font-weight:700">Carregando...</p>
+      <p id="user-email" style="font-size:13px;color:var(--text-muted)"></p>
+    </div>
+    <nav class="account-nav">
+      <a class="account-nav-item active" href="#" onclick="showSection('orders', this)">📦 Meus Pedidos</a>
+      <a class="account-nav-item" href="#" onclick="showSection('profile', this)">👤 Dados Pessoais</a>
+      <a class="account-nav-item" href="#" onclick="showSection('addresses', this)">📍 Endereços</a>
+      <a class="account-nav-item" href="cupons.html">🎟️ Meus Cupons</a>
+      <a class="account-nav-item" href="saldo.html">💰 Meu Saldo</a>
+      <a class="account-nav-item" href="favoritos.html">💚 Meus Favoritos</a>
+      <a class="account-nav-item" href="#" onclick="showSection('security', this)">🔒 Segurança</a>
+      <a class="account-nav-item" href="#" id="btn-logout" style="color:#e53e3e;margin-top:auto">🚪 Sair</a>
+    </nav>
+  </aside>
+  <div id="account-content"><div style="padding:40px;text-align:center">Carregando...</div></div>
+</div>
+
+<div id="footer"></div>
+
+<script src="js/cart.js"></script>
+<script src="js/main.js"></script>
+<script src="js/validadores.js"></script>
+<script type="module">
+import { supabase } from './js/supabase-config.js';
+
+function esc(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+}
+
+// Captura o hash da URL ANTES de qualquer await: o Supabase processa e
+// limpa esse hash durante a inicialização do cliente, então se a gente
+// só checar isso depois, a informação já pode ter sumido.
+const rawHashInicial = window.location.hash;
+const veioDeLinkRecuperacao = rawHashInicial.includes('type=recovery');
+const hashParamsC = new URLSearchParams(rawHashInicial.replace(/^#/, ''));
+const erroNoLink = hashParamsC.get('error');
+const codigoErroLink = hashParamsC.get('error_code');
+
+// Verifica se está logado (getSession renova o token sozinho se tiver
+// expirado — getUser() não fazia isso e derrubava sessões válidas)
+const { data: { session } } = await supabase.auth.getSession();
+if (!session) { window.location.replace('login.html'); throw new Error('não autenticado'); }
+const user = session.user;
+
+// Mostra nome e email
+const nome = user.user_metadata?.full_name || user.email.split('@')[0];
+document.getElementById('user-name').textContent = nome;
+document.getElementById('user-email').textContent = user.email;
+
+// Trata o retorno do link de "esqueci minha senha" enviado por e-mail.
+// Antes essa página ignorava completamente esse link — por isso não
+// recuperava nem trocava a senha.
+if (erroNoLink) {
+  const msgErro = codigoErroLink === 'otp_expired'
+    ? 'Esse link de redefinição expirou ou já foi usado. Solicite um novo no botão "Esqueceu sua senha?".'
+    : 'Não foi possível validar o link de redefinição. Solicite um novo.';
+  showToast(msgErro, 'error');
+  history.replaceState(null, '', window.location.pathname + window.location.search);
+}
+
+// Quando o link do e-mail é válido, o Supabase autentica a sessão e
+// dispara este evento — pulamos direto pra tela de "escolher nova senha"
+// (a identidade já foi confirmada pelo próprio link do e-mail).
+supabase.auth.onAuthStateChange((event) => {
+  if (event === 'PASSWORD_RECOVERY') {
+    document.querySelectorAll('.account-nav-item').forEach(a => a.classList.remove('active'));
+    document.querySelector('[onclick*="security"]')?.classList.add('active');
+    document.getElementById('page-title').textContent = 'Segurança';
+    renderPassoNovaSenhaDireta();
+  }
+});
+
+function renderPassoNovaSenhaDireta() {
+  document.getElementById('account-content').innerHTML = `
+  <div class="card"><div class="card-body" style="max-width:480px">
+    <p style="font-weight:700;font-size:16px;margin-bottom:4px">🔒 Redefinir Senha</p>
+    <p style="font-size:13px;color:var(--text-muted);margin-bottom:20px">Identidade confirmada pelo link do e-mail. Escolha sua nova senha.</p>
+    <div class="form-group">
+      <label class="form-label">Nova senha *</label>
+      <input type="password" class="form-input" id="new-pass-direto" placeholder="Mínimo 8 caracteres">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Confirmar nova senha *</label>
+      <input type="password" class="form-input" id="new-pass2-direto" placeholder="Repita a nova senha">
+    </div>
+    <button class="btn btn-primary" onclick="confirmarNovaSenhaDireta()" style="width:100%">✅ Salvar Nova Senha</button>
+  </div></div>`;
+}
+
+window.confirmarNovaSenhaDireta = async function() {
+  const p1 = document.getElementById('new-pass-direto').value;
+  const p2 = document.getElementById('new-pass2-direto').value;
+  if (p1.length < 8) { showToast('A senha deve ter no mínimo 8 caracteres', 'error'); return; }
+  if (p1 !== p2) { showToast('As senhas não coincidem', 'error'); return; }
+
+  const btn = document.querySelector('#account-content .btn-primary');
+  btn.disabled = true; btn.textContent = 'Salvando...';
+
+  const { error } = await supabase.auth.updateUser({ password: p1 });
+  btn.disabled = false; btn.textContent = '✅ Salvar Nova Senha';
+
+  if (error) { showToast('Erro ao salvar nova senha. Tente novamente.', 'error'); return; }
+
+  document.getElementById('account-content').innerHTML = `
+  <div class="card"><div class="card-body" style="text-align:center;padding:48px">
+    <p style="font-size:48px;margin-bottom:16px">✅</p>
+    <p style="font-weight:700;font-size:18px;margin-bottom:8px">Senha alterada!</p>
+    <p style="color:var(--text-muted);margin-bottom:24px">Sua senha foi atualizada com sucesso.</p>
+    <a href="conta.html" class="btn btn-primary">Ok</a>
+  </div></div>`;
+};
+
+function formatPrice(v) {
+  return Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+
+function formatDate(d) {
+  return new Date(d).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
+function statusBadge(s) {
+  const map = {
+    'pendente': 'badge-yellow',
+    'pago': 'badge-blue',
+    'enviado': 'badge-blue',
+    'entregue': 'badge-green',
+    'cancelado': 'badge-red'
+  };
+  const labels = {
+    'pendente': 'Recebido',
+    'pago': 'Pagamento confirmado',
+    'enviado': 'Saiu para entrega',
+    'entregue': 'Entregue',
+    'cancelado': 'Cancelado'
+  };
+  return `<span class="badge ${map[s] || 'badge-muted'}">${labels[s] || s}</span>`;
+}
+
+// SEÇÃO PEDIDOS
+async function loadOrders() {
+  const content = document.getElementById('account-content');
+  content.innerHTML = '<div style="padding:40px;text-align:center">Buscando pedidos...</div>';
+
+  const { data: pedidos, error } = await supabase
+    .from('pedidos')
+    .select('*')
+    .eq('usuario_id', user.id)
+    .order('created_at', { ascending: false });
+
+  if (error || !pedidos?.length) {
+    content.innerHTML = `<div class="card"><div class="card-body" style="text-align:center;padding:48px">
+      <p style="font-size:40px;margin-bottom:12px">📦</p>
+      <p style="font-weight:700;margin-bottom:8px">Nenhum pedido ainda</p>
+      <p style="color:var(--text-muted);margin-bottom:20px">Seus pedidos aparecerão aqui após a compra.</p>
+      <a href="produtos.html" class="btn btn-primary">Ver Produtos</a>
+    </div></div>`;
+    return;
+  }
+
+  // Busca fotos de todos os produtos presentes nos pedidos de uma vez
+  const todosProdutoIds = [...new Set(pedidos.flatMap(p => (p.itens||[]).map(i => i.produto_id).filter(Boolean)))];
+  let fotosMap = {};
+  if (todosProdutoIds.length) {
+    const { data: prods } = await supabase.from('produtos').select('id, image_url, emoji').in('id', todosProdutoIds);
+    (prods || []).forEach(pr => { fotosMap[pr.id] = { image_url: pr.image_url, emoji: pr.emoji }; });
+  }
+
+  // Busca solicitações de devolução já feitas, pra não deixar pedir de novo
+  const { data: devolucoes } = await supabase.from('solicitacoes_devolucao').select('*').eq('usuario_id', user.id);
+  const devolucaoPorPedido = {};
+  (devolucoes || []).forEach(d => { devolucaoPorPedido[d.pedido_id] = d; });
+
+  content.innerHTML = pedidos.map(p => {
+    const itensHTML = (p.itens || []).map(i => {
+      const nome = esc(i.nome || i.name || 'Produto');
+      const pid = i.produto_id;
+      const foto = pid ? fotosMap[pid] : null;
+      const thumb = foto?.image_url
+        ? `<img src="${foto.image_url}" style="width:28px;height:28px;object-fit:cover;border-radius:6px;flex-shrink:0">`
+        : `<span style="font-size:18px;line-height:1;flex-shrink:0">${foto?.emoji || i.emoji || '📦'}</span>`;
+      return pid
+        ? `<a href="produto.html?id=${pid}" style="color:var(--text);text-decoration:none;display:inline-flex;align-items:center;gap:6px;padding:4px 10px 4px 4px;border:1px solid var(--border);border-radius:20px;font-size:12px;margin:2px 2px 2px 0;transition:border-color .2s;background:var(--bg-muted)" onmouseover="this.style.borderColor='var(--primary)'" onmouseout="this.style.borderColor='var(--border)'">${thumb}<span>${nome}</span></a>`
+        : `<span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--text-muted)">${thumb}<span>${nome}</span></span>`;
+    }).join('');
+    const podeEditar = p.status === 'pendente';
+    const devolucao = devolucaoPorPedido[p.id];
+    const labelsDevolucao = { solicitado: '🔄 Devolução em análise', aprovado: '✅ Devolução aprovada', rejeitado: '❌ Devolução recusada', reembolsado: '💰 Reembolsado em saldo' };
+    return `<div class="card" style="margin-bottom:12px">
+      <div class="card-body">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px">
+          <div style="flex:1">
+            <p style="font-weight:700;margin-bottom:6px">#${p.id.slice(0,8).toUpperCase()}</p>
+            <div style="margin-bottom:6px">${itensHTML}</div>
+            <p style="font-size:12px;color:var(--text-muted);margin-top:4px">📅 ${formatDate(p.created_at)}</p>
+          </div>
+          <div style="text-align:right">
+            ${statusBadge(p.status)}
+            <p style="font-weight:900;color:var(--primary);margin-top:6px">${formatPrice(p.total)}</p>
+          </div>
+        </div>
+        ${devolucao ? `<p style="font-size:12px;font-weight:700;margin-top:10px">${labelsDevolucao[devolucao.status] || devolucao.status}</p>` : ''}
+        ${(p.status !== 'cancelado' || podeEditar) ? `
+        <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);text-align:right;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap">
+          ${p.status !== 'cancelado' ? `<button onclick="abrirRastreio('${p.id}')" class="btn btn-outline btn-sm">📍 Rastrear Pedido</button>` : ''}
+          ${p.status === 'entregue' && !devolucao ? `<button onclick="abrirSolicitarDevolucao('${p.id}')" class="btn btn-outline btn-sm">↩️ Solicitar Devolução</button>` : ''}
+          ${podeEditar ? `<button onclick="abrirEdicaoPedido('${p.id}')" class="btn btn-outline btn-sm">✏️ Editar dados</button>
+          <button onclick="cancelarPedido('${p.id}')" class="btn btn-sm" style="background:#fee2e2;color:#b91c1c;border:none">Cancelar Pedido</button>` : ''}
+        </div>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+
+  window._pedidosCache = pedidos;
+}
+
+window.abrirSolicitarDevolucao = function(pedidoId) {
+  const modal = document.createElement('div');
+  modal.id = 'modal-devolucao';
+  modal.style = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;display:flex;align-items:center;justify-content:center;padding:16px';
+  modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+  modal.innerHTML = `
+    <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:16px;padding:22px;width:100%;max-width:420px" onclick="event.stopPropagation()">
+      <p style="font-weight:900;font-size:16px;margin-bottom:14px">↩️ Solicitar Devolução</p>
+      <label class="form-label" style="display:block;margin-bottom:6px;font-size:12px;color:var(--text-muted)">Motivo</label>
+      <select id="devolucao-motivo" class="form-input" style="width:100%;margin-bottom:12px">
+        <option>Produto com defeito</option>
+        <option>Produto diferente do anunciado</option>
+        <option>Não gostei / me arrependi</option>
+        <option>Chegou danificado</option>
+        <option>Outro motivo</option>
+      </select>
+      <label class="form-label" style="display:block;margin-bottom:6px;font-size:12px;color:var(--text-muted)">Conte mais (opcional)</label>
+      <textarea id="devolucao-detalhes" class="form-input" rows="3" style="width:100%;resize:vertical;margin-bottom:16px" placeholder="Detalhes do problema..."></textarea>
+      <div style="display:flex;gap:8px">
+        <button onclick="document.getElementById('modal-devolucao').remove()" class="btn btn-outline" style="flex:1">Cancelar</button>
+        <button onclick="enviarSolicitacaoDevolucao('${pedidoId}')" class="btn btn-primary" style="flex:1">Enviar Solicitação</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+};
+
+window.enviarSolicitacaoDevolucao = async function(pedidoId) {
+  const motivo = document.getElementById('devolucao-motivo').value;
+  const detalhes = document.getElementById('devolucao-detalhes').value.trim();
+  const { error } = await supabase.from('solicitacoes_devolucao').insert({
+    pedido_id: pedidoId, usuario_id: user.id, motivo, detalhes: detalhes || null
+  });
+  document.getElementById('modal-devolucao')?.remove();
+  if (error) { showToast('Erro ao enviar solicitação. Tente novamente.', 'error'); return; }
+  showToast('Solicitação enviada! Vamos analisar e te avisar.', 'success');
+  loadOrders();
+};
+window.cancelarPedido = async function(id) {
+  if (!confirm('Tem certeza que deseja cancelar este pedido?')) return;
+  const { error } = await supabase.from('pedidos').update({ status: 'cancelado' }).eq('id', id);
+  if (error) { showToast('Erro ao cancelar pedido.', 'error'); return; }
+  showToast('Pedido cancelado.', 'success');
+  loadOrders();
+};
+
+// ===== RASTREIO DO PEDIDO (linha do tempo tipo iFood, ao vivo) =====
+const ETAPAS_RASTREIO = [
+  { status: 'pendente', label: 'Pedido recebido', icone: '🧾' },
+  { status: 'pago', label: 'Pagamento confirmado', icone: '💳' },
+  { status: 'enviado', label: 'Saiu para entrega', icone: '🛵' },
+  { status: 'entregue', label: 'Entregue', icone: '📦' }
+];
+
+let _canalRastreio = null;
+
+window.fecharRastreio = function() {
+  const modal = document.getElementById('modal-rastreio');
+  if (modal) modal.remove();
+  if (_canalRastreio) { supabase.removeChannel(_canalRastreio); _canalRastreio = null; }
+};
+
+function renderRastreioConteudo(pedido, historico) {
+  if (pedido.status === 'cancelado') {
+    return `<div style="text-align:center;padding:24px 8px">
+      <p style="font-size:40px;margin-bottom:10px">❌</p>
+      <p style="font-weight:700;margin-bottom:4px">Pedido cancelado</p>
+      <p style="color:var(--text-muted);font-size:13px">Este pedido não está mais em andamento.</p>
+    </div>`;
+  }
+
+  const idxAtual = ETAPAS_RASTREIO.findIndex(e => e.status === pedido.status);
+  const horaPorStatus = {};
+  (historico || []).forEach(h => { if (!horaPorStatus[h.status]) horaPorStatus[h.status] = h.criado_em; });
+
+  const mostrarCodigo = pedido.status === 'enviado' && pedido.codigo_confirmacao;
+
+  return `<div style="padding:4px 4px 0">
+    ${mostrarCodigo ? `
+    <div style="background:rgba(170,239,0,0.08);border:1px solid var(--primary);border-radius:12px;padding:12px 14px;margin-bottom:18px">
+      <p style="font-size:11px;color:var(--text-muted);text-transform:uppercase;font-weight:700;letter-spacing:.04em">Código de confirmação</p>
+      <p style="font-size:20px;font-weight:900;letter-spacing:.05em;margin-top:2px">${pedido.codigo_confirmacao}</p>
+      <p style="font-size:11px;color:var(--text-muted);margin-top:2px">Informe esse código pro entregador quando o pedido chegar.</p>
+    </div>` : ''}
+    ${ETAPAS_RASTREIO.map((etapa, i) => {
+      const feito = idxAtual >= 0 && i <= idxAtual;
+      const atual = i === idxAtual;
+      const hora = horaPorStatus[etapa.status];
+      return `
+      <div style="display:flex;gap:14px">
+        <div style="display:flex;flex-direction:column;align-items:center">
+          <div style="width:36px;height:36px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:16px;
+            background:${feito ? 'rgba(170,239,0,0.15)' : 'var(--bg-muted)'};
+            border:2px solid ${feito ? 'var(--primary)' : 'var(--border)'};
+            ${atual ? 'animation: successRing 1.4s ease-out infinite;' : ''}">
+            ${feito ? (i === idxAtual ? etapa.icone : '✓') : etapa.icone}
+          </div>
+          ${i < ETAPAS_RASTREIO.length - 1 ? `<div style="width:2px;flex:1;min-height:28px;background:${i < idxAtual ? 'var(--primary)' : 'var(--border)'}"></div>` : ''}
+        </div>
+        <div style="padding-bottom:26px">
+          <p style="font-weight:${atual ? '900' : '700'};font-size:14px;color:${feito ? 'var(--text)' : 'var(--text-muted)'}">${etapa.label}</p>
+          <p style="font-size:11px;color:var(--text-muted);margin-top:2px">${hora ? new Date(hora).toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' }) : (feito ? '' : 'Aguardando...')}</p>
+        </div>
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+
+window.abrirRastreio = async function(pedidoId) {
+  const modal = document.createElement('div');
+  modal.id = 'modal-rastreio';
+  modal.style = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;display:flex;align-items:center;justify-content:center;padding:16px';
+  modal.innerHTML = `
+    <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:20px;padding:24px;width:100%;max-width:420px;max-height:90vh;overflow-y:auto">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">
+        <p style="font-weight:900;font-size:17px">📍 Rastrear Pedido</p>
+        <button onclick="fecharRastreio()" style="background:none;border:none;color:var(--text-muted);font-size:20px;cursor:pointer">✕</button>
+      </div>
+      <p style="font-size:12px;color:var(--text-muted);margin-bottom:16px">#${pedidoId.slice(0,8).toUpperCase()}</p>
+      <div id="rastreio-conteudo"><div style="padding:30px;text-align:center;color:var(--text-muted)">Carregando...</div></div>
+    </div>`;
+  document.body.appendChild(modal);
+
+  async function atualizarConteudo() {
+    const { data: pedido } = await supabase.from('pedidos').select('*').eq('id', pedidoId).single();
+    const { data: historico } = await supabase.from('pedidos_status_historico').select('*').eq('pedido_id', pedidoId).order('criado_em', { ascending: true });
+    const alvo = document.getElementById('rastreio-conteudo');
+    if (alvo && pedido) alvo.innerHTML = renderRastreioConteudo(pedido, historico);
+  }
+
+  await atualizarConteudo();
+
+  // Assina atualizações em tempo real: quando o admin muda o status,
+  // a tela do cliente atualiza sozinha, sem precisar recarregar.
+  _canalRastreio = supabase
+    .channel('rastreio-' + pedidoId)
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'pedidos', filter: `id=eq.${pedidoId}` }, atualizarConteudo)
+    .subscribe();
+};
+
+// Edição de dados do pedido — só permitida enquanto status = pendente
+window.abrirEdicaoPedido = function(id) {
+  const pedido = (window._pedidosCache || []).find(p => p.id === id);
+  if (!pedido) return;
+  const end = pedido.endereco || {};
+
+  const modal = document.createElement('div');
+  modal.id = 'modal-editar-pedido';
+  modal.style = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;display:flex;align-items:center;justify-content:center;padding:16px';
+  modal.innerHTML = `
+    <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:20px;padding:24px;width:100%;max-width:420px;max-height:90vh;overflow-y:auto">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <h2 style="font-size:16px;font-weight:900">Editar dados do pedido</h2>
+        <button onclick="document.getElementById('modal-editar-pedido').remove()" style="background:none;border:none;color:var(--text-muted);font-size:20px;cursor:pointer">✕</button>
+      </div>
+      <div class="form-group"><label class="form-label">Nome completo</label>
+        <input type="text" class="form-input" id="edit-pedido-nome" value="${end.nome || ''}"></div>
+      <div class="form-group"><label class="form-label">Telefone</label>
+        <input type="text" class="form-input" id="edit-pedido-telefone" value="${end.telefone || ''}"></div>
+      <div class="form-group"><label class="form-label">Bairro</label>
+        <input type="text" class="form-input" id="edit-pedido-bairro" value="${end.bairro || ''}"></div>
+      <div class="form-group"><label class="form-label">Endereço (rua, número)</label>
+        <input type="text" class="form-input" id="edit-pedido-endereco" value="${end.endereco || ''}"></div>
+      <div class="form-group"><label class="form-label">Ponto de referência</label>
+        <input type="text" class="form-input" id="edit-pedido-referencia" value="${end.referencia || ''}"></div>
+      <button class="btn btn-primary btn-full" onclick="salvarEdicaoPedido('${id}')" style="margin-top:8px">Salvar Alterações</button>
+    </div>`;
+  document.body.appendChild(modal);
+};
+
+window.salvarEdicaoPedido = async function(id) {
+  const pedido = (window._pedidosCache || []).find(p => p.id === id);
+  if (!pedido) return;
+
+  const sanitizar = (str, max) => String(str || '').replace(/<[^>]*>/g, '').trim().substring(0, max);
+  const novoEndereco = {
+    ...(pedido.endereco || {}),
+    nome: sanitizar(document.getElementById('edit-pedido-nome').value, 100),
+    telefone: document.getElementById('edit-pedido-telefone').value.trim(),
+    bairro: sanitizar(document.getElementById('edit-pedido-bairro').value, 100),
+    endereco: sanitizar(document.getElementById('edit-pedido-endereco').value, 200),
+    referencia: sanitizar(document.getElementById('edit-pedido-referencia').value, 200)
+  };
+
+  const { error } = await supabase.from('pedidos').update({
+    endereco: novoEndereco,
+    usuario_nome: novoEndereco.nome,
+    usuario_telefone: novoEndereco.telefone
+  }).eq('id', id);
+
+  if (error) { showToast('Erro ao salvar alterações.', 'error'); return; }
+  document.getElementById('modal-editar-pedido')?.remove();
+  showToast('Dados do pedido atualizados!', 'success');
+  loadOrders();
+};
+
+// SEÇÃO PERFIL
+async function loadProfile() {
+  const { data: perfil } = await supabase
+    .from('usuarios')
+    .select('*')
+    .eq('id', user.id)
+    .single();
+
+  const cpfAtual = perfil?.cpf || '';
+  const telefoneAtual = perfil?.telefone || '';
+
+  const content = document.getElementById('account-content');
+  content.innerHTML = `<div class="card"><div class="card-body">
+    <form id="form-perfil" style="max-width:480px">
+      <div class="form-group"><label class="form-label">Nome completo</label>
+        <input type="text" class="form-input" id="edit-name" value="${perfil?.nome || nome}"></div>
+      <div class="form-group"><label class="form-label">E-mail</label>
+        <input type="email" class="form-input" value="${user.email}" disabled style="opacity:0.6"></div>
+      <button type="submit" class="btn btn-primary">Salvar Nome</button>
+    </form>
+
+    <div style="margin-top:24px;padding-top:24px;border-top:1px solid var(--border)">
+      <label class="form-label">CPF</label>
+      <div id="cpf-status" style="margin-bottom:10px;font-size:13px">
+        ${cpfAtual
+          ? `<strong>${window.mascararCPF(cpfAtual)}</strong> <button type="button" id="btn-trocar-cpf" class="btn" style="padding:2px 10px;font-size:12px;margin-left:8px">Trocar CPF</button>`
+          : `<span style="color:#ef4444">⚠️ Nenhum CPF cadastrado</span>`}
+      </div>
+      <div id="bloco-editar-cpf" style="display:${cpfAtual ? 'none' : 'block'}">
+        <div class="form-group">
+          <input type="text" class="form-input" id="input-cpf" placeholder="000.000.000-00" maxlength="14" oninput="mascaraCPF(this)">
+        </div>
+        <button type="button" id="btn-salvar-cpf" class="btn btn-primary">Salvar CPF</button>
+        <button type="button" id="btn-cancelar-cpf" class="btn" style="margin-left:8px;display:${cpfAtual ? 'inline-block' : 'none'}">Cancelar</button>
+      </div>
+    </div>
+
+    <div style="margin-top:24px;padding-top:24px;border-top:1px solid var(--border)">
+      <label class="form-label">Telefone</label>
+      <div id="telefone-status" style="margin-bottom:10px;font-size:13px">
+        ${telefoneAtual
+          ? `<strong>${formatarTelExibicao(telefoneAtual)}</strong> <button type="button" id="btn-trocar-tel" class="btn" style="padding:2px 10px;font-size:12px;margin-left:8px">Trocar número</button>`
+          : `<span style="color:#ef4444">⚠️ Nenhum telefone cadastrado</span>`}
+      </div>
+      <div id="bloco-editar-tel" style="display:${telefoneAtual ? 'none' : 'block'}">
+        <div class="form-group">
+          <input type="tel" class="form-input" id="input-tel" placeholder="(11) 99999-9999" maxlength="15" oninput="mascaraTelConta(this)">
+        </div>
+        <button type="button" id="btn-salvar-tel" class="btn btn-primary">Salvar telefone</button>
+        <button type="button" id="btn-cancelar-tel" class="btn" style="margin-left:8px;display:${telefoneAtual ? 'inline-block' : 'none'}">Cancelar</button>
+      </div>
+    </div>
+  </div></div>`;
+
+  // Salvar nome
+  document.getElementById('form-perfil').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const { error } = await supabase.from('usuarios').upsert({
+      id: user.id,
+      email: user.email,
+      nome: document.getElementById('edit-name').value
+    });
+    if (error) { showToast('Erro ao salvar.', 'error'); return; }
+    showToast('Nome atualizado!', 'success');
+    document.getElementById('user-name').textContent = document.getElementById('edit-name').value;
+  });
+
+  // CPF — salva direto (sem confirmação por e-mail por enquanto; a
+  // checagem de CPF único continua valendo antes de salvar).
+  document.getElementById('btn-trocar-cpf')?.addEventListener('click', () => {
+    document.getElementById('bloco-editar-cpf').style.display = 'block';
+  });
+  document.getElementById('btn-cancelar-cpf')?.addEventListener('click', () => {
+    document.getElementById('bloco-editar-cpf').style.display = 'none';
+  });
+  document.getElementById('btn-salvar-cpf')?.addEventListener('click', async (e) => {
+    const cpfVal = document.getElementById('input-cpf').value;
+    if (!window.validarCPFReal(cpfVal)) { showToast('CPF inválido. Verifique os números.', 'error'); return; }
+
+    const btn = e.target;
+    btn.disabled = true; btn.textContent = 'Salvando...';
+
+    const { data: cpfLivre, error: erroCpf } = await supabase.rpc('cpf_disponivel', {
+      cpf_input: cpfVal,
+      usuario_atual: user.id
+    });
+    if (erroCpf) { btn.disabled = false; btn.textContent = 'Salvar CPF'; showToast('Não foi possível validar o CPF agora.', 'error'); return; }
+    if (cpfLivre === false) { btn.disabled = false; btn.textContent = 'Salvar CPF'; showToast('Este CPF já está em uso por outra conta.', 'error'); return; }
+
+    const { error } = await supabase.from('usuarios').upsert({ id: user.id, email: user.email, cpf: cpfVal });
+    btn.disabled = false; btn.textContent = 'Salvar CPF';
+    if (error) {
+      showToast(error.code === '23505' ? 'Este CPF já está em uso por outra conta.' : 'Erro ao salvar.', 'error');
+      return;
+    }
+    showToast('CPF salvo com sucesso!', 'success');
+    loadProfile();
+  });
+
+  // Telefone — salva direto
+  document.getElementById('btn-trocar-tel')?.addEventListener('click', () => {
+    document.getElementById('bloco-editar-tel').style.display = 'block';
+  });
+  document.getElementById('btn-cancelar-tel')?.addEventListener('click', () => {
+    document.getElementById('bloco-editar-tel').style.display = 'none';
+  });
+  document.getElementById('btn-salvar-tel')?.addEventListener('click', async (e) => {
+    const telVal = document.getElementById('input-tel').value;
+    if (!window.validarTelefoneReal(telVal)) { showToast('Telefone inválido. Use um número real com DDD.', 'error'); return; }
+
+    const btn = e.target;
+    btn.disabled = true; btn.textContent = 'Salvando...';
+    const { error } = await supabase.from('usuarios').upsert({ id: user.id, email: user.email, telefone: telVal });
+    btn.disabled = false; btn.textContent = 'Salvar telefone';
+    if (error) { showToast('Erro ao salvar.', 'error'); return; }
+    showToast('Telefone salvo com sucesso!', 'success');
+    loadProfile();
+  });
+}
+
+function formatarTelExibicao(telefone) {
+  const d = String(telefone || '').replace(/\D/g, '').replace(/^55/, '');
+  if (d.length === 11) return `(${d.slice(0,2)}) ${d.slice(2,7)}-${d.slice(7)}`;
+  if (d.length === 10) return `(${d.slice(0,2)}) ${d.slice(2,6)}-${d.slice(6)}`;
+  return telefone;
+}
+
+// SEÇÃO ENDEREÇOS
+async function loadAddresses() {
+  const content = document.getElementById('account-content');
+  content.innerHTML = '<div style="padding:40px;text-align:center">Carregando endereços...</div>';
+
+  const { data: enderecos, error } = await supabase
+    .from('enderecos')
+    .select('*')
+    .eq('usuario_id', user.id)
+    .order('favorito', { ascending: false });
+
+  if (error || !enderecos?.length) {
+    content.innerHTML = `
+    <div class="card"><div class="card-body" style="text-align:center;padding:48px">
+      <p style="font-size:40px;margin-bottom:12px">📍</p>
+      <p style="font-weight:700;margin-bottom:8px">Nenhum endereço cadastrado</p>
+      <p style="color:var(--text-muted);margin-bottom:20px">Adicione um endereço para agilizar suas compras.</p>
+      <button class="btn btn-primary" onclick="abrirModalEndereco()">+ Adicionar Endereço</button>
+    </div></div>`;
+    return;
+  }
+
+  content.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <p style="font-weight:700;font-size:15px">Meus Endereços</p>
+      <button class="btn btn-primary btn-sm" onclick="abrirModalEndereco()">+ Adicionar</button>
+    </div>
+    ${enderecos.map(end => `
+    <div class="card" style="margin-bottom:12px;border:2px solid ${end.favorito ? 'var(--primary)' : 'var(--border)'}">
+      <div class="card-body">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">
+          <div style="flex:1">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+              <p style="font-weight:700;font-size:14px">${end.apelido || 'Endereço'}</p>
+              ${end.favorito ? '<span style="background:var(--primary);color:#000;font-size:10px;font-weight:900;padding:2px 8px;border-radius:20px">⭐ FAVORITO</span>' : ''}
+            </div>
+            <p style="font-size:13px;color:var(--text-muted)">${end.rua}, ${end.numero}${end.complemento ? ' - ' + end.complemento : ''}</p>
+            <p style="font-size:13px;color:var(--text-muted)">${esc(end.bairro)} — Santa Maria, RS</p>
+            ${end.referencia ? `<p style="font-size:12px;color:var(--text-muted);margin-top:2px">📌 ${end.referencia}</p>` : ''}
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0">
+            ${!end.favorito ? `<button onclick="tornarFavorito('${end.id}')" style="background:none;border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:12px;cursor:pointer;color:var(--text-muted);white-space:nowrap">⭐ Favoritar</button>` : ''}
+            <button onclick="abrirModalEndereco('${end.id}')" style="background:none;border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:12px;cursor:pointer;color:var(--text)">✏️ Editar</button>
+            <button onclick="excluirEndereco('${end.id}')" style="background:none;border:1px solid rgba(239,68,68,0.3);border-radius:8px;padding:6px 10px;font-size:12px;cursor:pointer;color:#ef4444">🗑️ Excluir</button>
+          </div>
+        </div>
+      </div>
+    </div>`).join('')}`;
+}
+
+window.tornarFavorito = async function(id) {
+  // Remove favorito de todos e define no selecionado
+  await supabase.from('enderecos').update({ favorito: false }).eq('usuario_id', user.id);
+  await supabase.from('enderecos').update({ favorito: true }).eq('id', id);
+  showToast('Endereço favorito definido!', 'success');
+  loadAddresses();
+};
+
+window.excluirEndereco = async function(id) {
+  if (!confirm('Excluir este endereço?')) return;
+  await supabase.from('enderecos').delete().eq('id', id);
+  showToast('Endereço excluído.', 'success');
+  loadAddresses();
+};
+
+window.abrirModalEndereco = async function(id = null) {
+  let dados = { apelido:'', rua:'', numero:'', complemento:'', bairro:'', referencia:'', favorito: false };
+  if (id) {
+    const { data } = await supabase.from('enderecos').select('*').eq('id', id).single();
+    if (data) dados = data;
+  }
+
+  const modal = document.createElement('div');
+  modal.id = 'modal-endereco';
+  modal.style = 'position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:200;display:flex;align-items:center;justify-content:center;padding:16px';
+  modal.innerHTML = `
+    <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:20px;padding:24px;width:100%;max-width:440px;max-height:92vh;overflow-y:auto">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+        <h2 style="font-size:16px;font-weight:900">${id ? 'Editar Endereço' : 'Novo Endereço'}</h2>
+        <button onclick="document.getElementById('modal-endereco').remove()" style="background:none;border:none;color:var(--text-muted);font-size:20px;cursor:pointer">✕</button>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Apelido (ex: Casa, Trabalho)</label>
+        <input type="text" class="form-input" id="end-apelido" placeholder="Casa" value="${dados.apelido || ''}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Rua *</label>
+        <input type="text" class="form-input" id="end-rua" placeholder="Rua Santiago" value="${dados.rua || ''}">
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="form-group">
+          <label class="form-label">Número *</label>
+          <input type="text" class="form-input" id="end-numero" placeholder="95" value="${dados.numero || ''}">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Complemento</label>
+          <input type="text" class="form-input" id="end-complemento" placeholder="Apto 2" value="${dados.complemento || ''}">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Bairro *</label>
+        <input type="text" class="form-input" id="end-bairro" placeholder="Centro" value="${dados.bairro || ''}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Ponto de referência</label>
+        <input type="text" class="form-input" id="end-referencia" placeholder="Próximo ao mercado X" value="${dados.referencia || ''}">
+      </div>
+
+      <label style="display:flex;align-items:center;gap:10px;margin-bottom:20px;cursor:pointer;padding:12px;border:1px solid var(--border);border-radius:12px">
+        <input type="checkbox" id="end-favorito" ${dados.favorito ? 'checked' : ''} style="width:18px;height:18px;accent-color:var(--primary)">
+        <div>
+          <p style="font-size:13px;font-weight:700">⭐ Definir como favorito</p>
+          <p style="font-size:11px;color:var(--text-muted)">Será pré-preenchido automaticamente no checkout</p>
+        </div>
+      </label>
+
+      <button class="btn btn-primary btn-full" onclick="salvarEndereco('${id || ''}')">
+        ${id ? 'Salvar Alterações' : 'Adicionar Endereço'}
+      </button>
+    </div>`;
+  document.body.appendChild(modal);
+};
+
+window.salvarEndereco = async function(id) {
+  const san = (v, max) => String(v || '').replace(/<[^>]*>/g,'').trim().substring(0, max);
+  const rua = san(document.getElementById('end-rua').value, 150);
+  const numero = san(document.getElementById('end-numero').value, 20);
+  const bairro = san(document.getElementById('end-bairro').value, 100);
+  if (!rua || !numero || !bairro) { showToast('Preencha rua, número e bairro', 'error'); return; }
+
+  const favorito = document.getElementById('end-favorito').checked;
+
+  // Se vai ser favorito, remove dos outros primeiro
+  if (favorito) {
+    await supabase.from('enderecos').update({ favorito: false }).eq('usuario_id', user.id);
+  }
+
+  const payload = {
+    usuario_id: user.id,
+    apelido: san(document.getElementById('end-apelido').value, 50) || 'Endereço',
+    rua, numero,
+    complemento: san(document.getElementById('end-complemento').value, 100),
+    bairro,
+    referencia: san(document.getElementById('end-referencia').value, 200),
+    favorito
+  };
+
+  let erro;
+  if (id) {
+    ({ error: erro } = await supabase.from('enderecos').update(payload).eq('id', id));
+  } else {
+    ({ error: erro } = await supabase.from('enderecos').insert(payload));
+  }
+
+  if (erro) { showToast('Erro ao salvar endereço.', 'error'); return; }
+  document.getElementById('modal-endereco')?.remove();
+  showToast(id ? 'Endereço atualizado!' : 'Endereço adicionado!', 'success');
+  loadAddresses();
+};
+
+// SEÇÃO SEGURANÇA — fluxo: senha atual → código por e-mail → nova senha
+function loadSecurity() {
+  renderPassoSenhaAtual();
+}
+
+function renderPassoSenhaAtual() {
+  document.getElementById('account-content').innerHTML = `
+  <div class="card"><div class="card-body" style="max-width:480px">
+    <p style="font-weight:700;font-size:16px;margin-bottom:4px">🔒 Alterar Senha</p>
+    <p style="font-size:13px;color:var(--text-muted);margin-bottom:20px">Passo 1 de 3 — Confirme sua identidade</p>
+
+    <div class="form-group">
+      <label class="form-label">Senha atual *</label>
+      <input type="password" class="form-input" id="senha-atual" placeholder="Digite sua senha atual">
+    </div>
+
+    <button class="btn btn-primary" onclick="validarSenhaAtual()" style="width:100%">Continuar →</button>
+
+    <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border);text-align:center">
+      <p style="font-size:12px;color:var(--text-muted);margin-bottom:8px">Esqueceu sua senha?</p>
+      <button onclick="enviarResetEmail()" style="background:none;border:none;color:var(--primary);font-size:13px;font-weight:700;cursor:pointer">Receber link de redefinição por e-mail</button>
+    </div>
+  </div></div>`;
+}
+
+window.validarSenhaAtual = async function() {
+  const senhaAtual = document.getElementById('senha-atual').value;
+  if (!senhaAtual) { showToast('Digite sua senha atual', 'error'); return;  }
+
+  const btn = document.querySelector('#account-content .btn-primary');
+  btn.disabled = true; btn.textContent = 'Verificando...';
+
+  // Re-autentica com e-mail + senha atual para confirmar identidade
+  const { error } = await supabase.auth.signInWithPassword({
+    email: user.email,
+    password: senhaAtual
+  });
+
+  if (error) {
+    btn.disabled = false; btn.textContent = 'Continuar →';
+    showToast('Senha atual incorreta. Tente novamente.', 'error');
+    return;
+  }
+
+  // Senha correta — avança para escolher canal de verificação
+  renderPassoEscolherCanal();
+};
+
+function renderPassoEscolherCanal() {
+  const telMasked = (user.user_metadata?.phone || '').replace(/(\d{2})(\d{4,5})(\d{4})/, '($1) ****-$3') || '';
+
+  document.getElementById('account-content').innerHTML = `
+  <div class="card"><div class="card-body" style="max-width:480px">
+    <p style="font-weight:700;font-size:16px;margin-bottom:4px">🔒 Alterar Senha</p>
+    <p style="font-size:13px;color:var(--text-muted);margin-bottom:20px">Passo 2 de 3 — Como deseja receber o código?</p>
+
+    <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px">
+      <div onclick="selecionarCanal('email')" id="canal-email"
+        style="display:flex;align-items:center;gap:12px;padding:14px 16px;border:2px solid var(--primary);border-radius:12px;cursor:pointer;background:rgba(170,239,0,0.05)">
+        <span style="font-size:22px">📧</span>
+        <div>
+          <p style="font-weight:700;font-size:13px">E-mail</p>
+          <p style="font-size:12px;color:var(--text-muted)">${user.email}</p>
+        </div>
+        <span style="margin-left:auto;font-size:10px;background:var(--primary);color:#000;font-weight:900;padding:2px 8px;border-radius:20px">RECOMENDADO</span>
+      </div>
+
+      <div onclick="selecionarCanal('whatsapp')" id="canal-whatsapp"
+        style="display:flex;align-items:center;gap:12px;padding:14px 16px;border:2px solid var(--border);border-radius:12px;cursor:pointer">
+        <span style="font-size:22px">💬</span>
+        <div>
+          <p style="font-weight:700;font-size:13px">WhatsApp / SMS</p>
+          <p style="font-size:12px;color:var(--text-muted)">Código enviado pelo suporte</p>
+        </div>
+      </div>
+    </div>
+
+    <button class="btn btn-primary" onclick="enviarCodigoVerificacao()" style="width:100%">Enviar Código →</button>
+    <button onclick="renderPassoSenhaAtual()" style="width:100%;background:none;border:none;color:var(--text-muted);font-size:13px;cursor:pointer;margin-top:12px">← Voltar</button>
+  </div></div>`;
+}
+
+let _canalSelecionado = 'email';
+window.selecionarCanal = function(canal) {
+  _canalSelecionado = canal;
+  ['email','whatsapp'].forEach(c => {
+    const el = document.getElementById('canal-' + c);
+    el.style.borderColor = c === canal ? 'var(--primary)' : 'var(--border)';
+    el.style.background = c === canal ? 'rgba(170,239,0,0.05)' : '';
+  });
+};
+
+window.enviarCodigoVerificacao = async function() {
+  const btn = document.querySelector('#account-content .btn-primary');
+  btn.disabled = true; btn.textContent = 'Enviando...';
+
+  if (_canalSelecionado === 'email') {
+    // Supabase envia OTP por e-mail nativamente
+    const { error } = await supabase.auth.signInWithOtp({ email: user.email, options: { shouldCreateUser: false } });
+    if (error) {
+      btn.disabled = false; btn.textContent = 'Enviar Código →';
+      showToast('Erro ao enviar código. Tente novamente.', 'error');
+      return;
+    }
+    showToast('Código enviado para ' + user.email, 'success');
+    renderPassoNovasSenha('email');
+
+  } else {
+    // WhatsApp: abre conversa com o suporte
+    const msg = encodeURIComponent('Olá, preciso de um código para alterar minha senha. Meu e-mail é: ' + user.email);
+    window.open('https://wa.me/5555984566918?text=' + msg, '_blank');
+    renderPassoNovasSenha('whatsapp');
+  }
+};
+
+function renderPassoNovasSenha(canal) {
+  const instrucao = canal === 'email'
+    ? `Enviamos um código de 6 dígitos para <strong>${user.email}</strong>`
+    : `Aguarde o código via WhatsApp do suporte. Digite-o abaixo quando receber.`;
+
+  document.getElementById('account-content').innerHTML = `
+  <div class="card"><div class="card-body" style="max-width:480px">
+    <p style="font-weight:700;font-size:16px;margin-bottom:4px">🔒 Alterar Senha</p>
+    <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px">Passo 3 de 3 — Código e nova senha</p>
+
+    <div style="background:rgba(170,239,0,0.06);border:1px solid rgba(170,239,0,0.25);border-radius:10px;padding:12px 14px;margin-bottom:16px;font-size:13px">
+      ${instrucao}
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Código de verificação *</label>
+      <input type="text" class="form-input" id="codigo-ver" placeholder="000000" maxlength="6"
+        style="letter-spacing:6px;font-size:20px;font-weight:700;text-align:center">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Nova senha *</label>
+      <input type="password" class="form-input" id="new-pass" placeholder="Mínimo 8 caracteres">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Confirmar nova senha *</label>
+      <input type="password" class="form-input" id="new-pass2" placeholder="Repita a nova senha">
+    </div>
+
+    <button class="btn btn-primary" onclick="confirmarNovaSenha('${canal}')" style="width:100%">✅ Confirmar Nova Senha</button>
+    <button onclick="renderPassoEscolherCanal()" style="width:100%;background:none;border:none;color:var(--text-muted);font-size:13px;cursor:pointer;margin-top:12px">← Voltar</button>
+  </div></div>`;
+}
+
+window.confirmarNovaSenha = async function(canal) {
+  const codigo = document.getElementById('codigo-ver').value.trim();
+  const p1 = document.getElementById('new-pass').value;
+  const p2 = document.getElementById('new-pass2').value;
+
+  if (!codigo || codigo.length < 6) { showToast('Digite o código de 6 dígitos', 'error'); return; }
+  if (p1.length < 8) { showToast('A senha deve ter no mínimo 8 caracteres', 'error'); return; }
+  if (p1 !== p2) { showToast('As senhas não coincidem', 'error'); return; }
+
+  const btn = document.querySelector('#account-content .btn-primary');
+  btn.disabled = true; btn.textContent = 'Verificando código...';
+
+  if (canal === 'email') {
+    // Verifica OTP e já atualiza a senha
+    const { error } = await supabase.auth.verifyOtp({ email: user.email, token: codigo, type: 'email' });
+    if (error) {
+      btn.disabled = false; btn.textContent = '✅ Confirmar Nova Senha';
+      showToast('Código inválido ou expirado. Tente novamente.', 'error');
+      return;
+    }
+  }
+  // Para whatsapp, o código foi validado manualmente pelo suporte — prossegue
+
+  btn.textContent = 'Salvando senha...';
+  const { error: errSenha } = await supabase.auth.updateUser({ password: p1 });
+  if (errSenha) {
+    btn.disabled = false; btn.textContent = '✅ Confirmar Nova Senha';
+    showToast('Erro ao salvar nova senha. Tente novamente.', 'error');
+    return;
+  }
+
+  document.getElementById('account-content').innerHTML = `
+  <div class="card"><div class="card-body" style="text-align:center;padding:48px">
+    <p style="font-size:48px;margin-bottom:16px">✅</p>
+    <p style="font-weight:700;font-size:18px;margin-bottom:8px">Senha alterada!</p>
+    <p style="color:var(--text-muted);margin-bottom:24px">Sua senha foi atualizada com sucesso.</p>
+    <button onclick="loadSecurity()" class="btn btn-primary">Ok</button>
+  </div></div>`;
+};
+
+window.enviarResetEmail = async function() {
+  const { error } = await supabase.auth.resetPasswordForEmail(user.email, {
+    redirectTo: window.location.origin + '/conta.html?secao=security'
+  });
+  if (error) { showToast('Erro ao enviar e-mail.', 'error'); return; }
+  showToast('Link de redefinição enviado para ' + user.email, 'success');
+};
+
+// Navegação
+window.showSection = function(section, link) {
+  event.preventDefault();
+  document.querySelectorAll('.account-nav-item').forEach(a => a.classList.remove('active'));
+  link.classList.add('active');
+  const titles = { orders: 'Meus Pedidos', profile: 'Dados Pessoais', addresses: 'Endereços', security: 'Segurança' };
+  document.getElementById('page-title').textContent = titles[section];
+  if (section === 'orders') loadOrders();
+  else if (section === 'profile') loadProfile();
+  else if (section === 'addresses') loadAddresses();
+  else if (section === 'security') loadSecurity();
+};
+
+// Logout
+document.getElementById('btn-logout').addEventListener('click', async (e) => {
+  e.preventDefault();
+  await supabase.auth.signOut();
+  window.location.href = 'login.html';
+});
+
+// Verifica se veio com parâmetro de seção na URL (ex: conta.html?secao=profile)
+const urlParamsC = new URLSearchParams(window.location.search);
+const secaoInicial = urlParamsC.get('secao');
+if (secaoInicial === 'profile') {
+  const linkProfile = document.querySelector('[onclick*="profile"]');
+  if (linkProfile) {
+    document.querySelectorAll('.account-nav-item').forEach(a => a.classList.remove('active'));
+    linkProfile.classList.add('active');
+    document.getElementById('page-title').textContent = 'Dados Pessoais';
+  }
+  loadProfile();
+} else if (secaoInicial === 'security') {
+  const linkSecurity = document.querySelector('[onclick*="security"]');
+  if (linkSecurity) {
+    document.querySelectorAll('.account-nav-item').forEach(a => a.classList.remove('active'));
+    linkSecurity.classList.add('active');
+    document.getElementById('page-title').textContent = 'Segurança';
+  }
+  // Se veio de um link de recuperação válido (não expirado), pula direto
+  // pra tela de nova senha em vez do fluxo normal (senha atual → código).
+  if (veioDeLinkRecuperacao && !erroNoLink) {
+    renderPassoNovaSenhaDireta();
+  } else {
+    loadSecurity();
+  }
+} else {
+  loadOrders();
+}
+</script>
+
+<script>
+function mascaraCPF(input) {
+  let v = input.value.replace(/\D/g, '').slice(0, 11);
+  v = v.replace(/(\d{3})(\d)/, '$1.$2');
+  v = v.replace(/(\d{3})(\d)/, '$1.$2');
+  v = v.replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+  input.value = v;
+}
+
+function mascaraTelConta(input) {
+  let v = input.value.replace(/\D/g, '').slice(0, 11);
+  if (v.length <= 10) v = v.replace(/(\d{2})(\d{4})(\d{0,4})/, '($1) $2-$3');
+  else v = v.replace(/(\d{2})(\d{5})(\d{0,4})/, '($1) $2-$3');
+  input.value = v;
+}
+
+</script>
+</body>
+</html>

@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Clientes Admin — Zipshop</title>
+  <link rel="stylesheet" href="../css/style.css">
+
+<style>
+.admin-mobile-bar {
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 200;
+}
+.admin-hamburger {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 20px;
+  width: 38px;
+  height: 38px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.admin-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 299;
+}
+.admin-overlay.active { display: block; }
+@media (max-width: 900px) {
+  .admin-mobile-bar { display: flex; }
+  .admin-sidebar {
+    display: flex !important;
+    position: fixed;
+    top: 0;
+    left: -260px;
+    height: 100vh;
+    width: 240px;
+    z-index: 300;
+    transition: left 0.25s ease;
+    overflow-y: auto;
+  }
+  .admin-sidebar.admin-sidebar-open { left: 0; }
+}
+</style>
+</head>
+<body>
+<div class="admin-layout">
+  <aside class="admin-sidebar">
+    <div class="admin-sidebar-logo">
+      <div class="logo"><img src="../img/logo-icon.jpeg" style="width:32px;height:32px" onerror="this.style.display='none'"><span class="logo-text"><span>ZIP</span><span>SHOP</span></span></div>
+      <div class="admin-sidebar-subtitle">Painel Administrativo</div>
+    </div>
+    <nav class="admin-nav">
+      <a href="index.html" class="admin-nav-item">📊 Dashboard</a>
+      <a href="produtos.html" class="admin-nav-item">📦 Produtos</a>
+      <a href="importar.html" class="admin-nav-item">🛍️ Importar da Shopee</a>
+      <a href="pedidos.html" class="admin-nav-item">🛒 Pedidos</a>
+      <a href="clientes.html" class="admin-nav-item active">👥 Clientes</a>
+      <a href="categorias.html" class="admin-nav-item">🏷️ Categorias</a>
+      <a href="banners.html" class="admin-nav-item">🖼️ Banners</a>
+      <a href="textos.html" class="admin-nav-item">📝 Textos do Site</a>
+      <a href="cupons.html" class="admin-nav-item">🎟️ Cupons</a>
+      <a href="devolucoes.html" class="admin-nav-item">↩️ Devoluções</a>
+      <a href="analytics.html" class="admin-nav-item">📈 Analytics</a>
+    </nav>
+    <div style="padding:16px;border-top:1px solid var(--border)">
+      <a href="../index.html" class="admin-nav-item" style="color:var(--text-muted)">🏪 Ver Loja</a>
+    </div>
+  </aside>
+
+  <main class="admin-main">
+  <!-- MOBILE MENU BAR -->
+  <div class="admin-mobile-bar">
+    <button class="admin-hamburger" onclick="toggleAdminMenu()" id="admin-hamburger-btn">☰</button>
+    <div class="logo" style="display:flex;align-items:center;gap:8px">
+      <img src="../img/logo-icon.jpeg" alt="Zipshop" class="logo-img" style="width:28px;height:28px" onerror="this.style.display='none'">
+      <span class="logo-text"><span>ZIP</span><span>SHOP</span></span>
+    </div>
+    <span style="font-size:11px;color:var(--text-muted)">Admin</span>
+  </div>
+  <!-- OVERLAY -->
+  <div class="admin-overlay" id="admin-overlay" onclick="toggleAdminMenu()"></div>
+
+    <h1 class="admin-page-title">Clientes</h1>
+    <p class="admin-page-sub">Base de clientes cadastrados</p>
+
+    <div class="kpi-grid" style="margin-bottom:24px">
+      <div class="kpi-card"><span class="kpi-icon">👥</span><div class="kpi-label">Total de Clientes</div><div class="kpi-value" id="kpi-total">—</div></div>
+      <div class="kpi-card"><span class="kpi-icon">🛒</span><div class="kpi-label">Com Pedidos</div><div class="kpi-value" id="kpi-compraram">—</div></div>
+      <div class="kpi-card"><span class="kpi-icon">💸</span><div class="kpi-label">Ticket Médio</div><div class="kpi-value" id="kpi-ticket">—</div></div>
+      <div class="kpi-card"><span class="kpi-icon">📦</span><div class="kpi-label">Total Pedidos</div><div class="kpi-value" id="kpi-pedidos">—</div></div>
+    </div>
+
+    <div style="margin-bottom:16px">
+      <input type="text" class="form-input" style="max-width:320px" placeholder="Buscar cliente..." oninput="filtrar(this.value)">
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Cliente</th><th>E-mail</th><th>Cadastro</th><th>Pedidos</th><th>Total Gasto</th></tr></thead>
+        <tbody id="clients-table">
+          <tr><td colspan="5" style="text-align:center;padding:40px;color:var(--text-muted)">Carregando...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </main>
+</div>
+
+<script type="module">
+import { isAdmin, supabase } from '../js/admin-guard.js';
+if (!isAdmin) throw new Error('not admin');
+
+
+let clientes = [];
+
+function esc(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+}
+
+function formatPrice(v) {
+  return Number(v||0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+function formatDate(d) {
+  return new Date(d).toLocaleDateString('pt-BR');
+}
+function initials(name) {
+  return (name||'?').split(' ').map(n => n[0]).slice(0,2).join('').toUpperCase();
+}
+
+async function carregar() {
+  const [{ data: usuarios }, { data: pedidos }] = await Promise.all([
+    supabase.from('usuarios').select('*').order('created_at', { ascending: false }),
+    supabase.from('pedidos').select('usuario_id, total')
+  ]);
+
+  // Agrupa pedidos por usuario
+  const pedidosPorUsuario = {};
+  const gastosPorUsuario = {};
+  (pedidos||[]).forEach(p => {
+    pedidosPorUsuario[p.usuario_id] = (pedidosPorUsuario[p.usuario_id]||0) + 1;
+    gastosPorUsuario[p.usuario_id] = (gastosPorUsuario[p.usuario_id]||0) + Number(p.total||0);
+  });
+
+  clientes = (usuarios||[]).map(u => ({
+    ...u,
+    numPedidos: pedidosPorUsuario[u.id]||0,
+    totalGasto: gastosPorUsuario[u.id]||0
+  }));
+
+  // KPIs
+  const totalPedidos = Object.values(pedidosPorUsuario).reduce((s,v) => s+v, 0);
+  const compraram = clientes.filter(c => c.numPedidos > 0).length;
+  const ticketMedio = compraram > 0 ? Object.values(gastosPorUsuario).reduce((s,v) => s+v, 0) / compraram : 0;
+
+  document.getElementById('kpi-total').textContent = clientes.length;
+  document.getElementById('kpi-compraram').textContent = compraram;
+  document.getElementById('kpi-ticket').textContent = formatPrice(ticketMedio);
+  document.getElementById('kpi-pedidos').textContent = totalPedidos;
+
+  renderTabela(clientes);
+}
+
+function renderTabela(lista) {
+  const tbody = document.getElementById('clients-table');
+  if (!lista.length) {
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:40px;color:var(--text-muted)">Nenhum cliente encontrado</td></tr>';
+    return;
+  }
+  tbody.innerHTML = lista.map(c => `
+    <tr>
+      <td>
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="width:36px;height:36px;border-radius:50%;background:var(--primary);color:#000;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;flex-shrink:0">${esc(initials(c.nome||c.email))}</div>
+          <div style="font-weight:700">${esc(c.nome||'—')}</div>
+        </div>
+      </td>
+      <td style="color:var(--text-muted)">${esc(c.email||'—')}</td>
+      <td style="color:var(--text-muted)">${c.created_at ? formatDate(c.created_at) : '—'}</td>
+      <td style="text-align:center;font-weight:700">${c.numPedidos}</td>
+      <td style="font-weight:700;color:var(--primary)">${formatPrice(c.totalGasto)}</td>
+    </tr>`).join('');
+}
+
+window.filtrar = function(q) {
+  const lista = clientes.filter(c =>
+    (c.nome||'').toLowerCase().includes(q.toLowerCase()) ||
+    (c.email||'').toLowerCase().includes(q.toLowerCase())
+  );
+  renderTabela(lista);
+};
+
+carregar();
+</script>
+
+<script>
+function toggleAdminMenu() {
+  const sidebar = document.querySelector('.admin-sidebar');
+  const overlay = document.getElementById('admin-overlay');
+  const btn = document.getElementById('admin-hamburger-btn');
+  const open = sidebar.classList.toggle('admin-sidebar-open');
+  overlay.classList.toggle('active', open);
+  btn.textContent = open ? '✕' : '☰';
+}
+</script>
+</body>
+</html>

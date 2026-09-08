@@ -1,0 +1,1289 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<link rel="preconnect" href="https://kkliwdphrdbguclsvxcw.supabase.co">
+<link rel="dns-prefetch" href="https://kkliwdphrdbguclsvxcw.supabase.co">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="base" content="">
+  <title>Checkout — Zipshop</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="navbar"></div>
+
+<div class="page-hero">
+  <div class="container">
+    <div class="breadcrumb"><a href="index.html">Home</a><span>/</span><a href="carrinho.html">Carrinho</a><span>/</span><span>Checkout</span></div>
+    <h1>Finalizar Compra</h1>
+  </div>
+</div>
+
+<div id="main-content"></div>
+<div id="footer"></div>
+
+<script src="js/cart.js"></script>
+<script src="js/main.js"></script>
+<script src="js/validadores.js"></script>
+<script>
+function formatPrice(v) { return Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }); }
+
+// Animação de comemoração do pedido confirmado: chuva de moedas + confete,
+// pra dar aquele "gostinho de prêmio" e reforçar a compra.
+function dispararCelebracao() {
+  let overlay = document.getElementById('celebracao-overlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'celebracao-overlay';
+    overlay.className = 'celebracao-overlay';
+    document.body.appendChild(overlay);
+  }
+  overlay.innerHTML = '';
+
+  const cores = ['#AAEF00', '#FFD23F', '#FF6B6B', '#4ECDC4', '#C084FC', '#60A5FA'];
+  for (let i = 0; i < 42; i++) {
+    const el = document.createElement('div');
+    el.className = 'confete';
+    el.style.left = (Math.random() * 100) + 'vw';
+    el.style.background = cores[Math.floor(Math.random() * cores.length)];
+    el.style.animationDuration = (2.1 + Math.random() * 1.3) + 's';
+    el.style.animationDelay = (Math.random() * 0.5) + 's';
+    overlay.appendChild(el);
+  }
+
+  const moedas = ['🪙', '💰', '💚', '💚'];
+  for (let i = 0; i < 18; i++) {
+    const el = document.createElement('div');
+    el.className = 'moeda-cai';
+    el.textContent = moedas[Math.floor(Math.random() * moedas.length)];
+    el.style.left = (Math.random() * 100) + 'vw';
+    el.style.fontSize = (16 + Math.random() * 16) + 'px';
+    el.style.animationDuration = (1.7 + Math.random() * 1.2) + 's';
+    el.style.animationDelay = (Math.random() * 0.6) + 's';
+    overlay.appendChild(el);
+  }
+
+  if (navigator.vibrate) navigator.vibrate([35, 30, 35]);
+
+  setTimeout(() => { overlay.innerHTML = ''; }, 4000);
+}
+
+// CORREÇÃO: telas travando pra sempre (ex: "Salvando pedido...") quando a
+// conexão está ruim/instável. Antes, se uma chamada ao Supabase nunca
+// respondesse, o site ficava preso naquele texto indefinidamente, sem
+// nenhum aviso. Agora qualquer chamada crítica tem um limite de tempo —
+// se estourar, mostramos um erro claro em vez de travar a tela.
+function comTimeout(promise, ms = 15000, mensagem = 'A operação demorou demais. Verifique sua conexão e tente novamente.') {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error(mensagem)), ms))
+  ]);
+}
+
+let selectedPayment = 'pix';
+let selectedDelivery = 'rota';
+let selectedHorario = '';
+// CORREÇÃO BUG 13: se um cupom já foi aplicado lá no carrinho, ele
+// continua aplicado aqui — não precisa digitar de novo.
+let _cupomAplicado = getCupomAplicado(); // { codigo, tipo, valor, id }
+let _saldoDisponivel = 0;
+let _usarSaldo = false;
+
+function calcDescontoSaldo(baseAposCupom) {
+  if (!_usarSaldo || _saldoDisponivel <= 0) return 0;
+  return Math.min(_saldoDisponivel, baseAposCupom);
+}
+
+function calcFrete(subtotal) {
+  if (selectedDelivery === 'exclusiva') return 9.90;
+  // Cupom de frete grátis
+  if (_cupomAplicado?.tipo === 'frete_gratis') return 0;
+  return subtotal >= 14.90 ? 0 : 2.90;
+}
+
+// CORREÇÃO BUG 15 — horário de corte da Entrega Exclusiva:
+// Até as 18h, a Entrega Exclusiva chega em até 3h no mesmo dia.
+// Depois das 18h, as entregas do dia já acabaram — a próxima leva
+// começa às 8h do dia seguinte, então o prazo passa a ser "até 3h
+// depois disso", ou seja, até as 11h do dia seguinte.
+function infoEntregaExclusiva() {
+  const hora = new Date().getHours();
+  const foraDoHorario = hora >= 18;
+  return {
+    foraDoHorario,
+    tituloPrazo: foraDoHorario ? 'Fora do horário — até 11h de amanhã' : 'Motoboy exclusivo — até 3 horas',
+    previsao: foraDoHorario ? 'Até 11h do dia seguinte' : 'Até 3 horas',
+    avisoExtra: foraDoHorario
+      ? '⏰ Já passou das 18h (horário de corte). Pedidos feitos agora entram na primeira rota do dia seguinte (a partir das 8h) e chegam em até 3h depois disso — ou seja, até as 11h de amanhã.'
+      : '⏰ Pedida até as 18h, chega em até 3h ainda hoje. Depois das 18h, o prazo passa a ser até as 11h do dia seguinte.'
+  };
+}
+
+// Desconto de 5% no PIX aplicado somente sobre o subtotal (produtos), não sobre o frete
+function calcSubtotalComDesconto(subtotal) {
+  return selectedPayment === 'pix' ? subtotal * 0.95 : subtotal;
+}
+
+function calcDescontoCupom(subtotalComDesconto) {
+  if (!_cupomAplicado) return 0;
+  if (_cupomAplicado.tipo === 'percentual') return subtotalComDesconto * (_cupomAplicado.valor / 100);
+  if (_cupomAplicado.tipo === 'fixo') return Math.min(_cupomAplicado.valor, subtotalComDesconto);
+  if (_cupomAplicado.tipo === 'frete_gratis') return 0;
+  return 0;
+}
+
+async function renderCheckout() {
+  const cart = getCart();
+  const subtotal = getCartTotal();
+
+  if (cart.length === 0) { window.location.href = 'carrinho.html'; return; }
+
+  import('/js/analytics.js').then(m => m.registrarEvento('inicio_checkout', { meta: { subtotal } })).catch(() => {});
+
+  const frete = calcFrete(subtotal);
+  const subtotalComDesconto = calcSubtotalComDesconto(subtotal);
+  const descontoCupomInicial = calcDescontoCupom(subtotalComDesconto);
+  const descontoSaldoInicial = calcDescontoSaldo(subtotalComDesconto - descontoCupomInicial);
+  const totalFinal = subtotalComDesconto - descontoCupomInicial - descontoSaldoInicial + frete;
+
+  // Busca TODOS os endereços salvos e o perfil do usuário para pré-preencher
+  // CORREÇÃO/MELHORIA: antes só buscava o favorito; agora busca a lista
+  // toda pra montar o seletor compacto de endereços no checkout.
+  let enderecosSalvos = [];
+  let perfilUsuario = null;
+  try {
+    const { createClient: _cc } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm');
+    const _sb = _cc('https://kkliwdphrdbguclsvxcw.supabase.co', 'sb_publishable_OMXANLsZK98fPWygp8ZHfA_xzSpWgYb');
+    const { data: { session: _s } } = await _sb.auth.getSession();
+    const _u = _s?.user || null;
+    if (_u) {
+      const [{ data: endData }, { data: perfData }, { data: extratoData }] = await Promise.all([
+        _sb.from('enderecos').select('*').eq('usuario_id', _u.id).order('favorito', { ascending: false }).order('created_at', { ascending: false }),
+        _sb.from('usuarios').select('nome, telefone').eq('id', _u.id).single(),
+        _sb.from('saldo_extrato').select('valor').eq('usuario_id', _u.id)
+      ]);
+      enderecosSalvos = endData || [];
+      perfilUsuario = perfData;
+      _saldoDisponivel = (extratoData || []).reduce((s, e) => s + Number(e.valor), 0);
+    }
+  } catch(e) {}
+
+  window._enderecosSalvos = enderecosSalvos;
+  const endFav = enderecosSalvos[0] || null; // favorito (ou o mais recente) pré-selecionado
+  window._enderecoSelecionadoId = endFav?.id || null;
+
+  const orderItems = cart.map(item => `
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border)">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="font-size:24px">${item.emoji || '📦'}</span>
+        <div>
+          <div style="font-size:13px;font-weight:700">${item.name || 'Produto'}</div>
+          <div style="font-size:12px;color:var(--text-muted)">Qtd: ${item.qty}</div>
+        </div>
+      </div>
+      <span style="font-weight:700">${formatPrice((item.price||0) * item.qty)}</span>
+    </div>`).join('');
+
+  document.getElementById('main-content').innerHTML = `
+  <div class="checkout-layout">
+    <div>
+
+      <!-- AVISO SANTA MARIA -->
+      <div style="background:rgba(170,239,0,0.08);border:1px solid rgba(170,239,0,0.3);border-radius:12px;padding:14px 16px;margin-bottom:16px;display:flex;gap:10px;align-items:flex-start">
+        <span style="font-size:20px">📍</span>
+        <div>
+          <p style="font-weight:700;font-size:13px;margin-bottom:2px">Entrega apenas em Santa Maria — RS</p>
+          <p style="font-size:12px;color:var(--text-muted)">Fora de Santa Maria? Entre em contato pelo 
+            <a href="https://wa.me/5555984566918" target="_blank" style="color:var(--primary);font-weight:700">WhatsApp</a> para fazer seu pedido.
+          </p>
+        </div>
+      </div>
+
+      <!-- STEP 1 - DADOS -->
+      <div class="checkout-step">
+        <div class="checkout-step-title" style="display:flex;justify-content:space-between;align-items:center">
+          <span><span class="step-num">1</span> Seus Dados</span>
+          ${enderecosSalvos.length ? '<a href=\"conta.html?secao=addresses\" style=\"font-size:12px;color:var(--primary);font-weight:700\">Gerenciar endereços</a>' : ''}
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div class="form-group" style="grid-column:1/-1">
+            <label class="form-label">Nome completo *</label>
+            <input type="text" class="form-input" id="campo-nome" placeholder="João Silva" value="${perfilUsuario?.nome || ''}">
+          </div>
+          <div class="form-group" style="grid-column:1/-1">
+            <label class="form-label">Telefone / WhatsApp *</label>
+            <input type="tel" class="form-input" id="campo-telefone" placeholder="(55) 99999-9999" maxlength="15" oninput="mascaraTelefone(this)" value="${perfilUsuario?.telefone || ''}">
+          </div>
+
+          <!-- MELHORIA: seletor compacto de endereços salvos, em vez do
+               formulário inteiro aberto de cara. -->
+          <div style="grid-column:1/-1" id="bloco-selecao-endereco">
+            <label class="form-label" style="margin-bottom:8px">Endereço de entrega</label>
+            <div id="lista-enderecos-salvos" style="display:flex;flex-direction:column;gap:8px">
+              ${enderecosSalvos.map(end => `
+              <div class="card-endereco-salvo" data-id="${end.id}" onclick="selecionarEnderecoSalvo('${end.id}')"
+                style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;border:2px solid ${end.id === endFav?.id ? 'var(--primary)' : 'var(--border)'};border-radius:12px;cursor:pointer;${end.id === endFav?.id ? 'background:rgba(170,239,0,0.05)' : ''}">
+                <div style="display:flex;align-items:center;gap:10px;min-width:0">
+                  <span style="font-size:20px">${{'Casa':'🏠','Trabalho':'🏢','Prédio de estudo':'🎓'}[end.apelido] || '📍'}</span>
+                  <div style="min-width:0">
+                    <p style="font-size:13px;font-weight:700">${end.apelido || 'Endereço'}${end.favorito ? ' ⭐' : ''}</p>
+                    <p style="font-size:12px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${end.rua}, ${end.numero} — ${end.bairro}</p>
+                  </div>
+                </div>
+              </div>`).join('')}
+              <div id="card-novo-endereco" onclick="mostrarNovoEndereco()"
+                style="display:flex;align-items:center;gap:10px;padding:12px 14px;border:2px dashed var(--border);border-radius:12px;cursor:pointer;color:var(--text-muted)">
+                <span style="font-size:20px">➕</span>
+                <p style="font-size:13px;font-weight:700">Novo endereço de entrega</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- FORM COMPLETO DE ENDEREÇO (aberto direto se não há endereço salvo,
+               ou ao clicar em "Novo endereço") -->
+          <div style="grid-column:1/-1;${enderecosSalvos.length ? 'display:none' : ''}" id="bloco-form-endereco-completo">
+            ${enderecosSalvos.length ? `<button type="button" onclick="voltarSelecaoEndereco()" style="background:none;border:none;color:var(--primary);font-size:12px;font-weight:700;cursor:pointer;margin-bottom:12px;padding:0">← Voltar para meus endereços</button>` : ''}
+
+            <div class="form-group">
+              <label class="form-label">Este endereço é</label>
+              <div style="display:flex;gap:8px;flex-wrap:wrap" id="bloco-modalidade-endereco">
+                ${['Casa','Trabalho','Prédio de estudo'].map(m => `
+                <button type="button" onclick="selecionarModalidade('${m}')" data-modalidade="${m}"
+                  class="btn btn-sm" style="border:2px solid var(--border);background:none;color:var(--text)">
+                  ${{'Casa':'🏠','Trabalho':'🏢','Prédio de estudo':'🎓'}[m]} ${m}
+                </button>`).join('')}
+              </div>
+              <input type="hidden" id="campo-apelido-endereco" value="${endFav?.apelido || 'Casa'}">
+            </div>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+              <div class="form-group">
+                <label class="form-label">CEP *</label>
+                <div style="display:flex;gap:8px">
+                  <input type="text" class="form-input" id="campo-cep" placeholder="00000-000" maxlength="9" oninput="mascaraCEP(this)" style="flex:1">
+                  <button type="button" onclick="buscarCEP()" class="btn btn-outline btn-sm" style="white-space:nowrap">Buscar</button>
+                </div>
+                <p id="cep-feedback" style="font-size:12px;margin-top:4px;display:none"></p>
+              </div>
+              <div class="form-group" style="grid-column:1/-1">
+                <label class="form-label">Rua *</label>
+                <input type="text" class="form-input" id="campo-rua" placeholder="Nome da rua" value="${endFav?.rua || ''}">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Número *</label>
+                <input type="text" class="form-input" id="campo-numero" placeholder="Número" value="${endFav?.numero || ''}">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Complemento</label>
+                <input type="text" class="form-input" id="campo-complemento" placeholder="Apto, bloco, etc (opcional)" value="${endFav?.complemento || ''}">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Bairro *</label>
+                <input type="text" class="form-input" id="campo-bairro" placeholder="Bairro" value="${endFav?.bairro || ''}">
+              </div>
+              <div class="form-group" style="grid-column:1/-1">
+                <label class="form-label">Ponto de referência</label>
+                <input type="text" class="form-input" id="campo-referencia" placeholder="Ex: Próximo ao mercado X" value="${endFav?.referencia || ''}">
+              </div>
+              <div class="form-group" style="grid-column:1/-1;display:flex;align-items:center;gap:8px">
+                <input type="checkbox" id="campo-salvar-endereco" ${enderecosSalvos.length ? '' : 'checked'} style="width:18px;height:18px;accent-color:var(--primary)">
+                <label for="campo-salvar-endereco" style="font-size:13px;color:var(--text-muted);cursor:pointer">Salvar este endereço para as próximas compras</label>
+              </div>
+            </div>
+          </div>
+
+          <!-- INSTRUÇÃO DE ENTREGA -->
+          <div style="grid-column:1/-1;margin-top:4px">
+            <label class="form-label" style="margin-bottom:8px">Se eu não estiver em casa...</label>
+            <div style="display:flex;flex-direction:column;gap:8px">
+              <div onclick="selecionarEntregaAusencia('eu')" id="ausencia-eu"
+                style="display:flex;align-items:center;gap:10px;padding:12px 14px;border:2px solid var(--primary);border-radius:12px;cursor:pointer;background:rgba(170,239,0,0.05)">
+                <span style="font-size:20px">🏠</span>
+                <div>
+                  <p style="font-size:13px;font-weight:700">Só entregar para mim</p>
+                  <p style="font-size:11px;color:var(--text-muted)">Entregador aguarda ou agenda nova tentativa</p>
+                </div>
+              </div>
+              <div onclick="selecionarEntregaAusencia('portaria')" id="ausencia-portaria"
+                style="display:flex;align-items:center;gap:10px;padding:12px 14px;border:2px solid var(--border);border-radius:12px;cursor:pointer">
+                <span style="font-size:20px">📬</span>
+                <div>
+                  <p style="font-size:13px;font-weight:700">Deixar na portaria</p>
+                  <p style="font-size:11px;color:var(--text-muted)">Deixar com o porteiro ou na entrada</p>
+                </div>
+              </div>
+              <div onclick="selecionarEntregaAusencia('vizinho')" id="ausencia-vizinho"
+                style="display:flex;align-items:center;gap:10px;padding:12px 14px;border:2px solid var(--border);border-radius:12px;cursor:pointer">
+                <span style="font-size:20px">👥</span>
+                <div>
+                  <p style="font-size:13px;font-weight:700">Entregar para um vizinho</p>
+                  <p style="font-size:11px;color:var(--text-muted)">Informe qual vizinho pode receber</p>
+                </div>
+              </div>
+              <div id="campo-vizinho-wrap" style="display:none">
+                <input type="text" class="form-input" id="campo-vizinho"
+                  placeholder="Ex: Apto 42 — João Silva / Casa da frente" style="margin-top:4px">
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- STEP 2 - ENTREGA -->
+      <div class="checkout-step">
+        <div class="checkout-step-title"><span class="step-num">2</span> Tipo de Entrega</div>
+        <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px">
+          <div onclick="selecionarEntrega('rota')" id="card-rota"
+            style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border:2px solid var(--primary);border-radius:12px;cursor:pointer;background:rgba(170,239,0,0.05)">
+            <div style="display:flex;align-items:center;gap:12px">
+              <span style="font-size:24px">🛵</span>
+              <div>
+                <div style="font-weight:700;font-size:14px">Entrega por Rota</div>
+                <div style="font-size:12px;color:var(--text-muted)">Prazo: 24 a 48 horas — Santa Maria</div>
+                <div style="font-size:11px;color:var(--text-muted);margin-top:2px">PIX, cartão ou dinheiro na entrega</div>
+              </div>
+            </div>
+            <div style="text-align:right;font-weight:900;color:var(--primary)">
+              ${frete === 0 && selectedDelivery === 'rota' ? 'Grátis' : 'R$ 2,90'}
+            </div>
+          </div>
+          <div onclick="selecionarEntrega('exclusiva')" id="card-exclusiva"
+            style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border:2px solid var(--border);border-radius:12px;cursor:pointer">
+            <div style="display:flex;align-items:center;gap:12px">
+              <span style="font-size:24px">⚡</span>
+              <div>
+                <div style="font-weight:700;font-size:14px">Entrega Exclusiva</div>
+                <div style="font-size:12px;color:var(--text-muted)" id="exclusiva-prazo-label">${infoEntregaExclusiva().tituloPrazo}</div>
+                <div style="font-size:11px;color:var(--text-muted);margin-top:2px">PIX, cartão ou dinheiro na entrega</div>
+              </div>
+            </div>
+            <div style="text-align:right;font-weight:900">R$ 9,90</div>
+          </div>
+        </div>
+
+        <!-- CORREÇÃO BUG 14: aviso de que a entrega não é rastreável -->
+        <p style="font-size:11px;color:var(--text-muted);margin-top:2px">📦 Este é um serviço de entrega local sem rastreamento online — o acompanhamento é feito por telefone/WhatsApp, não existe link ou app de rastreio.</p>
+
+        <!-- HORÁRIO (só para rota) -->
+        <div id="bloco-horario" style="margin-top:4px">
+          <label class="form-label">Janela de horário preferida</label>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:6px">
+            <div onclick="selecionarHorario('08:00-12:00')" id="h1"
+              style="padding:10px;border:2px solid var(--border);border-radius:10px;text-align:center;cursor:pointer;font-size:13px">
+              🌅 08h–12h
+            </div>
+            <div onclick="selecionarHorario('12:00-16:00')" id="h2"
+              style="padding:10px;border:2px solid var(--border);border-radius:10px;text-align:center;cursor:pointer;font-size:13px">
+              ☀️ 12h–16h
+            </div>
+            <div onclick="selecionarHorario('16:00-20:00')" id="h3"
+              style="padding:10px;border:2px solid var(--border);border-radius:10px;text-align:center;cursor:pointer;font-size:13px">
+              🌆 16h–20h
+            </div>
+          </div>
+          <p style="font-size:11px;color:var(--text-muted);margin-top:6px">* Horário estimado — o entregador pode chegar dentro desta janela de 4 horas.</p>
+        </div>
+
+        <!-- AVISO EXCLUSIVA -->
+        <div id="aviso-exclusiva" style="display:none;margin-top:12px;background:rgba(170,239,0,0.08);border:1px solid rgba(170,239,0,0.3);border-radius:10px;padding:14px">
+          <p style="font-weight:700;font-size:13px;margin-bottom:6px">⚡ Entrega Exclusiva</p>
+          <ul style="font-size:12px;color:var(--text-muted);padding-left:16px;line-height:1.8" id="lista-aviso-exclusiva">
+            <li>Motoboy exclusivo para seu pedido — <span id="exclusiva-aviso-prazo">${infoEntregaExclusiva().previsao}</span></li>
+            <li>Frete de <strong>R$ 9,90</strong> incluído no total</li>
+            <li><strong>Pagamento obrigatório pelo app</strong> (PIX ou Cartão) — não disponível pagamento na entrega para esta opção</li>
+            <li id="exclusiva-aviso-corte" style="${infoEntregaExclusiva().foraDoHorario ? 'color:#eab308;font-weight:700' : ''}">${infoEntregaExclusiva().avisoExtra}</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- STEP 3 - PAGAMENTO -->
+      <div class="checkout-step" id="bloco-pagamento">
+        <div class="checkout-step-title"><span class="step-num">3</span> Forma de Pagamento</div>
+        <div class="payment-options" id="opcoes-pagamento">
+          <div class="payment-option selected" onclick="selectPayment('pix')" id="pay-pix">
+            <div class="payment-option-icon">📱</div>
+            <div class="payment-option-label">PIX</div>
+          </div>
+          <div class="payment-option" onclick="selectPayment('cartao')" id="pay-cartao">
+            <div class="payment-option-icon">💳</div>
+            <div class="payment-option-label">Cartão</div>
+          </div>
+          <div class="payment-option" onclick="selectPayment('dinheiro')" id="pay-dinheiro">
+            <div class="payment-option-icon">💵</div>
+            <div class="payment-option-label">Na Entrega</div>
+          </div>
+        </div>
+        <div id="payment-detail"></div>
+      </div>
+
+      <!-- CUPOM DE DESCONTO -->
+      <div class="checkout-step" style="padding:16px">
+        <div class="checkout-step-title" style="margin-bottom:12px"><span class="step-num">4</span> Cupom de Desconto</div>
+        <div style="display:flex;gap:8px">
+          <input type="text" class="form-input" id="campo-cupom" placeholder="Digite o código do cupom" style="flex:1;text-transform:uppercase" value="${_cupomAplicado?.codigo || ''}">
+          <button onclick="aplicarCupom()" class="btn btn-outline" style="white-space:nowrap;padding:0 16px">Aplicar</button>
+        </div>
+        <div id="cupom-feedback" style="margin-top:8px;font-size:13px;${_cupomAplicado ? '' : 'display:none'}">${_cupomAplicado ? `✅ Cupom aplicado! ${_cupomAplicado.codigo}` : ''}</div>
+        <a href="cupons.html" style="display:block;margin-top:10px;font-size:12px;color:var(--primary);font-weight:700">🎟️ Ver meus cupons disponíveis</a>
+      </div>
+
+      ${_saldoDisponivel > 0 ? `
+      <div class="checkout-step" style="padding:16px">
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
+          <input type="checkbox" id="usar-saldo-check" onchange="toggleUsarSaldo(this.checked)" style="width:18px;height:18px;accent-color:var(--primary)">
+          <span style="font-size:14px;font-weight:700">💰 Usar meu saldo (${formatPrice(_saldoDisponivel)} disponível)</span>
+        </label>
+        <p style="font-size:12px;color:var(--text-muted);margin-top:4px;margin-left:28px">Abate direto no total dessa compra. <a href="saldo.html" style="color:var(--primary);font-weight:700">Ver extrato →</a></p>
+      </div>` : ''}
+
+      <label style="display:flex;align-items:flex-start;gap:8px;margin-bottom:16px;cursor:pointer;font-size:12px;color:var(--text-muted)">
+        <input type="checkbox" id="aceite-termos" style="margin-top:2px">
+        <span>Li e aceito os <a href="termos.html" target="_blank" style="color:var(--primary);font-weight:700">Termos de Uso e Política de Entrega</a>, incluindo as regras de pagamento na entrega.</span>
+      </label>
+
+      <button class="btn btn-primary btn-lg btn-full" id="btn-confirmar" onclick="finalizarPedido()">
+        ⚡ Confirmar Pedido — ${formatPrice(totalFinal)}
+      </button>
+
+    </div>
+
+    <!-- RESUMO -->
+    <div>
+      <div class="cart-summary" style="position:sticky;top:80px">
+        <p style="font-size:15px;font-weight:900;margin-bottom:16px">Resumo do Pedido</p>
+        ${orderItems}
+        <div style="margin-top:16px" id="resumo-valores">
+          <div class="summary-row"><span>Subtotal</span><span>${formatPrice(subtotal)}</span></div>
+          <div class="summary-row" id="resumo-desconto-pix" style="${selectedPayment === 'pix' ? '' : 'display:none'}">
+            <span style="color:#22c55e">Desconto PIX (5%)</span><span style="color:#22c55e">-${formatPrice(subtotal * 0.05)}</span>
+          </div>
+          <div class="summary-row" id="resumo-desconto-cupom" style="display:none">
+            <span style="color:#22c55e">🎟️ Cupom</span><span style="color:#22c55e" id="resumo-cupom-valor"></span>
+          </div>
+          <div class="summary-row" id="resumo-desconto-saldo" style="display:none">
+            <span style="color:#22c55e">💰 Saldo usado</span><span style="color:#22c55e" id="resumo-saldo-valor"></span>
+          </div>
+          <div class="summary-row" id="resumo-frete">
+            <span>Frete</span>
+            <span>${frete === 0 ? '<span style="color:#22c55e">Grátis</span>' : formatPrice(frete)}</span>
+          </div>
+          <div class="summary-total"><span>Total</span><span style="color:var(--primary)" id="resumo-total">${formatPrice(totalFinal)}</span></div>
+        </div>
+      </div>
+    </div>
+  </div>`;
+
+  // Garante que o botão de modalidade certo apareça destacado
+  selecionarModalidade(endFav?.apelido || 'Casa');
+}
+
+let _ausenciaSelecionada = 'eu';
+// ——— CUPOM ———
+function atualizarResumoTotal() {
+  const subtotal = getCartTotal();
+  const frete = calcFrete(subtotal);
+  const subtotalComDesconto = calcSubtotalComDesconto(subtotal);
+  const descontoCupom = calcDescontoCupom(subtotalComDesconto);
+  const descontoSaldo = calcDescontoSaldo(subtotalComDesconto - descontoCupom);
+  const total = subtotalComDesconto - descontoCupom - descontoSaldo + frete;
+
+  // Desconto PIX
+  const descontoPixEl = document.getElementById('resumo-desconto-pix');
+  if (descontoPixEl) descontoPixEl.style.display = selectedPayment === 'pix' ? '' : 'none';
+
+  // Desconto cupom
+  const cupomEl = document.getElementById('resumo-desconto-cupom');
+  const cupomValorEl = document.getElementById('resumo-cupom-valor');
+  if (cupomEl && cupomValorEl) {
+    if (_cupomAplicado) {
+      cupomEl.style.display = '';
+      if (_cupomAplicado.tipo === 'frete_gratis') cupomValorEl.textContent = 'Frete Grátis';
+      else cupomValorEl.textContent = '-' + formatPrice(descontoCupom);
+    } else {
+      cupomEl.style.display = 'none';
+    }
+  }
+
+  // Desconto saldo
+  const saldoEl = document.getElementById('resumo-desconto-saldo');
+  const saldoValorEl = document.getElementById('resumo-saldo-valor');
+  if (saldoEl && saldoValorEl) {
+    if (_usarSaldo && descontoSaldo > 0) {
+      saldoEl.style.display = '';
+      saldoValorEl.textContent = '-' + formatPrice(descontoSaldo);
+    } else {
+      saldoEl.style.display = 'none';
+    }
+  }
+
+  // Frete
+  const freteEl = document.getElementById('resumo-frete');
+  if (freteEl) freteEl.innerHTML = `<span>Frete</span><span>${frete === 0 ? '<span style="color:#22c55e">Grátis</span>' : formatPrice(frete)}</span>`;
+
+  const totalEl = document.getElementById('resumo-total');
+  if (totalEl) totalEl.textContent = formatPrice(total);
+  const btn = document.getElementById('btn-confirmar');
+  if (btn) btn.textContent = `⚡ Confirmar Pedido — ${formatPrice(total)}`;
+}
+
+window.toggleUsarSaldo = function(checked) {
+  _usarSaldo = checked;
+  atualizarResumoTotal();
+};
+
+window.aplicarCupom = async function() {
+  const codigo = (document.getElementById('campo-cupom')?.value || '').trim().toUpperCase();
+  const feedback = document.getElementById('cupom-feedback');
+  if (!codigo) { feedback.style.display='block'; feedback.style.color='#ef4444'; feedback.textContent='Digite um código de cupom.'; return; }
+
+  feedback.style.display='block'; feedback.style.color='var(--text-muted)'; feedback.textContent='Verificando cupom...';
+
+  const { createClient: _cc } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm');
+  const _sb = _cc('https://kkliwdphrdbguclsvxcw.supabase.co', 'sb_publishable_OMXANLsZK98fPWygp8ZHfA_xzSpWgYb');
+  const { data: { session: _sessCupom } } = await _sb.auth.getSession();
+  const user = _sessCupom?.user || null;
+
+  const { data: cupom, error } = await _sb.from('cupons')
+    .select('*').eq('codigo', codigo).eq('ativo', true).single();
+
+  if (error || !cupom) {
+    _cupomAplicado = null; clearCupomAplicado();
+    feedback.style.color='#ef4444'; feedback.textContent='❌ Cupom inválido ou não encontrado.';
+    atualizarResumoTotal(); return;
+  }
+
+  // Valida expiração
+  if (cupom.valido_ate && new Date(cupom.valido_ate) < new Date()) {
+    _cupomAplicado = null; clearCupomAplicado();
+    feedback.style.color='#ef4444'; feedback.textContent='❌ Este cupom expirou.';
+    atualizarResumoTotal(); return;
+  }
+
+  // Valida uso máximo
+  if (cupom.uso_maximo && cupom.uso_atual >= cupom.uso_maximo) {
+    _cupomAplicado = null; clearCupomAplicado();
+    feedback.style.color='#ef4444'; feedback.textContent='❌ Este cupom atingiu o limite de usos.';
+    atualizarResumoTotal(); return;
+  }
+
+  // Valida uso único por usuário
+  if (user && cupom.uso_unico_por_usuario) {
+    const { data: jaUsou } = await _sb.from('cupons_usos')
+      .select('id').eq('cupom_id', cupom.id).eq('usuario_id', user.id).single();
+    if (jaUsou) {
+      _cupomAplicado = null; clearCupomAplicado();
+      feedback.style.color='#ef4444'; feedback.textContent='❌ Você já utilizou este cupom.';
+      atualizarResumoTotal(); return;
+    }
+  }
+
+  // Valida pedido mínimo
+  const subtotal = getCartTotal();
+  if (cupom.pedido_minimo && subtotal < cupom.pedido_minimo) {
+    _cupomAplicado = null; clearCupomAplicado();
+    feedback.style.color='#ef4444';
+    feedback.textContent = `❌ Pedido mínimo para este cupom: ${formatPrice(cupom.pedido_minimo)}`;
+    atualizarResumoTotal(); return;
+  }
+
+  _cupomAplicado = { id: cupom.id, codigo: cupom.codigo, tipo: cupom.tipo, valor: cupom.valor };
+  // CORREÇÃO BUG 13: persiste o cupom aplicado aqui também, pra ele
+  // não "sumir" se o cliente voltar pro carrinho ou recarregar a página.
+  setCupomAplicado(_cupomAplicado);
+
+  const desc = cupom.tipo === 'percentual' ? `${cupom.valor}% de desconto`
+    : cupom.tipo === 'fixo' ? `R$ ${cupom.valor} de desconto`
+    : 'Frete Grátis';
+  feedback.style.color='#22c55e'; feedback.textContent=`✅ Cupom aplicado! ${desc}`;
+  atualizarResumoTotal();
+};
+
+// MELHORIA: seletor compacto de endereços salvos no checkout.
+function selecionarEnderecoSalvo(id) {
+  const end = (window._enderecosSalvos || []).find(e => String(e.id) === String(id));
+  if (!end) return;
+  window._enderecoSelecionadoId = id;
+
+  document.querySelectorAll('.card-endereco-salvo').forEach(card => {
+    const ativo = card.dataset.id === String(id);
+    card.style.borderColor = ativo ? 'var(--primary)' : 'var(--border)';
+    card.style.background = ativo ? 'rgba(170,239,0,0.05)' : '';
+  });
+
+  document.getElementById('campo-apelido-endereco').value = end.apelido || 'Casa';
+  document.getElementById('campo-rua').value = end.rua || '';
+  document.getElementById('campo-numero').value = end.numero || '';
+  document.getElementById('campo-complemento').value = end.complemento || '';
+  document.getElementById('campo-bairro').value = end.bairro || '';
+  document.getElementById('campo-referencia').value = end.referencia || '';
+  document.getElementById('campo-salvar-endereco').checked = false; // já está salvo, não precisa salvar de novo
+
+  document.getElementById('bloco-form-endereco-completo').style.display = 'none';
+}
+window.selecionarEnderecoSalvo = selecionarEnderecoSalvo;
+
+function mostrarNovoEndereco() {
+  window._enderecoSelecionadoId = null;
+  document.querySelectorAll('.card-endereco-salvo').forEach(card => {
+    card.style.borderColor = 'var(--border)';
+    card.style.background = '';
+  });
+  ['campo-cep','campo-rua','campo-numero','campo-complemento','campo-bairro','campo-referencia'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  document.getElementById('campo-salvar-endereco').checked = true;
+  selecionarModalidade('Casa');
+  const selecao = document.getElementById('bloco-selecao-endereco');
+  if (selecao) selecao.style.display = 'none';
+  document.getElementById('bloco-form-endereco-completo').style.display = '';
+}
+window.mostrarNovoEndereco = mostrarNovoEndereco;
+
+function voltarSelecaoEndereco() {
+  document.getElementById('bloco-form-endereco-completo').style.display = 'none';
+  const selecao = document.getElementById('bloco-selecao-endereco');
+  if (selecao) selecao.style.display = '';
+  const idAtual = window._enderecoSelecionadoId || (window._enderecosSalvos || [])[0]?.id;
+  if (idAtual) selecionarEnderecoSalvo(idAtual);
+}
+window.voltarSelecaoEndereco = voltarSelecaoEndereco;
+
+function selecionarModalidade(nome) {
+  document.getElementById('campo-apelido-endereco').value = nome;
+  document.querySelectorAll('#bloco-modalidade-endereco button').forEach(btn => {
+    const ativo = btn.dataset.modalidade === nome;
+    btn.style.borderColor = ativo ? 'var(--primary)' : 'var(--border)';
+    btn.style.background = ativo ? 'rgba(170,239,0,0.08)' : 'none';
+  });
+}
+window.selecionarModalidade = selecionarModalidade;
+
+function selecionarEntregaAusencia(tipo) {
+  _ausenciaSelecionada = tipo;
+  ['eu','portaria','vizinho'].forEach(t => {
+    const el = document.getElementById('ausencia-' + t);
+    if (!el) return;
+    el.style.borderColor = t === tipo ? 'var(--primary)' : 'var(--border)';
+    el.style.background = t === tipo ? 'rgba(170,239,0,0.05)' : '';
+  });
+  const vizinhoWrap = document.getElementById('campo-vizinho-wrap');
+  if (vizinhoWrap) vizinhoWrap.style.display = tipo === 'vizinho' ? 'block' : 'none';
+}
+window.selecionarEntregaAusencia = selecionarEntregaAusencia;
+
+function mascaraTelefone(input) {
+  let v = input.value.replace(/\D/g,'');
+  if (v.length <= 10) v = v.replace(/(\d{2})(\d{4})(\d{0,4})/,'($1) $2-$3');
+  else v = v.replace(/(\d{2})(\d{5})(\d{0,4})/,'($1) $2-$3');
+  input.value = v;
+}
+
+function mascaraCEP(input) {
+  let v = input.value.replace(/\D/g,'').slice(0,8);
+  if (v.length > 5) v = v.replace(/(\d{5})(\d{1,3})/, '$1-$2');
+  input.value = v;
+  if (v.replace(/\D/g,'').length === 8) buscarCEP();
+}
+
+async function buscarCEP() {
+  const cep = (document.getElementById('campo-cep')?.value || '').replace(/\D/g,'');
+  const feedback = document.getElementById('cep-feedback');
+  if (cep.length !== 8) return;
+  feedback.style.display = 'block';
+  feedback.style.color = 'var(--text-muted)';
+  feedback.textContent = 'Buscando endereço...';
+  try {
+    const res = await fetch('https://viacep.com.br/ws/' + cep + '/json/');
+    const data = await res.json();
+    if (data.erro) {
+      feedback.style.color = '#ef4444';
+      feedback.textContent = '❌ CEP não encontrado.';
+      return;
+    }
+    const rua = document.getElementById('campo-rua');
+    const bairro = document.getElementById('campo-bairro');
+    if (rua && !rua.value) rua.value = data.logradouro || '';
+    else if (rua) rua.value = data.logradouro || rua.value;
+    if (bairro && !bairro.value) bairro.value = data.bairro || '';
+    else if (bairro) bairro.value = data.bairro || bairro.value;
+    feedback.style.color = '#22c55e';
+    feedback.textContent = '✅ Endereço encontrado — confira e edite se necessário.';
+    document.getElementById('campo-numero')?.focus();
+  } catch(e) {
+    feedback.style.color = '#ef4444';
+    feedback.textContent = '❌ Erro ao buscar CEP. Tente novamente.';
+  }
+}
+
+// Valida o telefone de verdade: DDD real, quantidade exata de dígitos e
+// rejeita padrões falsos como 611190000000 (ver js/validadores.js)
+function validarTelefone(telefone) {
+  return window.validarTelefoneReal(telefone);
+}
+
+function selecionarEntrega(tipo) {
+  selectedDelivery = tipo;
+  const cart = getCart();
+  const subtotal = getCartTotal();
+  const frete = calcFrete(subtotal);
+  const subtotalComDesconto = calcSubtotalComDesconto(subtotal);
+  const total = subtotalComDesconto + frete;
+
+  document.getElementById('card-rota').style.borderColor = tipo === 'rota' ? 'var(--primary)' : 'var(--border)';
+  document.getElementById('card-rota').style.background = tipo === 'rota' ? 'rgba(170,239,0,0.05)' : '';
+  document.getElementById('card-exclusiva').style.borderColor = tipo === 'exclusiva' ? 'var(--primary)' : 'var(--border)';
+  document.getElementById('card-exclusiva').style.background = tipo === 'exclusiva' ? 'rgba(170,239,0,0.05)' : '';
+
+  document.getElementById('bloco-horario').style.display = tipo === 'rota' ? 'block' : 'none';
+  document.getElementById('aviso-exclusiva').style.display = tipo === 'exclusiva' ? 'block' : 'none';
+
+  // Exclusiva: pagamento OBRIGATÓRIO pelo app (PIX ou Cartão) — sem opção de dinheiro
+  const optDinheiro = document.getElementById('pay-dinheiro');
+  if (tipo === 'exclusiva') {
+    optDinheiro.style.display = 'none';
+    if (selectedPayment === 'dinheiro') selectPayment('pix');
+  } else {
+    optDinheiro.style.display = '';
+  }
+
+  document.getElementById('bloco-pagamento').style.opacity = '1';
+  document.getElementById('bloco-pagamento').style.pointerEvents = 'auto';
+
+  // Atualiza resumo
+  document.getElementById('resumo-frete').innerHTML = `<span>Frete (${tipo === 'exclusiva' ? 'Exclusiva' : 'Rota'})</span><span>${frete === 0 ? '<span style="color:#22c55e">Grátis</span>' : formatPrice(frete)}</span>`;
+  document.getElementById('resumo-total').textContent = formatPrice(total);
+  document.getElementById('btn-confirmar').textContent = `⚡ Confirmar Pedido — ${formatPrice(total)}`;
+}
+
+function selecionarHorario(h) {
+  selectedHorario = h;
+  ['h1','h2','h3'].forEach(id => {
+    document.getElementById(id).style.borderColor = 'var(--border)';
+    document.getElementById(id).style.background = '';
+  });
+  const map = {'08:00-12:00':'h1','12:00-16:00':'h2','16:00-20:00':'h3'};
+  const el = document.getElementById(map[h]);
+  if (el) { el.style.borderColor = 'var(--primary)'; el.style.background = 'rgba(170,239,0,0.08)'; }
+}
+
+function selectPayment(type) {
+  selectedPayment = type;
+  ['pix','cartao','dinheiro'].forEach(p => {
+    const el = document.getElementById('pay-' + p);
+    if (el) el.classList.remove('selected');
+  });
+  const sel = document.getElementById('pay-' + type);
+  if (sel) sel.classList.add('selected');
+
+  const det = document.getElementById('payment-detail');
+  if (!det) return;
+  if (type === 'cartao') {
+    det.innerHTML = `<div style="margin-top:12px;background:var(--bg-muted);border-radius:10px;padding:14px;font-size:13px;color:var(--text-muted)">
+      💳 Você será redirecionado para o Mercado Pago para pagar com cartão de forma segura.</div>`;
+  } else if (type === 'dinheiro') {
+    det.innerHTML = `<div style="margin-top:12px;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.3);border-radius:10px;padding:14px">
+      <p style="font-weight:700;font-size:13px;margin-bottom:4px">💵 Pagamento na Entrega</p>
+      <p style="font-size:12px;color:var(--text-muted)">Tenha o valor <strong>exato e trocado</strong>. Caso não haja troco, poderá ser cobrada taxa adicional.</p>
+    </div>`;
+  } else {
+    det.innerHTML = `<div style="margin-top:12px;background:var(--bg-muted);border-radius:10px;padding:14px;font-size:13px;color:var(--text-muted)">
+      📱 Você será redirecionado para pagar via PIX no Mercado Pago.</div>`;
+  }
+
+  // Recalcula o resumo de valores ao trocar forma de pagamento (desconto PIX)
+  const cart = getCart();
+  const subtotal = getCartTotal();
+  const frete = calcFrete(subtotal);
+  const subtotalComDesconto = calcSubtotalComDesconto(subtotal);
+  const total = subtotalComDesconto + frete;
+
+  const descontoEl = document.getElementById('resumo-desconto-pix');
+  if (descontoEl) descontoEl.style.display = type === 'pix' ? '' : 'none';
+
+  const totalEl = document.getElementById('resumo-total');
+  if (totalEl) totalEl.textContent = formatPrice(total);
+
+  const btn = document.getElementById('btn-confirmar');
+  if (btn) btn.textContent = `⚡ Confirmar Pedido — ${formatPrice(total)}`;
+}
+
+async function enviarEmailPedido(pedido) {
+  try {
+    await fetch('/.netlify/functions/enviar-email-pedido', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pedido })
+    });
+  } catch(e) { console.error('Erro ao enviar email:', e); }
+}
+
+async function finalizarPedido() {
+  const nome = document.getElementById('campo-nome')?.value.trim();
+  const telefone = document.getElementById('campo-telefone')?.value.trim();
+  const bairro = document.getElementById('campo-bairro')?.value.trim();
+  const rua = document.getElementById('campo-rua')?.value.trim();
+  const numero = document.getElementById('campo-numero')?.value.trim();
+  const complemento = document.getElementById('campo-complemento')?.value.trim();
+  const referencia = document.getElementById('campo-referencia')?.value.trim();
+  const endereco = rua && numero ? `${rua}, ${numero}${complemento ? ' - ' + complemento : ''}` : '';
+
+  if (!document.getElementById('aceite-termos')?.checked) { showToast('Você precisa aceitar os Termos de Uso', 'error'); return; }
+  if (!nome) { showToast('Digite seu nome completo', 'error'); return; }
+  if (!validarTelefone(telefone)) { showToast('Digite um telefone válido com DDD (ex: 55 99999-9999)', 'error'); return; }
+  if (!bairro) { showToast('Digite seu bairro', 'error'); return; }
+  if (!rua) { showToast('Digite o nome da rua', 'error'); return; }
+  if (!numero) { showToast('Digite o número da residência', 'error'); return; }
+  if (selectedDelivery === 'rota' && !selectedHorario) { showToast('Escolha uma janela de horário', 'error'); return; }
+
+  // Sanitiza todos os campos de texto antes de salvar
+  const sanitizar = (str, max) => String(str || '').replace(/<[^>]*>/g, '').trim().substring(0, max);
+  const nomeLimpo = sanitizar(nome, 100);
+  const bairroLimpo = sanitizar(bairro, 100);
+  const enderecoLimpo = sanitizar(endereco, 200);
+  const referenciaLimpa = sanitizar(referencia, 200);
+
+  const btn = document.getElementById('btn-confirmar');
+  btn.disabled = true; btn.textContent = 'Verificando...';
+
+  const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm');
+  const supabase = createClient('https://kkliwdphrdbguclsvxcw.supabase.co', 'sb_publishable_OMXANLsZK98fPWygp8ZHfA_xzSpWgYb');
+  const { data: { session: sessaoConfirmar } } = await supabase.auth.getSession();
+  const user = sessaoConfirmar?.user || null;
+
+  if (!user) {
+    showToast('Faça login para finalizar sua compra', 'error');
+    setTimeout(() => window.location.href = 'login.html', 1500);
+    btn.disabled = false;
+    return;
+  }
+
+  btn.textContent = 'Salvando pedido...';
+
+  // MELHORIA: se o cliente preencheu um endereço novo e marcou "salvar",
+  // grava na tabela de endereços — sem travar o pedido se isso falhar.
+  const salvarEndereco = document.getElementById('campo-salvar-endereco')?.checked;
+  if (salvarEndereco && !window._enderecoSelecionadoId) {
+    const apelido = document.getElementById('campo-apelido-endereco')?.value || 'Casa';
+    try {
+      await comTimeout(
+        supabase.from('enderecos').insert({
+          usuario_id: user.id,
+          apelido,
+          rua, numero, complemento, bairro: bairroLimpo, referencia: referenciaLimpa
+        }),
+        8000
+      );
+    } catch (e) { /* não bloqueia o pedido se der erro/timeout ao salvar o endereço */ }
+  }
+
+  const cart = getCart();
+  const subtotal = getCartTotal();
+  const frete = calcFrete(subtotal);
+  const subtotalComDesconto = calcSubtotalComDesconto(subtotal);
+  const descontoCupom = calcDescontoCupom(subtotalComDesconto);
+  const descontoSaldo = calcDescontoSaldo(subtotalComDesconto - descontoCupom);
+  const total = subtotalComDesconto - descontoCupom - descontoSaldo + frete;
+
+  // Indicação: resolve o código guardado no navegador pro id de quem indicou
+  // (nunca credita o próprio comprador se ele usar o próprio link)
+  let indicadorId = null;
+  let codigoIndicacaoUsado = null;
+  try {
+    const codigoRef = localStorage.getItem('codigo_indicacao');
+    if (codigoRef) {
+      const { data: indicador } = await supabase.from('usuarios').select('id').eq('codigo_indicacao', codigoRef).maybeSingle();
+      if (indicador && indicador.id !== user.id) {
+        indicadorId = indicador.id;
+        codigoIndicacaoUsado = codigoRef;
+      }
+    }
+  } catch (e) { /* indicação é um bônus — se falhar, o pedido segue normal */ }
+
+  const itens = cart.map(item => ({
+    produto_id: item.id,
+    nome: item.name,
+    preco: item.price,
+    quantidade: item.qty,
+    emoji: item.emoji || '📦'
+  }));
+
+  // Instrução de ausência
+  const ausenciaMap = { eu: 'Só entregar para mim', portaria: 'Deixar na portaria', vizinho: 'Entregar para vizinho' };
+  const vizinho = sanitizar(document.getElementById('campo-vizinho')?.value || '', 150);
+  const instrucaoAusencia = _ausenciaSelecionada === 'vizinho'
+    ? `Entregar para vizinho: ${vizinho || 'não informado'}`
+    : (ausenciaMap[_ausenciaSelecionada] || 'Só entregar para mim');
+
+  // CORREÇÃO BUG 15: previsão da Exclusiva reflete o horário de corte real
+  const exclusivaInfo = infoEntregaExclusiva();
+  const dadosEntrega = {
+    nome: nomeLimpo, telefone, bairro: bairroLimpo, endereco: enderecoLimpo, referencia: referenciaLimpa,
+    cidade: 'Santa Maria - RS',
+    tipo: selectedDelivery,
+    horario_preferido: selectedDelivery === 'rota' ? selectedHorario : `Exclusiva - ${exclusivaInfo.previsao}`,
+    previsao: selectedDelivery === 'rota' ? `Janela: ${selectedHorario} (24-48h)` : exclusivaInfo.previsao,
+    instrucao_ausencia: instrucaoAusencia
+  };
+
+  let pedido, error;
+  // Código de confirmação de entrega (estilo iFood): o cliente informa
+  // esse código pro entregador, e o admin digita no painel na hora da
+  // entrega pra confirmar automaticamente que o pedido chegou.
+  const codigoConfirmacao = String(Math.floor(1000 + Math.random() * 9000));
+  try {
+    const resp = await comTimeout(
+      supabase.from('pedidos').insert({
+        usuario_id: user.id,
+        usuario_email: user.email,
+        usuario_nome: nomeLimpo,
+        usuario_telefone: telefone,
+        itens,
+        subtotal,
+        frete,
+        total,
+        status: 'pendente',
+        endereco: dadosEntrega,
+        pagamento: selectedPayment,
+        tipo_entrega: selectedDelivery,
+        cupom_codigo: _cupomAplicado?.codigo || null,
+        cupom_desconto: descontoCupom || 0,
+        codigo_confirmacao: codigoConfirmacao,
+        saldo_usado: descontoSaldo || 0,
+        indicador_id: indicadorId,
+        codigo_indicacao_usado: codigoIndicacaoUsado
+      }).select().single(),
+      20000, 'Não conseguimos confirmar seu pedido a tempo. Verifique sua conexão e tente novamente.'
+    );
+    pedido = resp.data; error = resp.error;
+  } catch (timeoutErr) {
+    btn.disabled = false; btn.textContent = '⚡ Confirmar Pedido';
+    showToast(timeoutErr.message, 'error');
+    return;
+  }
+
+  if (error) {
+    btn.disabled = false; btn.textContent = '⚡ Confirmar Pedido';
+    // Mensagem vinda da trava no banco (trigger checar_perfil_completo_para_pedido)
+    if (error.message && error.message.includes('Cadastro incompleto')) {
+      showToast(error.message, 'error');
+    } else if (error.message && error.message.includes('ESTOQUE_INSUFICIENTE')) {
+      const nomeProduto = error.message.split('ESTOQUE_INSUFICIENTE:')[1]?.split('—')[0]?.trim();
+      showToast(`😕 Ih, "${nomeProduto || 'um item'}" ficou sem estoque suficiente. Ajusta a quantidade no carrinho.`, 'error');
+      setTimeout(() => window.location.href = 'carrinho.html', 2500);
+    } else {
+      showToast('Erro ao salvar pedido. Tente novamente.', 'error');
+    }
+    return;
+  }
+
+  // Registra uso do cupom
+  if (_cupomAplicado) {
+    await supabase.from('cupons_usos').insert({ cupom_id: _cupomAplicado.id, usuario_id: user.id, pedido_id: pedido.id });
+    await supabase.from('cupons').update({ uso_atual: supabase.rpc ? undefined : undefined }).eq('id', _cupomAplicado.id);
+    await supabase.rpc('incrementar_uso_cupom', { cupom_id_param: _cupomAplicado.id }).catch(() => {});
+  }
+
+  // Registra o resgate do saldo (cashback/indicação) usado nessa compra —
+  // entra negativo no extrato, abatendo do saldo disponível.
+  if (descontoSaldo > 0) {
+    await supabase.from('saldo_extrato').insert({
+      usuario_id: user.id,
+      pedido_id: pedido.id,
+      tipo: 'resgate',
+      valor: -descontoSaldo,
+      descricao: `Usado no pedido #${pedido.id.slice(0,8).toUpperCase()}`
+    }).catch(() => {});
+  }
+  // O código de indicação só vale pra essa compra — limpa pra não
+  // continuar sendo aplicado nos próximos pedidos do mesmo navegador.
+  if (codigoIndicacaoUsado) localStorage.removeItem('codigo_indicacao');
+
+  const pedidoId = pedido.id;
+  const pedidoIdCurto = pedidoId.slice(0,8).toUpperCase();
+
+  // Pagamento na entrega — confirma direto
+  if (selectedPayment === 'dinheiro') {
+    clearCart();
+    enviarEmailPedido({ ...pedido, usuario_email: user.email });
+    document.getElementById('main-content').innerHTML = `
+    <div class="success-box">
+      <div class="success-check-wrap">
+        <svg width="56" height="56" viewBox="0 0 52 52">
+          <circle class="success-check-circle" cx="26" cy="26" r="24"/>
+          <path class="success-check-mark" d="M14 27l7 7 17-17"/>
+        </svg>
+      </div>
+      <h1>Pedido Confirmado!</h1>
+      <p style="font-size:18px;font-weight:700;margin-bottom:4px">#${pedidoIdCurto}</p>
+      <div class="order-info-card">
+        <div class="order-info-row">
+          <div class="order-info-icon">📍</div>
+          <div class="order-info-text">
+            <div class="order-info-label">Endereço</div>
+            <div class="order-info-value">${endereco}, ${bairro}</div>
+          </div>
+        </div>
+        <div class="order-info-row">
+          <div class="order-info-icon">📞</div>
+          <div class="order-info-text">
+            <div class="order-info-label">Telefone</div>
+            <div class="order-info-value">${telefone}</div>
+          </div>
+        </div>
+        <div class="order-info-row">
+          <div class="order-info-icon">🚀</div>
+          <div class="order-info-text">
+            <div class="order-info-label">Entrega</div>
+            <div class="order-info-value">${selectedDelivery === 'exclusiva' ? `Exclusiva — ${dadosEntrega.previsao}` : 'Por rota — 24-48h'}</div>
+          </div>
+        </div>
+        ${selectedHorario ? `
+        <div class="order-info-row">
+          <div class="order-info-icon">🕐</div>
+          <div class="order-info-text">
+            <div class="order-info-label">Janela</div>
+            <div class="order-info-value">${selectedHorario}</div>
+          </div>
+        </div>` : ''}
+        <div class="order-info-row">
+          <div class="order-info-icon">💵</div>
+          <div class="order-info-text">
+            <div class="order-info-label">Pagamento</div>
+            <div class="order-info-value">Na entrega — dinheiro trocado</div>
+          </div>
+        </div>
+        <div class="order-info-row">
+          <div class="order-info-icon">🔑</div>
+          <div class="order-info-text">
+            <div class="order-info-label">Código de confirmação</div>
+            <div class="order-info-value">${pedido.codigo_confirmacao} — informe pro entregador na hora da entrega</div>
+          </div>
+        </div>
+        <div class="order-info-note">
+          <span>📦</span>
+          <span>Entrega sem rastreamento online — qualquer dúvida, fale pelo WhatsApp.</span>
+        </div>
+      </div>
+      <p style="font-size:12px;color:var(--text-muted);margin-bottom:24px">Você receberá uma confirmação em breve.</p>
+      <div style="display:flex;gap:12px">
+        <a href="conta.html" class="btn btn-outline" style="flex:1">Meus Pedidos</a>
+        <a href="index.html" class="btn btn-primary" style="flex:1">Continuar Comprando</a>
+      </div>
+    </div>`;
+    window.scrollTo(0,0);
+    dispararCelebracao();
+    import('/js/analytics.js').then(m => m.registrarEvento('compra_concluida', { meta: { pedidoId: pedido.id, total: pedido.total } })).catch(() => {});
+    return;
+  }
+
+  // PIX ou Cartão → Mercado Pago
+  btn.textContent = 'Redirecionando para pagamento...';
+
+  // Detecta se está rodando localmente (Live Server)
+  const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+  if (isLocal) {
+    clearCart();
+    document.getElementById('main-content').innerHTML = `
+    <div class="success-box">
+      <div class="success-icon">✅</div>
+      <h1>Pedido Salvo!</h1>
+      <p style="font-size:15px;font-weight:700;margin-bottom:8px">#${pedidoIdCurto}</p>
+      <div style="background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.3);border-radius:12px;padding:14px;margin-bottom:20px">
+        <p style="font-size:13px;color:#f59e0b;font-weight:700">⚠️ Ambiente Local (Live Server)</p>
+        <p style="font-size:12px;color:var(--text-muted);margin-top:4px">O pagamento via Mercado Pago só funciona quando o site está publicado no Netlify. Pedido salvo no banco com sucesso!</p>
+      </div>
+      <div style="display:flex;gap:12px">
+        <a href="conta.html" class="btn btn-outline" style="flex:1">Meus Pedidos</a>
+        <a href="index.html" class="btn btn-primary" style="flex:1">Continuar Comprando</a>
+      </div>
+    </div>`;
+    window.scrollTo(0,0);
+    return;
+  }
+
+  try {
+    const mpResponse = await comTimeout(
+      fetch('/.netlify/functions/criar-pagamento', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pedidoId, email: user.email })
+      }),
+      15000, 'Não conseguimos conectar com o pagamento a tempo. Tente novamente.'
+    );
+
+    const mpData = await mpResponse.json();
+    if (mpData.erro) throw new Error(mpData.erro);
+    // Não limpa o carrinho aqui — só quando o pagamento for confirmado (tela "aprovado")
+    // Isso evita que o cliente fique travado se desistir/voltar do Mercado Pago
+    window.location.href = mpData.url;
+
+  } catch (err) {
+    btn.disabled = false; btn.textContent = '⚡ Confirmar Pedido';
+    showToast(err.message || 'Erro ao conectar com pagamento. Tente novamente.', 'error');
+  }
+}
+</script>
+
+<script type="module">
+function esc(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+// Verifica retorno do Mercado Pago
+const urlParams = new URLSearchParams(window.location.search);
+const statusMP = urlParams.get('status');
+const pedidoMP = urlParams.get('pedido');
+
+if (statusMP) {
+  // Só limpa o carrinho quando o pagamento foi de fato aprovado
+  if (statusMP === 'aprovado') {
+    clearCart();
+  }
+
+  let codigoConfirmacao = null;
+  if (statusMP === 'aprovado' && pedidoMP) {
+    try {
+      const { createClient: createClientCod } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm');
+      const supabaseCod = createClientCod('https://kkliwdphrdbguclsvxcw.supabase.co', 'sb_publishable_OMXANLsZK98fPWygp8ZHfA_xzSpWgYb');
+      const { data: pedidoInfo } = await supabaseCod.from('pedidos').select('codigo_confirmacao').eq('id', pedidoMP).single();
+      codigoConfirmacao = pedidoInfo?.codigo_confirmacao || null;
+    } catch { /* se falhar, só não mostra o código aqui — não é crítico */ }
+  }
+
+  const icons = { aprovado:'✅', pendente:'⏳', erro:'❌' };
+  const titles = { aprovado:'Pagamento Aprovado!', pendente:'Pagamento Pendente', erro:'Pagamento não aprovado' };
+  const msgs = {
+    aprovado: 'Seu pedido foi confirmado e está sendo processado.',
+    pendente: 'Seu pagamento está sendo processado. Aguarde a confirmação.',
+    erro: 'Não foi possível processar seu pagamento. Tente novamente ou escolha outra forma de pagamento.'
+  };
+  document.getElementById('main-content').innerHTML = `
+  <div class="success-box">
+    ${statusMP === 'aprovado'
+      ? `<div class="success-check-wrap">
+          <svg width="56" height="56" viewBox="0 0 52 52">
+            <circle class="success-check-circle" cx="26" cy="26" r="24"/>
+            <path class="success-check-mark" d="M14 27l7 7 17-17"/>
+          </svg>
+        </div>`
+      : `<div class="success-icon">${icons[statusMP]||'❓'}</div>`
+    }
+    <h1>${titles[statusMP]||'Status do Pedido'}</h1>
+    <p style="color:var(--text-muted);margin-bottom:${codigoConfirmacao ? '16px' : '32px'}">${msgs[statusMP]||''}</p>
+    ${codigoConfirmacao ? `
+    <div class="order-info-card" style="margin-bottom:24px">
+      <div class="order-info-row" style="border-bottom:none">
+        <div class="order-info-icon">🔑</div>
+        <div class="order-info-text">
+          <div class="order-info-label">Código de confirmação</div>
+          <div class="order-info-value">${codigoConfirmacao} — informe pro entregador na hora da entrega</div>
+        </div>
+      </div>
+    </div>` : ''}
+    <div style="display:flex;gap:12px">
+      ${statusMP === 'erro'
+        ? `<a href="checkout.html" class="btn btn-primary" style="flex:1">Tentar Novamente</a>`
+        : `<a href="conta.html" class="btn btn-outline" style="flex:1">Meus Pedidos</a>
+           <a href="index.html" class="btn btn-primary" style="flex:1">Continuar Comprando</a>`
+      }
+    </div>
+  </div>`;
+  if (statusMP === 'aprovado') {
+    window.scrollTo(0,0);
+    dispararCelebracao();
+    import('/js/analytics.js').then(m => m.registrarEvento('compra_concluida', { meta: { pedidoId: pedidoMP } })).catch(() => {});
+  }
+} else {
+  // Verifica se o usuário tem perfil completo antes de permitir comprar
+  //
+  // CORREÇÃO: essa etapa inicial não tinha nenhum tratamento de erro —
+  // se a internet estivesse ruim (ou o Supabase demorasse/falhasse), a
+  // tela ficava em branco pra sempre, sem nenhum aviso. Agora qualquer
+  // falha aqui cai numa tela de erro com botão de "Tentar novamente".
+  try {
+    const { createClient: createClientCheck } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm');
+    const supabaseCheck = createClientCheck('https://kkliwdphrdbguclsvxcw.supabase.co', 'sb_publishable_OMXANLsZK98fPWygp8ZHfA_xzSpWgYb');
+
+    const { data: { session: sessionCheck } } = await comTimeout(supabaseCheck.auth.getSession(), 15000);
+    const userCheck = sessionCheck?.user || null;
+
+    if (!userCheck) {
+      window.location.replace('login.html');
+    } else {
+      const { data: perfilCheck } = await comTimeout(
+        supabaseCheck.from('usuarios').select('nome, cpf, telefone').eq('id', userCheck.id).single(),
+        15000
+      );
+
+    const nomeOk = perfilCheck?.nome && perfilCheck.nome.trim().length > 1;
+    const cpfOk = perfilCheck?.cpf && window.validarCPFReal(perfilCheck.cpf);
+    // O negócio decidiu não usar SMS pago para confirmar telefone.
+    // Aqui só exigimos que o telefone tenha um formato real (DDD válido
+    // etc.) — a garantia de que os dados são do próprio dono da conta
+    // passa a vir da confirmação por e-mail feita ao editar o cadastro
+    // (ver conta.html / netlify/functions/confirmar-alteracao-dados.js).
+    const telOk = perfilCheck?.telefone && window.validarTelefoneReal(perfilCheck.telefone);
+
+    if (!nomeOk || !cpfOk || !telOk) {
+      const faltando = [];
+      if (!nomeOk) faltando.push('Nome completo');
+      if (!cpfOk) faltando.push('CPF');
+      if (!telOk) faltando.push('Telefone válido com DDD');
+
+      document.getElementById('main-content').innerHTML = `
+      <div class="success-box" style="text-align:center;padding:48px 24px">
+        <div style="font-size:48px;margin-bottom:16px">👤</div>
+        <h1 style="font-size:22px;margin-bottom:12px">Complete seu perfil</h1>
+        <p style="color:var(--text-muted);margin-bottom:12px">Para finalizar uma compra, precisamos que seu cadastro esteja completo.</p>
+        <div style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.25);border-radius:12px;padding:16px;margin-bottom:24px;text-align:left">
+          <p style="font-size:13px;font-weight:700;margin-bottom:8px;color:#ef4444">⚠️ Dados faltando:</p>
+          ${faltando.map(f => '<p style="font-size:13px;color:var(--text-muted);margin-bottom:4px">• ' + f + '</p>').join('')}
+        </div>
+        <a href="conta.html?secao=profile" class="btn btn-primary" style="display:inline-block">Completar Cadastro</a>
+      </div>`;
+    } else {
+      // Antes de ir pro checkout em si, confirma com o cliente se os
+      // dados salvos estão corretos. O CPF nunca aparece inteiro na
+      // tela — só os últimos dígitos.
+      document.getElementById('main-content').innerHTML = `
+      <div class="success-box" style="text-align:center;padding:48px 24px">
+        <div style="font-size:48px;margin-bottom:16px">📋</div>
+        <h1 style="font-size:22px;margin-bottom:12px">Confira seus dados</h1>
+        <p style="color:var(--text-muted);margin-bottom:20px">Esses dados vão junto com o seu pedido. Estão corretos?</p>
+        <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:24px;text-align:left">
+          <p style="font-size:14px;margin-bottom:8px">👤 <strong>Nome:</strong> ${perfilCheck.nome}</p>
+          <p style="font-size:14px;margin-bottom:8px">🪪 <strong>CPF:</strong> ${window.mascararCPF(perfilCheck.cpf)}</p>
+          <p style="font-size:14px">📞 <strong>Telefone:</strong> ${perfilCheck.telefone}</p>
+        </div>
+        <div style="display:flex;gap:12px">
+          <a href="conta.html?secao=profile" class="btn btn-outline" style="flex:1">Editar dados</a>
+          <button type="button" id="btn-confirmar-dados-checkout" class="btn btn-primary" style="flex:1">Sim, confirmar</button>
+        </div>
+      </div>`;
+
+      document.getElementById('btn-confirmar-dados-checkout').addEventListener('click', () => {
+        renderCheckout();
+        selectPayment('pix');
+      });
+    }
+  }
+  } catch (erroInicial) {
+    document.getElementById('main-content').innerHTML = `
+    <div class="success-box" style="text-align:center;padding:48px 24px">
+      <div style="font-size:48px;margin-bottom:16px">⚠️</div>
+      <h1 style="font-size:22px;margin-bottom:12px">Não foi possível carregar o checkout</h1>
+      <p style="color:var(--text-muted);margin-bottom:24px">${esc(erroInicial.message) || 'Verifique sua conexão com a internet e tente novamente.'}</p>
+      <button type="button" onclick="window.location.reload()" class="btn btn-primary" style="display:inline-block">🔄 Tentar novamente</button>
+    </div>`;
+  }
+}
+</script>
+</body>
+</html>

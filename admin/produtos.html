@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Produtos Admin — Zipshop</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="admin-layout">
+  <aside class="admin-sidebar">
+    <div class="admin-sidebar-logo">
+      <div class="logo">
+        <img src="../img/logo-icon.jpeg" alt="Zipshop" style="width:32px;height:32px" onerror="this.style.display='none'">
+        <span class="logo-text"><span>ZIP</span><span>SHOP</span></span>
+      </div>
+      <div class="admin-sidebar-subtitle">Painel Administrativo</div>
+    </div>
+    <nav class="admin-nav">
+      <a href="index.html" class="admin-nav-item">📊 Dashboard</a>
+      <a href="produtos.html" class="admin-nav-item active">📦 Produtos</a>
+      <a href="importar.html" class="admin-nav-item">🛍️ Importar da Shopee</a>
+      <a href="pedidos.html" class="admin-nav-item">🛒 Pedidos</a>
+      <a href="clientes.html" class="admin-nav-item">👥 Clientes</a>
+      <a href="categorias.html" class="admin-nav-item">🏷️ Categorias</a>
+      <a href="banners.html" class="admin-nav-item">🖼️ Banners</a>
+      <a href="textos.html" class="admin-nav-item">📝 Textos do Site</a>
+      <a href="cupons.html" class="admin-nav-item">🎟️ Cupons</a>
+      <a href="devolucoes.html" class="admin-nav-item">↩️ Devoluções</a>
+      <a href="analytics.html" class="admin-nav-item">📈 Analytics</a>
+    </nav>
+    <div style="padding:16px;border-top:1px solid var(--border)">
+      <a href="../index.html" class="admin-nav-item" style="color:var(--text-muted)">🏪 Ver Loja</a>
+    </div>
+  </aside>
+
+  <main class="admin-main">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px">
+      <div>
+        <h1 class="admin-page-title">Produtos</h1>
+        <p class="admin-page-sub">Gerencie o catálogo de produtos</p>
+      </div>
+      <button class="btn btn-primary" onclick="abrirModal()">+ Novo Produto</button>
+    </div>
+
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-body" style="display:flex;gap:12px;flex-wrap:wrap">
+        <input type="text" class="form-input" id="busca" placeholder="Buscar produto..." style="flex:1;min-width:0" oninput="filtrar()">
+        <select class="form-input" id="filtro-cat" style="width:100%;max-width:180px" onchange="filtrar()">
+          <option value="">Todas as categorias</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Produto</th>
+            <th>Categoria</th>
+            <th>Preço</th>
+            <th>Estoque</th>
+            <th>Status</th>
+            <th>Ações</th>
+          </tr>
+        </thead>
+        <tbody id="produtos-table">
+          <tr><td colspan="6" style="text-align:center;padding:40px;color:var(--text-muted)">Carregando...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </main>
+</div>
+
+<!-- MODAL -->
+<div id="modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:1000;display:flex;align-items:center;justify-content:center;display:none">
+  <div style="background:var(--bg-card);border-radius:16px;padding:32px;width:100%;max-width:560px;max-height:90vh;overflow-y:auto;position:relative">
+    <button onclick="fecharModal()" style="position:absolute;top:16px;right:16px;background:none;border:none;color:var(--text-muted);font-size:24px;cursor:pointer">×</button>
+    <h2 id="modal-title" style="margin-bottom:24px;font-size:20px">Novo Produto</h2>
+    <input type="hidden" id="edit-id">
+
+    <!-- FOTO -->
+    <div style="margin-bottom:16px">
+      <label class="form-label">Foto do Produto</label>
+      <div id="foto-preview" style="width:100%;height:160px;border:2px dashed var(--border);border-radius:12px;display:flex;align-items:center;justify-content:center;cursor:pointer;margin-bottom:8px;overflow:hidden;background:var(--bg-muted)" onclick="document.getElementById('foto-input').click()">
+        <div id="foto-placeholder" style="text-align:center;color:var(--text-muted)">
+          <p style="font-size:32px">📷</p>
+          <p style="font-size:13px">Clique para selecionar foto</p>
+        </div>
+        <img id="foto-img" src="" style="display:none;width:100%;height:100%;object-fit:cover">
+      </div>
+      <input type="file" id="foto-input" accept="image/*" style="display:none" onchange="previewFoto(this)">
+      <p style="font-size:12px;color:var(--text-muted)">JPG, PNG ou WebP. Máximo 5MB.</p>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Fotos adicionais (galeria)</label>
+      <div id="galeria-grid" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px"></div>
+      <button type="button" class="btn btn-outline btn-sm" onclick="document.getElementById('galeria-input').click()">+ Adicionar fotos</button>
+      <input type="file" id="galeria-input" accept="image/*" multiple style="display:none" onchange="adicionarFotosGaleria(this)">
+      <p style="font-size:12px;color:var(--text-muted);margin-top:4px">Aparecem como miniaturas clicáveis na página do produto.</p>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Nome *</label>
+      <input type="text" class="form-input" id="edit-name" placeholder="Ex: iPhone 15 Pro Max">
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="form-group">
+        <label class="form-label">Categoria *</label>
+        <select class="form-input" id="edit-cat">
+          <option>Smartphones</option>
+          <option>Notebooks</option>
+          <option>Headphones</option>
+          <option>Smart TVs</option>
+          <option>Games</option>
+          <option>Acessorios</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Marca</label>
+        <input type="text" class="form-input" id="edit-brand" placeholder="Ex: Apple">
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+      <div class="form-group">
+        <label class="form-label">Preço (R$) *</label>
+        <input type="number" class="form-input" id="edit-price" placeholder="0,00" step="0.01">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Preço antigo</label>
+        <input type="number" class="form-input" id="edit-old-price" placeholder="0,00" step="0.01">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Estoque</label>
+        <input type="number" class="form-input" id="edit-stock" placeholder="0">
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Emoji</label>
+      <input type="text" class="form-input" id="edit-emoji" placeholder="📱" maxlength="2">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Garantia</label>
+      <select class="form-input" id="edit-garantia">
+        <option value="">Sem garantia</option>
+        <option value="30 dias">30 dias (produtos não duráveis — CDC)</option>
+        <option value="90 dias">90 dias (produtos duráveis — CDC)</option>
+        <option value="6 meses">6 meses</option>
+        <option value="12 meses">12 meses</option>
+        <option value="18 meses">18 meses</option>
+        <option value="24 meses">24 meses</option>
+        <option value="36 meses">36 meses</option>
+      </select>
+      <p style="font-size:11px;color:var(--text-muted);margin-top:4px">⚖️ Produtos duráveis (eletrônicos, joias) têm garantia legal mínima de 90 dias pelo CDC.</p>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Descrição</label>
+      <textarea class="form-input" id="edit-desc" rows="3" placeholder="Descreva o produto..."></textarea>
+
+    <div style="display:flex;flex-direction:column;gap:10px;margin-top:12px;padding:14px;background:var(--bg-muted);border-radius:10px;border:1px solid var(--border);margin-bottom:12px">
+      <p style="font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em">🔗 Produtos Relacionados</p>
+      <p style="font-size:11px;color:var(--text-muted)">Cole os IDs dos produtos separados por vírgula (ex: 3,7,12). Aparecem na seção "Relacionados" da página do produto.</p>
+      <input type="text" class="form-input" id="edit-relacionados" placeholder="Ex: 3, 7, 12" style="font-size:13px">
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px;margin-top:0;padding:14px;background:var(--bg-muted);border-radius:10px;border:1px solid var(--border);margin-bottom:12px">
+      <p style="font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em">🎨 Variações de Cor</p>
+      <p style="font-size:11px;color:var(--text-muted)">Uma cor por linha no formato: <strong>Nome #hexcor</strong> (ex: Preto #000000 / Branco #ffffff)</p>
+      <textarea class="form-input" id="edit-cores" rows="3" placeholder="Preto #1a1a1a&#10;Branco #ffffff&#10;Azul Titan #3b5bdb" style="font-size:13px;resize:vertical"></textarea>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px;margin-top:0;padding:14px;background:var(--bg-muted);border-radius:10px;border:1px solid var(--border);margin-bottom:12px">
+      <p style="font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em">💰 Cashback &amp; Indicação</p>
+      <p style="font-size:11px;color:var(--text-muted)">Percentual do valor do item que vira saldo pro cliente. Só é creditado quando o pedido é marcado como "Entregue".</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="form-group" style="margin:0">
+          <label class="form-label">Cashback pra quem compra (%)</label>
+          <input type="number" class="form-input" id="edit-cashback" placeholder="0" step="0.1" min="0" max="100">
+        </div>
+        <div class="form-group" style="margin:0">
+          <label class="form-label">Comissão pra quem indicou (%)</label>
+          <input type="number" class="form-input" id="edit-indicacao" placeholder="0" step="0.1" min="0" max="100">
+        </div>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px;margin-top:0;padding:14px;background:var(--bg-muted);border-radius:10px;border:1px solid var(--border)">
+      <p style="font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em">Configurações especiais</p>
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
+        <input type="checkbox" id="edit-oferta" style="width:16px;height:16px;accent-color:var(--primary)">
+        <span style="font-size:13px;font-weight:600">⚡ Oferta do Dia</span>
+        <span style="font-size:11px;color:var(--text-muted)">(aparece na seção "Ofertas do Dia")</span>
+      </label>
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
+        <input type="checkbox" id="edit-frete-gratis" style="width:16px;height:16px;accent-color:var(--primary)">
+        <span style="font-size:13px;font-weight:600">🚚 Frete Grátis</span>
+        <span style="font-size:11px;color:var(--text-muted)">(exibe selo de frete grátis no produto)</span>
+      </label>
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
+        <input type="checkbox" id="edit-entrega-24h" style="width:16px;height:16px;accent-color:var(--primary)">
+        <span style="font-size:13px;font-weight:600">⚡ Entrega em 24h</span>
+        <span style="font-size:11px;color:var(--text-muted)">(exibe selo de entrega rápida)</span>
+      </label>
+    </div>
+    </div>
+
+    <div id="upload-progress" style="display:none;margin-bottom:12px">
+      <p style="font-size:13px;color:var(--primary);margin-bottom:4px">Enviando foto...</p>
+      <div style="background:var(--bg-muted);border-radius:4px;height:6px"><div id="progress-bar" style="background:var(--primary);height:6px;border-radius:4px;width:0%;transition:width 0.3s"></div></div>
+    </div>
+
+    <div style="display:flex;gap:12px;margin-top:8px">
+      <button class="btn btn-outline" onclick="fecharModal()" style="flex:1">Cancelar</button>
+      <button class="btn btn-primary" id="btn-salvar" onclick="salvarProduto()" style="flex:1">Salvar Produto</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { isAdmin, supabase } from '../js/admin-guard.js';
+if (!isAdmin) throw new Error('not admin');
+
+
+let produtos = [];
+let fotoFile = null;
+let galeriaNovas = []; // arquivos novos (ainda não subidos) selecionados nesta edição
+let galeriaExistente = []; // fotos já salvas no produto ({url, thumb}) sendo editado
+
+// Reduz o tamanho da imagem no navegador ANTES de enviar pro Supabase.
+// Fotos direto do celular costumam vir com vários MB — sem isso, as
+// páginas de produto e listagem ficam lentas pra carregar.
+async function comprimirImagem(file, maxLado = 1600, qualidade = 0.82) {
+  if (file.type === 'image/gif' || file.size < 300 * 1024) return file;
+
+  try {
+    const bitmap = await createImageBitmap(file);
+    const escala = Math.min(1, maxLado / Math.max(bitmap.width, bitmap.height));
+    const largura = Math.round(bitmap.width * escala);
+    const altura = Math.round(bitmap.height * escala);
+
+    const canvas = document.createElement('canvas');
+    canvas.width = largura;
+    canvas.height = altura;
+    canvas.getContext('2d').drawImage(bitmap, 0, 0, largura, altura);
+
+    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', qualidade));
+    if (!blob) return file;
+
+    const nomeBase = file.name.replace(/\.[^.]+$/, '');
+    return new File([blob], `${nomeBase}.jpg`, { type: 'image/jpeg' });
+  } catch (e) {
+    return file;
+  }
+}
+
+// CORREÇÃO PERFORMANCE: os cards da vitrine (grade de produtos) mostram
+// a foto bem pequena, mas antes carregavam o mesmo arquivo grande da
+// página do produto — desperdiçando dados e deixando o site lento,
+// principalmente no celular. Agora geramos uma miniatura leve (320px)
+// só pra esses cards.
+async function gerarMiniatura(file, maxLado = 320, qualidade = 0.72) {
+  try {
+    const bitmap = await createImageBitmap(file);
+    const escala = Math.min(1, maxLado / Math.max(bitmap.width, bitmap.height));
+    const largura = Math.round(bitmap.width * escala);
+    const altura = Math.round(bitmap.height * escala);
+
+    const canvas = document.createElement('canvas');
+    canvas.width = largura;
+    canvas.height = altura;
+    canvas.getContext('2d').drawImage(bitmap, 0, 0, largura, altura);
+
+    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', qualidade));
+    return blob ? new File([blob], 'thumb.jpg', { type: 'image/jpeg' }) : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+// ===== GALERIA (fotos adicionais do produto) =====
+function renderGaleriaGrid() {
+  const grid = document.getElementById('galeria-grid');
+  const itensExistentes = galeriaExistente.map((img, i) => `
+    <div style="position:relative;width:64px;height:64px">
+      <img src="${img.thumb || img.url}" style="width:100%;height:100%;object-fit:cover;border-radius:8px;border:1px solid var(--border)">
+      <button type="button" onclick="removerFotoGaleriaExistente(${i})" style="position:absolute;top:-6px;right:-6px;background:#ef4444;color:#fff;border:none;border-radius:50%;width:20px;height:20px;font-size:12px;cursor:pointer;line-height:1">✕</button>
+    </div>`).join('');
+  const itensNovos = galeriaNovas.map((item, i) => `
+    <div style="position:relative;width:64px;height:64px">
+      <img src="${item.preview}" style="width:100%;height:100%;object-fit:cover;border-radius:8px;border:2px solid var(--primary)">
+      <button type="button" onclick="removerFotoGaleriaNova(${i})" style="position:absolute;top:-6px;right:-6px;background:#ef4444;color:#fff;border:none;border-radius:50%;width:20px;height:20px;font-size:12px;cursor:pointer;line-height:1">✕</button>
+    </div>`).join('');
+  grid.innerHTML = (itensExistentes + itensNovos) || '<p style="font-size:12px;color:var(--text-muted)">Nenhuma foto extra ainda.</p>';
+}
+
+window.adicionarFotosGaleria = async function(input) {
+  for (const file of input.files) {
+    const comprimido = await comprimirImagem(file, 1200, 0.8);
+    const preview = await new Promise(resolve => {
+      const reader = new FileReader();
+      reader.onload = e => resolve(e.target.result);
+      reader.readAsDataURL(comprimido);
+    });
+    galeriaNovas.push({ file: comprimido, preview });
+  }
+  input.value = '';
+  renderGaleriaGrid();
+};
+
+window.removerFotoGaleriaNova = function(i) {
+  galeriaNovas.splice(i, 1);
+  renderGaleriaGrid();
+};
+window.removerFotoGaleriaExistente = function(i) {
+  galeriaExistente.splice(i, 1);
+  renderGaleriaGrid();
+};
+
+async function uploadGaleria(nomeProduto) {
+  const enviadas = [...galeriaExistente];
+  for (const item of galeriaNovas) {
+    const ext = 'jpg';
+    const base = `${Date.now()}-${Math.random().toString(36).slice(2,7)}-${nomeProduto.replace(/\s/g,'-')}`;
+    const { error } = await supabase.storage.from('Produtos').upload(`${base}.${ext}`, item.file, { cacheControl: '3600', upsert: false });
+    if (error) continue;
+    const url = supabase.storage.from('Produtos').getPublicUrl(`${base}.${ext}`).data.publicUrl;
+
+    let thumbUrl = url;
+    const thumbFile = await gerarMiniatura(item.file);
+    if (thumbFile) {
+      const thumbName = `${base}-thumb.jpg`;
+      const { error: erroThumb } = await supabase.storage.from('Produtos').upload(thumbName, thumbFile, { cacheControl: '3600', upsert: false });
+      if (!erroThumb) thumbUrl = supabase.storage.from('Produtos').getPublicUrl(thumbName).data.publicUrl;
+    }
+    enviadas.push({ url, thumb: thumbUrl });
+  }
+  return enviadas;
+}
+
+function formatPrice(v) {
+  return Number(v||0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+
+// Preview da foto antes de enviar
+window.previewFoto = async function(input) {
+  const original = input.files[0];
+  if (!original) return;
+  fotoFile = await comprimirImagem(original);
+  const reader = new FileReader();
+  reader.onload = e => {
+    document.getElementById('foto-img').src = e.target.result;
+    document.getElementById('foto-img').style.display = 'block';
+    document.getElementById('foto-placeholder').style.display = 'none';
+  };
+  reader.readAsDataURL(fotoFile);
+};
+
+// Upload da foto no Supabase Storage (imagem principal + miniatura leve)
+async function uploadFoto(file, nomeProduto) {
+  document.getElementById('upload-progress').style.display = 'block';
+  document.getElementById('progress-bar').style.width = '30%';
+
+  const ext = file.name.split('.').pop();
+  const baseName = `${Date.now()}-${nomeProduto.replace(/\s/g,'-')}`;
+  const fileName = `${baseName}.${ext}`;
+
+  const { error } = await supabase.storage
+    .from('Produtos')
+    .upload(fileName, file, { cacheControl: '3600', upsert: false });
+
+  document.getElementById('progress-bar').style.width = '65%';
+
+  if (error) {
+    console.error('Erro upload:', error);
+    document.getElementById('upload-progress').style.display = 'none';
+    return { imageUrl: null, thumbUrl: null };
+  }
+
+  const { data: urlData } = supabase.storage.from('Produtos').getPublicUrl(fileName);
+
+  // Gera e sobe a miniatura — se falhar por algum motivo, o site
+  // simplesmente usa a imagem principal nos cards (sem quebrar nada).
+  let thumbUrl = null;
+  const thumbFile = await gerarMiniatura(file);
+  if (thumbFile) {
+    const thumbName = `${baseName}-thumb.jpg`;
+    const { error: erroThumb } = await supabase.storage
+      .from('Produtos')
+      .upload(thumbName, thumbFile, { cacheControl: '3600', upsert: false });
+    if (!erroThumb) {
+      thumbUrl = supabase.storage.from('Produtos').getPublicUrl(thumbName).data.publicUrl;
+    }
+  }
+
+  document.getElementById('progress-bar').style.width = '100%';
+  setTimeout(() => document.getElementById('upload-progress').style.display = 'none', 500);
+
+  return { imageUrl: urlData.publicUrl, thumbUrl };
+}
+
+// Carregar produtos
+async function carregar() {
+  const { data } = await supabase.from('produtos').select('*').order('id');
+  produtos = data || [];
+
+  // Preenche filtro de categorias
+  const cats = [...new Set(produtos.map(p => p.category))];
+  const sel = document.getElementById('filtro-cat');
+  cats.forEach(c => sel.innerHTML += `<option value="${c}">${c}</option>`);
+
+  renderTabela(produtos);
+}
+
+function renderTabela(lista) {
+  const tbody = document.getElementById('produtos-table');
+  if (!lista.length) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:40px;color:var(--text-muted)">Nenhum produto encontrado</td></tr>';
+    return;
+  }
+  tbody.innerHTML = lista.map(p => `
+    <tr>
+      <td>
+        <div style="display:flex;align-items:center;gap:12px">
+          ${p.image_url
+            ? `<img src="${p.image_thumb_url || p.image_url}" loading="lazy" style="width:44px;height:44px;border-radius:8px;object-fit:cover">`
+            : `<div style="width:44px;height:44px;border-radius:8px;background:linear-gradient(135deg,#1e3a6e,#2563eb);display:flex;align-items:center;justify-content:center;font-size:22px">${p.emoji||'📦'}</div>`
+          }
+          <div>
+            <p style="font-weight:700;font-size:13px">${p.name}</p>
+            <p style="font-size:12px;color:var(--text-muted)">${p.brand||''}</p>
+          </div>
+        </div>
+      </td>
+      <td><span class="badge badge-muted">${p.category}</span></td>
+      <td style="font-weight:700">${formatPrice(p.price)}</td>
+      <td>${p.stock||0}</td>
+      <td>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+          <input type="checkbox" ${p.ativo?'checked':''} onchange="toggleAtivo(${p.id}, this.checked)">
+          <span style="font-size:12px">${p.ativo?'Ativo':'Inativo'}</span>
+        </label>
+      </td>
+      <td>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-outline btn-sm" onclick="editarProduto(${p.id})">✏️ Editar</button>
+          <button class="btn btn-sm" style="background:#fee2e2;color:#b91c1c;border:none" onclick="deletarProduto(${p.id})">🗑️</button>
+        </div>
+      </td>
+    </tr>`).join('');
+}
+
+window.filtrar = function() {
+  const q = document.getElementById('busca').value.toLowerCase();
+  const cat = document.getElementById('filtro-cat').value;
+  const lista = produtos.filter(p =>
+    (!q || p.name.toLowerCase().includes(q) || (p.brand||'').toLowerCase().includes(q)) &&
+    (!cat || p.category === cat)
+  );
+  renderTabela(lista);
+};
+
+window.abrirModal = function() {
+  document.getElementById('modal-title').textContent = 'Novo Produto';
+  document.getElementById('edit-id').value = '';
+  document.getElementById('edit-name').value = '';
+  document.getElementById('edit-brand').value = '';
+  document.getElementById('edit-price').value = '';
+  document.getElementById('edit-old-price').value = '';
+  document.getElementById('edit-stock').value = '';
+  document.getElementById('edit-emoji').value = '';
+  document.getElementById('edit-desc').value = '';
+  document.getElementById('edit-oferta').checked = false;
+  document.getElementById('edit-garantia').value = '';
+  document.getElementById('edit-frete-gratis').checked = false;
+  document.getElementById('edit-entrega-24h').checked = false;
+  document.getElementById('edit-cashback').value = '';
+  document.getElementById('edit-indicacao').value = '';
+  document.getElementById('foto-img').style.display = 'none';
+  document.getElementById('foto-placeholder').style.display = 'block';
+  document.getElementById('foto-input').value = '';
+  fotoFile = null;
+  galeriaNovas = [];
+  galeriaExistente = [];
+  renderGaleriaGrid();
+  document.getElementById('modal').style.display = 'flex';
+};
+
+window.fecharModal = function() {
+  document.getElementById('modal').style.display = 'none';
+};
+
+window.editarProduto = function(id) {
+  const p = produtos.find(x => x.id === id);
+  if (!p) return;
+  document.getElementById('modal-title').textContent = 'Editar Produto';
+  document.getElementById('edit-id').value = p.id;
+  document.getElementById('edit-name').value = p.name;
+  document.getElementById('edit-brand').value = p.brand||'';
+  document.getElementById('edit-cat').value = p.category||'Smartphones';
+  document.getElementById('edit-price').value = p.price;
+  document.getElementById('edit-old-price').value = p.old_price||'';
+  document.getElementById('edit-stock').value = p.stock||0;
+  document.getElementById('edit-emoji').value = p.emoji||'';
+  document.getElementById('edit-desc').value = p.description||'';
+  document.getElementById('edit-oferta').checked = p.oferta||false;
+  document.getElementById('edit-garantia').value = p.garantia||'';
+  document.getElementById('edit-frete-gratis').checked = p.frete_gratis||false;
+  document.getElementById('edit-entrega-24h').checked = p.entrega_24h||false;
+  document.getElementById('edit-cashback').value = p.cashback_percentual || '';
+  document.getElementById('edit-indicacao').value = p.indicacao_percentual || '';
+  galeriaNovas = [];
+  galeriaExistente = Array.isArray(p.imagens) ? [...p.imagens] : [];
+  renderGaleriaGrid();
+  // Relacionados: array de IDs → string separada por vírgula
+  document.getElementById('edit-relacionados').value = (p.relacionados_ids || []).join(', ');
+  // Cores: array de {nome, hex} → uma por linha "Nome #hex"
+  document.getElementById('edit-cores').value = (p.cores || []).map(c => c.hex ? `${c.nome} ${c.hex}` : c.nome).join('\n');
+  if (p.image_url) {
+    document.getElementById('foto-img').src = p.image_url;
+    document.getElementById('foto-img').style.display = 'block';
+    document.getElementById('foto-placeholder').style.display = 'none';
+  }
+  fotoFile = null;
+  document.getElementById('modal').style.display = 'flex';
+};
+
+window.salvarProduto = async function() {
+  const nome = document.getElementById('edit-name').value.trim();
+  if (!nome) { alert('Digite o nome do produto'); return; }
+  const preco = parseFloat(document.getElementById('edit-price').value);
+  if (!preco) { alert('Digite o preço'); return; }
+
+  const btn = document.getElementById('btn-salvar');
+  btn.disabled = true; btn.textContent = 'Salvando...';
+
+  let imageUrl = null;
+  let thumbUrl = null;
+  if (fotoFile) {
+    const resultado = await uploadFoto(fotoFile, nome);
+    imageUrl = resultado.imageUrl;
+    thumbUrl = resultado.thumbUrl;
+  }
+  const imagensGaleria = await uploadGaleria(nome);
+
+  const dados = {
+    name: nome,
+    brand: document.getElementById('edit-brand').value,
+    category: document.getElementById('edit-cat').value,
+    price: preco,
+    old_price: parseFloat(document.getElementById('edit-old-price').value) || null,
+    stock: parseInt(document.getElementById('edit-stock').value) || 0,
+    emoji: document.getElementById('edit-emoji').value || '📦',
+    imagens: imagensGaleria,
+    description: document.getElementById('edit-desc').value,
+    oferta: document.getElementById('edit-oferta').checked,
+    frete_gratis: document.getElementById('edit-frete-gratis').checked,
+    entrega_24h: document.getElementById('edit-entrega-24h').checked,
+    garantia: document.getElementById('edit-garantia').value || null,
+    cashback_percentual: parseFloat(document.getElementById('edit-cashback').value) || 0,
+    indicacao_percentual: parseFloat(document.getElementById('edit-indicacao').value) || 0,
+    relacionados_ids: document.getElementById('edit-relacionados').value
+      .split(',').map(v => parseInt(v.trim())).filter(v => !isNaN(v)),
+    cores: document.getElementById('edit-cores').value
+      .split('\n').map(l => l.trim()).filter(Boolean)
+      .map(l => {
+        const match = l.match(/^(.+?)\s*(#[0-9a-fA-F]{3,6})?$/);
+        return match ? { nome: match[1].trim(), hex: match[2] || null } : { nome: l, hex: null };
+      }),
+    ativo: true,
+    ...(imageUrl ? { image_url: imageUrl } : {}),
+    ...(thumbUrl ? { image_thumb_url: thumbUrl } : {})
+  };
+
+  const id = document.getElementById('edit-id').value;
+  let error;
+
+  console.log('Dados a salvar:', dados);
+  console.log('image_url:', dados.image_url);
+
+  if (id) {
+    ({ error } = await supabase.from('produtos').update(dados).eq('id', id));
+  } else {
+    ({ error } = await supabase.from('produtos').insert(dados));
+  }
+
+  btn.disabled = false; btn.textContent = 'Salvar Produto';
+
+  if (error) { alert('Erro ao salvar: ' + error.message); return; }
+
+  fecharModal();
+  await carregar();
+
+  const toast = document.createElement('div');
+  toast.className = 'toast success show';
+  toast.textContent = id ? 'Produto atualizado!' : 'Produto criado!';
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 2500);
+};
+
+window.toggleAtivo = async function(id, ativo) {
+  await supabase.from('produtos').update({ ativo }).eq('id', id);
+};
+
+window.deletarProduto = async function(id) {
+  if (!confirm('Deletar este produto?')) return;
+  await supabase.from('produtos').delete().eq('id', id);
+  await carregar();
+};
+
+carregar();
+</script>
+</body>
+</html>
