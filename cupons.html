@@ -8,6 +8,7 @@
   <meta name="base" content="">
   <title>Meus Cupons — Zipshop</title>
   <link rel="stylesheet" href="css/style.css">
+<script>function esc(s){return s==null?"":String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#039;");}</script>
 </head>
 <body>
 <div id="navbar"></div>
@@ -133,7 +134,7 @@ async function carregarCupons() {
               ${statusTag}
             </div>
             <p style="font-size:13px;color:var(--text-muted);margin-bottom:2px">${minimo}</p>
-            ${c.descricao ? `<p style="font-size:12px;color:var(--text-muted);margin-bottom:4px">${c.descricao}</p>` : ''}
+            ${c.descricao ? `<p style="font-size:12px;color:var(--text-muted);margin-bottom:4px">${esc(c.descricao)}</p>` : ''}
             <div style="display:flex;align-items:center;justify-content:space-between;margin-top:10px;padding-top:10px;border-top:1px dashed var(--border);flex-wrap:wrap;gap:8px">
               <div>
                 <span style="font-family:monospace;font-size:15px;font-weight:900;background:var(--bg-muted);padding:4px 12px;border-radius:6px;letter-spacing:2px">${c.codigo}</span>

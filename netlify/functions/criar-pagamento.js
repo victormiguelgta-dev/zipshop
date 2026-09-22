@@ -64,6 +64,21 @@ function buscarPedido(pedidoId) {
   });
 }
 
+// Confere o token de login e devolve o usuário (ou null)
+function getUser(token) {
+  return new Promise((resolve) => {
+    if (!token) return resolve(null);
+    const url = new URL(`${process.env.SUPABASE_URL}/auth/v1/user`);
+    const req = https.request({ hostname: url.hostname, path: url.pathname, method: 'GET',
+      headers: { 'apikey': process.env.SUPABASE_SERVICE_KEY, 'Authorization': `Bearer ${token}` } }, (res) => {
+      let b = ''; res.on('data', c => b += c);
+      res.on('end', () => { try { const u = JSON.parse(b); resolve(u && u.id ? u : null); } catch (e) { resolve(null); } });
+    });
+    req.on('error', () => resolve(null));
+    req.end();
+  });
+}
+
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: 'Method Not Allowed' };
@@ -91,17 +106,34 @@ exports.handler = async (event) => {
       return { statusCode: 404, body: JSON.stringify({ erro: 'Pedido não encontrado' }) };
     }
 
+    // 1b. Só cria pagamento para pedido ainda pendente (não recobra pago/cancelado)
+    if (pedido.status && pedido.status !== 'pendente') {
+      return { statusCode: 409, body: JSON.stringify({ erro: 'Este pedido não está mais aguardando pagamento.' }) };
+    }
+
+    // 1c. Se o pedido tem dono, confirma pelo token que quem paga é o dono
+    const donoId = pedido.usuario_id;
+    if (donoId && donoId !== 'anonimo') {
+      const _token = (event.headers.authorization || event.headers.Authorization || '').replace(/^Bearer /i, '');
+      const _user = await getUser(_token);
+      if (!_user || _user.id !== donoId) {
+        return { statusCode: 403, body: JSON.stringify({ erro: 'Você não tem permissão para pagar este pedido.' }) };
+      }
+    }
+
     // 2. Para cada item do pedido, busca o PREÇO REAL e ATUAL do produto no banco
     // Desconto de 5% no PIX é aplicado aqui também (sobre produtos, nunca sobre o frete)
     const descontoPix = pedido.pagamento === 'pix' ? 0.95 : 1;
     const itensValidados = [];
     for (const item of (pedido.itens || [])) {
+      const qtd = parseInt(item.quantidade || 1);
+      if (!(qtd > 0)) continue; // ignora quantidade zero/negativa
       const produtoReal = await buscarProduto(item.produto_id);
       if (!produtoReal) continue; // ignora produtos que não existem mais
 
       itensValidados.push({
         title: produtoReal.name,
-        quantity: parseInt(item.quantidade || 1),
+        quantity: qtd,
         unit_price: parseFloat((produtoReal.price * descontoPix).toFixed(2)), // PREÇO REAL DO BANCO, com desconto PIX se aplicável
         currency_id: 'BRL'
       });
@@ -189,7 +221,7 @@ exports.handler = async (event) => {
 
     return {
       statusCode: 200,
-      headers: { 'Access-Control-Allow-Origin': '*' },
+      headers: { 'Access-Control-Allow-Origin': 'https://zipshop01.netlify.app' },
       body: JSON.stringify({
         url: result.init_point,
         preference_id: result.id

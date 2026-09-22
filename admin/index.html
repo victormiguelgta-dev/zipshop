@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dashboard Admin — Zipshop</title>
   <link rel="stylesheet" href="../css/style.css">
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js" integrity="sha384-dug+JxfBvklEQdJ4AYuBBAIScUz0bVN73xpy273gcAwHjb3qI0fXmuYNaNfdyYJG" crossorigin="anonymous"></script>
 
 <style>
 .admin-mobile-bar {
@@ -285,11 +285,13 @@ window.updateStatus = async (id, status) => {
   if (status === 'enviado' || status === 'entregue') {
     const { data: pedidoAtualizado } = await supabase.from('pedidos').select('*').eq('id', id).single();
     if (pedidoAtualizado) {
-      fetch('/.netlify/functions/enviar-email-status', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pedido: pedidoAtualizado, tipo: status })
-      }).catch(() => {});
+      supabase.auth.getSession().then(({ data: { session } }) =>
+        fetch('/.netlify/functions/enviar-email-status', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (session?.access_token || '') },
+          body: JSON.stringify({ pedido: pedidoAtualizado, tipo: status })
+        })
+      ).catch(() => {});
     }
   }
 };

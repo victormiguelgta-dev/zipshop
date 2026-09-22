@@ -262,7 +262,7 @@ window.abrirDetalhesPedido = function(id) {
       <p style="font-size:11px;color:var(--text-muted);text-transform:uppercase;font-weight:700;margin-bottom:4px">📞 Telefone / Contato</p>
       <p style="font-size:15px;font-weight:700;margin-bottom:14px">
         ${esc(p.usuario_telefone || '—')}
-        ${p.usuario_telefone ? `<a href="https://wa.me/55${(p.usuario_telefone||'').replace(/\D/g,'')}" target="_blank" style="margin-left:8px;color:var(--primary);font-size:12px;font-weight:700">Abrir WhatsApp →</a>` : ''}
+        ${p.usuario_telefone ? `<a href="https://wa.me/55${(p.usuario_telefone||'').replace(/\D/g,'')}" target="_blank" rel="noopener" style="margin-left:8px;color:var(--primary);font-size:12px;font-weight:700">Abrir WhatsApp →</a>` : ''}
       </p>
 
       <p style="font-size:11px;color:var(--text-muted);text-transform:uppercase;font-weight:700;margin-bottom:4px">📍 Endereço de entrega</p>
@@ -329,11 +329,13 @@ window.updateStatus = async function(id, status) {
 
   // E-mail avisando o cliente (não trava a tela se falhar)
   if ((status === 'enviado' || status === 'entregue') && p) {
-    fetch('/.netlify/functions/enviar-email-status', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pedido: p, tipo: status })
-    }).catch(() => {});
+    supabase.auth.getSession().then(({ data: { session } }) =>
+      fetch('/.netlify/functions/enviar-email-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (session?.access_token || '') },
+        body: JSON.stringify({ pedido: p, tipo: status })
+      })
+    ).catch(() => {});
   }
 };
 

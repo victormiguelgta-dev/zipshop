@@ -55,6 +55,7 @@
   .admin-sidebar.admin-sidebar-open { left: 0; }
 }
 </style>
+<script>function esc(s){return s==null?"":String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#039;");}</script>
 </head>
 <body>
 <div class="admin-layout">
@@ -231,7 +232,7 @@ async function carregar() {
             </div>
           </div>
           <p style="font-size:18px;font-weight:900;color:var(--primary);margin-bottom:4px">${descTipo}</p>
-          ${c.descricao ? `<p style="font-size:12px;color:var(--text-muted);margin-bottom:6px">${c.descricao}</p>` : ''}
+          ${c.descricao ? `<p style="font-size:12px;color:var(--text-muted);margin-bottom:6px">${esc(c.descricao)}</p>` : ''}
           <div style="display:flex;gap:12px;flex-wrap:wrap;font-size:11px;color:var(--text-muted)">
             <span>📦 ${usos}</span>
             ${c.pedido_minimo ? `<span>💰 Mín: ${formatPrice(c.pedido_minimo)}</span>` : '<span>💰 Sem mínimo</span>'}

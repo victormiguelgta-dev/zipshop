@@ -1,31 +1,54 @@
 // Envia e-mails de atualização de pedido (saiu para entrega, entregue)
-// e de devolução (aprovada, rejeitada, reembolsada). Complementa o
-// enviar-email-pedido.js, que só cobre a confirmação inicial da compra.
+// e de devolução. SÓ ADMIN pode disparar (verificação por token), e o
+// destinatário é buscado no banco pelo id do pedido — nunca vem do corpo.
 const https = require('https');
+
+const CORS = { 'Access-Control-Allow-Origin': 'https://zipshop01.netlify.app' };
+
+function adminEmails() {
+  return (process.env.ADMIN_EMAILS || 'admin@zipshop.com,victormiguelgta@gmail.com')
+    .split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+}
+
+function getUser(token) {
+  return new Promise((resolve) => {
+    if (!token) return resolve(null);
+    const url = new URL(`${process.env.SUPABASE_URL}/auth/v1/user`);
+    const req = https.request({
+      hostname: url.hostname, path: url.pathname, method: 'GET',
+      headers: { 'apikey': process.env.SUPABASE_SERVICE_KEY, 'Authorization': `Bearer ${token}` }
+    }, (res) => {
+      let b = ''; res.on('data', c => b += c);
+      res.on('end', () => { try { const u = JSON.parse(b); resolve(u && u.id ? u : null); } catch(e) { resolve(null); } });
+    });
+    req.on('error', () => resolve(null));
+    req.end();
+  });
+}
+
+function buscarEmailPedido(pedidoId) {
+  return new Promise((resolve) => {
+    const url = new URL(`${process.env.SUPABASE_URL}/rest/v1/pedidos?id=eq.${pedidoId}&select=usuario_email`);
+    const req = https.request({
+      hostname: url.hostname, path: url.pathname + url.search, method: 'GET',
+      headers: { 'apikey': process.env.SUPABASE_SERVICE_KEY, 'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_KEY}` }
+    }, (res) => {
+      let b = ''; res.on('data', c => b += c);
+      res.on('end', () => { try { const r = JSON.parse(b)[0]; resolve(r ? r.usuario_email : null); } catch(e) { resolve(null); } });
+    });
+    req.on('error', () => resolve(null));
+    req.end();
+  });
+}
 
 function enviarEmail(destinatario, assunto, html) {
   return new Promise((resolve, reject) => {
-    const data = JSON.stringify({
-      from: 'Zipshop <onboarding@resend.dev>',
-      to: [destinatario],
-      subject: assunto,
-      html: html
-    });
+    const data = JSON.stringify({ from: 'Zipshop <onboarding@resend.dev>', to: [destinatario], subject: assunto, html });
     const options = {
-      hostname: 'api.resend.com',
-      path: '/emails',
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
-        'Content-Type': 'application/json',
-        'Content-Length': Buffer.byteLength(data)
-      }
+      hostname: 'api.resend.com', path: '/emails', method: 'POST',
+      headers: { 'Authorization': `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) }
     };
-    const req = https.request(options, (res) => {
-      let body = '';
-      res.on('data', chunk => body += chunk);
-      res.on('end', () => resolve({ status: res.statusCode, body: JSON.parse(body || '{}') }));
-    });
+    const req = https.request(options, (res) => { let b=''; res.on('data',c=>b+=c); res.on('end',()=>resolve({status:res.statusCode})); });
     req.on('error', reject);
     req.write(data);
     req.end();
@@ -53,9 +76,9 @@ function baseTemplate(titulo, corpo) {
 
 const TEMPLATES_STATUS = {
   enviado: (pedido) => ({
-    assunto: `🛵 Seu pedido saiu para entrega! #${pedido.id.slice(0,8).toUpperCase()}`,
+    assunto: `🛵 Seu pedido saiu para entrega! #${String(pedido.id).slice(0,8).toUpperCase()}`,
     html: baseTemplate('🛵 Saiu para entrega!', `
-      <p style="text-align:center;color:#ccc;margin-bottom:20px">Pedido #${pedido.id.slice(0,8).toUpperCase()} está a caminho.</p>
+      <p style="text-align:center;color:#ccc;margin-bottom:20px">Pedido #${String(pedido.id).slice(0,8).toUpperCase()} está a caminho.</p>
       ${pedido.codigo_confirmacao ? `
       <div style="background:#1a1a1a;border:1px solid #AAEF00;border-radius:12px;padding:16px;text-align:center;margin-bottom:16px">
         <p style="font-size:11px;color:#999;text-transform:uppercase;margin-bottom:4px">Código de confirmação</p>
@@ -65,7 +88,7 @@ const TEMPLATES_STATUS = {
     `)
   }),
   entregue: (pedido) => ({
-    assunto: `✅ Pedido entregue! #${pedido.id.slice(0,8).toUpperCase()}`,
+    assunto: `✅ Pedido entregue! #${String(pedido.id).slice(0,8).toUpperCase()}`,
     html: baseTemplate('✅ Pedido entregue!', `
       <p style="text-align:center;color:#ccc;margin-bottom:16px">Esperamos que você aproveite sua compra! Se tiver qualquer problema, é só falar com a gente.</p>
     `)
@@ -88,40 +111,37 @@ const TEMPLATES_DEVOLUCAO = {
 };
 
 exports.handler = async (event) => {
-  if (event.httpMethod !== 'POST') {
-    return { statusCode: 405, body: 'Method Not Allowed' };
-  }
-
+  if (event.httpMethod !== 'POST') return { statusCode: 405, body: 'Method Not Allowed' };
   try {
-    const { pedido, tipo, devolucao } = JSON.parse(event.body);
+    // 1. Só admin: verifica o token de login e confere se o e-mail é admin
+    const h = event.headers || {};
+    const token = (h.authorization || h.Authorization || '').replace(/^Bearer /i, '');
+    const user = await getUser(token);
+    if (!user || !adminEmails().includes(String(user.email || '').toLowerCase())) {
+      return { statusCode: 403, headers: CORS, body: JSON.stringify({ erro: 'Acesso restrito ao admin.' }) };
+    }
 
-    let assunto, html, destinatario;
+    const { pedido, tipo, devolucao } = JSON.parse(event.body || '{}');
 
+    let assunto, html;
     if (devolucao && TEMPLATES_DEVOLUCAO[tipo]) {
-      const t = TEMPLATES_DEVOLUCAO[tipo](devolucao, pedido);
-      assunto = t.assunto; html = t.html;
-      destinatario = pedido?.usuario_email;
+      const t = TEMPLATES_DEVOLUCAO[tipo](devolucao, pedido); assunto = t.assunto; html = t.html;
     } else if (pedido && TEMPLATES_STATUS[tipo]) {
-      const t = TEMPLATES_STATUS[tipo](pedido);
-      assunto = t.assunto; html = t.html;
-      destinatario = pedido.usuario_email;
+      const t = TEMPLATES_STATUS[tipo](pedido); assunto = t.assunto; html = t.html;
     } else {
-      return { statusCode: 400, body: JSON.stringify({ erro: 'Tipo de e-mail inválido ou dados incompletos' }) };
+      return { statusCode: 400, headers: CORS, body: JSON.stringify({ erro: 'Tipo de e-mail invalido ou dados incompletos' }) };
     }
 
+    // 2. Destinatário vem do banco (pelo id do pedido), nunca do corpo
+    const destinatario = pedido && pedido.id ? await buscarEmailPedido(pedido.id) : null;
     if (!destinatario) {
-      return { statusCode: 400, body: JSON.stringify({ erro: 'E-mail do destinatário não encontrado' }) };
+      return { statusCode: 400, headers: CORS, body: JSON.stringify({ erro: 'Destinatario nao encontrado' }) };
     }
 
-    const resultado = await enviarEmail(destinatario, assunto, html);
-
-    return {
-      statusCode: 200,
-      headers: { 'Access-Control-Allow-Origin': '*' },
-      body: JSON.stringify({ sucesso: true, resultado })
-    };
+    await enviarEmail(destinatario, assunto, html);
+    return { statusCode: 200, headers: CORS, body: JSON.stringify({ sucesso: true }) };
   } catch (err) {
-    console.error('Erro ao enviar email de status:', err);
-    return { statusCode: 500, body: JSON.stringify({ erro: 'Não foi possível enviar o e-mail.' }) };
+    console.error('Erro ao enviar email de status');
+    return { statusCode: 500, body: JSON.stringify({ erro: 'Nao foi possivel enviar o e-mail.' }) };
   }
 };

@@ -194,7 +194,7 @@ async function renderCheckout() {
         <div>
           <p style="font-weight:700;font-size:13px;margin-bottom:2px">Entrega apenas em Santa Maria — RS</p>
           <p style="font-size:12px;color:var(--text-muted)">Fora de Santa Maria? Entre em contato pelo 
-            <a href="https://wa.me/5555984566918" target="_blank" style="color:var(--primary);font-weight:700">WhatsApp</a> para fazer seu pedido.
+            <a href="https://wa.me/5555984566918" target="_blank" rel="noopener" style="color:var(--primary);font-weight:700">WhatsApp</a> para fazer seu pedido.
           </p>
         </div>
       </div>
@@ -208,11 +208,11 @@ async function renderCheckout() {
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
           <div class="form-group" style="grid-column:1/-1">
             <label class="form-label">Nome completo *</label>
-            <input type="text" class="form-input" id="campo-nome" placeholder="João Silva" value="${perfilUsuario?.nome || ''}">
+            <input type="text" class="form-input" id="campo-nome" placeholder="João Silva" value="${esc(perfilUsuario?.nome || '')}">
           </div>
           <div class="form-group" style="grid-column:1/-1">
             <label class="form-label">Telefone / WhatsApp *</label>
-            <input type="tel" class="form-input" id="campo-telefone" placeholder="(55) 99999-9999" maxlength="15" oninput="mascaraTelefone(this)" value="${perfilUsuario?.telefone || ''}">
+            <input type="tel" class="form-input" id="campo-telefone" placeholder="(55) 99999-9999" maxlength="15" oninput="mascaraTelefone(this)" value="${esc(perfilUsuario?.telefone || '')}">
           </div>
 
           <!-- MELHORIA: seletor compacto de endereços salvos, em vez do
@@ -226,8 +226,8 @@ async function renderCheckout() {
                 <div style="display:flex;align-items:center;gap:10px;min-width:0">
                   <span style="font-size:20px">${{'Casa':'🏠','Trabalho':'🏢','Prédio de estudo':'🎓'}[end.apelido] || '📍'}</span>
                   <div style="min-width:0">
-                    <p style="font-size:13px;font-weight:700">${end.apelido || 'Endereço'}${end.favorito ? ' ⭐' : ''}</p>
-                    <p style="font-size:12px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${end.rua}, ${end.numero} — ${end.bairro}</p>
+                    <p style="font-size:13px;font-weight:700">${esc(end.apelido || 'Endereço')}${end.favorito ? ' ⭐' : ''}</p>
+                    <p style="font-size:12px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(end.rua)}, ${esc(end.numero)} — ${esc(end.bairro)}</p>
                   </div>
                 </div>
               </div>`).join('')}
@@ -253,7 +253,7 @@ async function renderCheckout() {
                   ${{'Casa':'🏠','Trabalho':'🏢','Prédio de estudo':'🎓'}[m]} ${m}
                 </button>`).join('')}
               </div>
-              <input type="hidden" id="campo-apelido-endereco" value="${endFav?.apelido || 'Casa'}">
+              <input type="hidden" id="campo-apelido-endereco" value="${esc(endFav?.apelido || 'Casa')}">
             </div>
 
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
@@ -267,23 +267,23 @@ async function renderCheckout() {
               </div>
               <div class="form-group" style="grid-column:1/-1">
                 <label class="form-label">Rua *</label>
-                <input type="text" class="form-input" id="campo-rua" placeholder="Nome da rua" value="${endFav?.rua || ''}">
+                <input type="text" class="form-input" id="campo-rua" placeholder="Nome da rua" value="${esc(endFav?.rua || '')}">
               </div>
               <div class="form-group">
                 <label class="form-label">Número *</label>
-                <input type="text" class="form-input" id="campo-numero" placeholder="Número" value="${endFav?.numero || ''}">
+                <input type="text" class="form-input" id="campo-numero" placeholder="Número" value="${esc(endFav?.numero || '')}">
               </div>
               <div class="form-group">
                 <label class="form-label">Complemento</label>
-                <input type="text" class="form-input" id="campo-complemento" placeholder="Apto, bloco, etc (opcional)" value="${endFav?.complemento || ''}">
+                <input type="text" class="form-input" id="campo-complemento" placeholder="Apto, bloco, etc (opcional)" value="${esc(endFav?.complemento || '')}">
               </div>
               <div class="form-group">
                 <label class="form-label">Bairro *</label>
-                <input type="text" class="form-input" id="campo-bairro" placeholder="Bairro" value="${endFav?.bairro || ''}">
+                <input type="text" class="form-input" id="campo-bairro" placeholder="Bairro" value="${esc(endFav?.bairro || '')}">
               </div>
               <div class="form-group" style="grid-column:1/-1">
                 <label class="form-label">Ponto de referência</label>
-                <input type="text" class="form-input" id="campo-referencia" placeholder="Ex: Próximo ao mercado X" value="${endFav?.referencia || ''}">
+                <input type="text" class="form-input" id="campo-referencia" placeholder="Ex: Próximo ao mercado X" value="${esc(endFav?.referencia || '')}">
               </div>
               <div class="form-group" style="grid-column:1/-1;display:flex;align-items:center;gap:8px">
                 <input type="checkbox" id="campo-salvar-endereco" ${enderecosSalvos.length ? '' : 'checked'} style="width:18px;height:18px;accent-color:var(--primary)">
@@ -438,7 +438,7 @@ async function renderCheckout() {
 
       <label style="display:flex;align-items:flex-start;gap:8px;margin-bottom:16px;cursor:pointer;font-size:12px;color:var(--text-muted)">
         <input type="checkbox" id="aceite-termos" style="margin-top:2px">
-        <span>Li e aceito os <a href="termos.html" target="_blank" style="color:var(--primary);font-weight:700">Termos de Uso e Política de Entrega</a>, incluindo as regras de pagamento na entrega.</span>
+        <span>Li e aceito os <a href="termos.html" target="_blank" rel="noopener" style="color:var(--primary);font-weight:700">Termos de Uso e Política de Entrega</a>, incluindo as regras de pagamento na entrega.</span>
       </label>
 
       <button class="btn btn-primary btn-lg btn-full" id="btn-confirmar" onclick="finalizarPedido()">
@@ -1106,7 +1106,7 @@ async function finalizarPedido() {
     const mpResponse = await comTimeout(
       fetch('/.netlify/functions/criar-pagamento', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + ((await supabase.auth.getSession()).data.session?.access_token || '') },
         body: JSON.stringify({ pedidoId, email: user.email })
       }),
       15000, 'Não conseguimos conectar com o pagamento a tempo. Tente novamente.'
@@ -1258,9 +1258,9 @@ if (statusMP) {
         <h1 style="font-size:22px;margin-bottom:12px">Confira seus dados</h1>
         <p style="color:var(--text-muted);margin-bottom:20px">Esses dados vão junto com o seu pedido. Estão corretos?</p>
         <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:24px;text-align:left">
-          <p style="font-size:14px;margin-bottom:8px">👤 <strong>Nome:</strong> ${perfilCheck.nome}</p>
+          <p style="font-size:14px;margin-bottom:8px">👤 <strong>Nome:</strong> ${esc(perfilCheck.nome)}</p>
           <p style="font-size:14px;margin-bottom:8px">🪪 <strong>CPF:</strong> ${window.mascararCPF(perfilCheck.cpf)}</p>
-          <p style="font-size:14px">📞 <strong>Telefone:</strong> ${perfilCheck.telefone}</p>
+          <p style="font-size:14px">📞 <strong>Telefone:</strong> ${esc(perfilCheck.telefone)}</p>
         </div>
         <div style="display:flex;gap:12px">
           <a href="conta.html?secao=profile" class="btn btn-outline" style="flex:1">Editar dados</a>

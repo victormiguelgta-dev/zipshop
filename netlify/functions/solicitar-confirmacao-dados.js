@@ -1,13 +1,13 @@
-// netlify/functions/solicitar-confirmacao-dados.js
-//
 // Chamado quando o cliente tenta trocar CPF ou telefone no perfil.
-// Gera um código de 6 dígitos, guarda a troca pendente no banco
-// (com a service role key, nunca com a chave pública) e manda o
-// código por e-mail via Resend. A troca só é aplicada de fato
-// quando o cliente confirma o código em
-// confirmar-alteracao-dados.js.
-
+// Gera um código de 6 dígitos com crypto (não Math.random), guarda a
+// troca pendente no banco (service role key) e manda o código para o
+// e-mail REAL do usuário salvo no banco — nunca para um e-mail que veio
+// no corpo da requisição. Assim, mesmo que alguém chame com o id de
+// outra pessoa, o código vai para o dono verdadeiro da conta.
 const https = require('https');
+const crypto = require('crypto');
+
+const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function supabaseRequest(method, path, body) {
   return new Promise((resolve, reject) => {
@@ -15,27 +15,17 @@ function supabaseRequest(method, path, body) {
     const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
     const url = new URL(`${supabaseUrl}${path}`);
     const data = body ? JSON.stringify(body) : null;
-
     const options = {
-      hostname: url.hostname,
-      path: url.pathname + url.search,
-      method,
+      hostname: url.hostname, path: url.pathname + url.search, method,
       headers: {
-        'apikey': supabaseKey,
-        'Authorization': `Bearer ${supabaseKey}`,
-        'Content-Type': 'application/json',
-        'Prefer': 'return=representation',
+        'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}`,
+        'Content-Type': 'application/json', 'Prefer': 'return=representation',
         ...(data ? { 'Content-Length': Buffer.byteLength(data) } : {})
       }
     };
-
     const req = https.request(options, (res) => {
-      let out = '';
-      res.on('data', chunk => out += chunk);
-      res.on('end', () => {
-        try { resolve({ status: res.statusCode, body: JSON.parse(out || '[]') }); }
-        catch (e) { resolve({ status: res.statusCode, body: out }); }
-      });
+      let out = ''; res.on('data', chunk => out += chunk);
+      res.on('end', () => { try { resolve({ status: res.statusCode, body: JSON.parse(out || '[]') }); } catch (e) { resolve({ status: res.statusCode, body: out }); } });
     });
     req.on('error', reject);
     if (data) req.write(data);
@@ -47,20 +37,10 @@ function enviarEmail(destinatario, assunto, html) {
   return new Promise((resolve, reject) => {
     const data = JSON.stringify({ from: 'Zipshop <onboarding@resend.dev>', to: [destinatario], subject: assunto, html });
     const options = {
-      hostname: 'api.resend.com',
-      path: '/emails',
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
-        'Content-Type': 'application/json',
-        'Content-Length': Buffer.byteLength(data)
-      }
+      hostname: 'api.resend.com', path: '/emails', method: 'POST',
+      headers: { 'Authorization': `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) }
     };
-    const req = https.request(options, (res) => {
-      let body = '';
-      res.on('data', chunk => body += chunk);
-      res.on('end', () => resolve({ status: res.statusCode, body }));
-    });
+    const req = https.request(options, (res) => { let body=''; res.on('data',c=>body+=c); res.on('end',()=>resolve({status:res.statusCode, body})); });
     req.on('error', reject);
     req.write(data);
     req.end();
@@ -93,36 +73,48 @@ function validarTelefoneReal(telefone) {
 
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') return { statusCode: 405, body: 'Method Not Allowed' };
-
+  const CORS = { 'Access-Control-Allow-Origin': 'https://zipshop01.netlify.app' };
   try {
-    const { usuario_id, email, campo, valor_novo } = JSON.parse(event.body);
+    // O e-mail NÃO é lido do corpo — é buscado no banco pelo usuario_id.
+    const { usuario_id, campo, valor_novo } = JSON.parse(event.body || '{}');
 
-    if (!usuario_id || !email || !['cpf', 'telefone'].includes(campo) || !valor_novo) {
-      return { statusCode: 400, headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify({ erro: 'Dados inválidos.' }) };
+    if (!usuario_id || !uuidRegex.test(String(usuario_id)) || !['cpf', 'telefone'].includes(campo) || !valor_novo) {
+      return { statusCode: 400, headers: CORS, body: JSON.stringify({ erro: 'Dados inválidos.' }) };
     }
 
     const valorLimpo = String(valor_novo).replace(/\D/g, '');
 
     if (campo === 'cpf') {
       if (!validarCPFReal(valorLimpo)) {
-        return { statusCode: 400, headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify({ erro: 'CPF inválido.' }) };
+        return { statusCode: 400, headers: CORS, body: JSON.stringify({ erro: 'CPF inválido.' }) };
       }
-      // Confere disponibilidade antes de mandar o código, pra não
-      // fazer o cliente confirmar e-mail à toa por um CPF já usado.
       const disponivel = await supabaseRequest('POST', '/rest/v1/rpc/cpf_disponivel', { cpf_input: valorLimpo, usuario_atual: usuario_id });
       if (disponivel.body === false) {
-        return { statusCode: 409, headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify({ erro: 'Este CPF já está em uso por outra conta.' }) };
+        return { statusCode: 409, headers: CORS, body: JSON.stringify({ erro: 'Este CPF já está em uso por outra conta.' }) };
       }
     } else {
       if (!validarTelefoneReal(valorLimpo)) {
-        return { statusCode: 400, headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify({ erro: 'Telefone inválido.' }) };
+        return { statusCode: 400, headers: CORS, body: JSON.stringify({ erro: 'Telefone inválido.' }) };
       }
     }
 
-    const codigo = String(Math.floor(100000 + Math.random() * 900000));
+    // Busca o e-mail REAL do usuário no banco (destino do código)
+    const usuarioResp = await supabaseRequest('GET', `/rest/v1/usuarios?id=eq.${usuario_id}&select=email`);
+    const emailReal = Array.isArray(usuarioResp.body) && usuarioResp.body[0] ? usuarioResp.body[0].email : null;
+    if (!emailReal) {
+      return { statusCode: 404, headers: CORS, body: JSON.stringify({ erro: 'Usuário não encontrado.' }) };
+    }
+
+    // Limite: no máximo um código por minuto por campo
+    const existente = await supabaseRequest('GET', `/rest/v1/confirmacoes_pendentes?usuario_id=eq.${usuario_id}&campo=eq.${campo}&order=created_at.desc&limit=1`);
+    const ultimo = Array.isArray(existente.body) ? existente.body[0] : null;
+    if (ultimo && (Date.now() - new Date(ultimo.created_at).getTime()) < 60000) {
+      return { statusCode: 429, headers: CORS, body: JSON.stringify({ erro: 'Aguarde um minuto antes de pedir um novo código.' }) };
+    }
+
+    const codigo = String(crypto.randomInt(100000, 1000000));
     const expiraEm = new Date(Date.now() + 15 * 60 * 1000).toISOString();
 
-    // Remove pendências antigas do mesmo campo pra esse usuário
     await supabaseRequest('DELETE', `/rest/v1/confirmacoes_pendentes?usuario_id=eq.${usuario_id}&campo=eq.${campo}`);
 
     const insercao = await supabaseRequest('POST', '/rest/v1/confirmacoes_pendentes', {
@@ -130,7 +122,7 @@ exports.handler = async (event) => {
     });
 
     if (insercao.status >= 300) {
-      return { statusCode: 500, headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify({ erro: 'Não foi possível gerar a confirmação.' }) };
+      return { statusCode: 500, headers: CORS, body: JSON.stringify({ erro: 'Não foi possível gerar a confirmação.' }) };
     }
 
     const nomeCampo = campo === 'cpf' ? 'CPF' : 'telefone';
@@ -143,12 +135,11 @@ exports.handler = async (event) => {
         <p style="text-align:center;color:#666;font-size:12px">Se você não pediu essa alteração, ignore este e-mail.</p>
       </div>`;
 
-    await enviarEmail(email, `Confirme a alteração do seu ${nomeCampo} — Zipshop`, html);
+    await enviarEmail(emailReal, `Confirme a alteração do seu ${nomeCampo} — Zipshop`, html);
 
-    return { statusCode: 200, headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify({ sucesso: true }) };
-
+    return { statusCode: 200, headers: CORS, body: JSON.stringify({ sucesso: true }) };
   } catch (err) {
-    console.error('Erro em solicitar-confirmacao-dados:', err);
-    return { statusCode: 500, headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify({ erro: 'Erro interno.' }) };
+    console.error('Erro em solicitar-confirmacao-dados');
+    return { statusCode: 500, headers: CORS, body: JSON.stringify({ erro: 'Erro interno.' }) };
   }
 };

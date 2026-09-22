@@ -1,9 +1,18 @@
-cat > .gitignore << 'EOF'
+# Dependências
 node_modules/
+
+# Variáveis de ambiente — NUNCA versionar (segredos ficam aqui)
 .env
-.env.local
+.env.*
+
+# Netlify
 .netlify/
+
+# Pastas de trabalho / arquivos temporários
 mudança/
 *.zip
+*.rar
+
+# Sistema operacional
 .DS_Store
-EOF
+Thumbs.db

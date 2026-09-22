@@ -368,9 +368,10 @@ window.analisar = async function() {
   status.textContent = 'A IA está lendo o conteúdo...';
 
   try {
+    const { data: { session: _sess } } = await supabase.auth.getSession();
     const resp = await fetch('/.netlify/functions/analisar-produto-shopee', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (_sess?.access_token || '') },
       body: JSON.stringify({ texto })
     });
     const dados = await resp.json();

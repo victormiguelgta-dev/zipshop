@@ -199,11 +199,13 @@ window.responder = async function(id, novoStatus) {
 
   const d = devolucoes.find(x => x.id === id);
   if (d) {
-    fetch('/.netlify/functions/enviar-email-status', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ devolucao: d, pedido: d.pedidos, tipo: novoStatus })
-    }).catch(() => {});
+    supabase.auth.getSession().then(({ data: { session } }) =>
+      fetch('/.netlify/functions/enviar-email-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (session?.access_token || '') },
+        body: JSON.stringify({ devolucao: d, pedido: d.pedidos, tipo: novoStatus })
+      })
+    ).catch(() => {});
   }
   carregar();
 };

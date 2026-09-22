@@ -12,6 +12,24 @@
 
 const https = require('https');
 
+function adminEmails() {
+  return (process.env.ADMIN_EMAILS || 'admin@zipshop.com,victormiguelgta@gmail.com')
+    .split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+}
+function getUser(token) {
+  return new Promise((resolve) => {
+    if (!token) return resolve(null);
+    const url = new URL(`${process.env.SUPABASE_URL}/auth/v1/user`);
+    const req = https.request({ hostname: url.hostname, path: url.pathname, method: 'GET',
+      headers: { 'apikey': process.env.SUPABASE_SERVICE_KEY, 'Authorization': `Bearer ${token}` } }, (res) => {
+      let b = ''; res.on('data', c => b += c);
+      res.on('end', () => { try { const u = JSON.parse(b); resolve(u && u.id ? u : null); } catch (e) { resolve(null); } });
+    });
+    req.on('error', () => resolve(null));
+    req.end();
+  });
+}
+
 const CATEGORIAS_VALIDAS = [
   'Smartphones', 'Notebooks', 'Headphones', 'Smart TVs', 'Games', 'Acessorios'
 ];
@@ -56,6 +74,14 @@ function chamarGemini(prompt, apiKey) {
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: JSON.stringify({ erro: 'Method Not Allowed' }) };
+  }
+
+  // Só admin usa a importação por IA (evita queimar a cota do Gemini)
+  const _h = event.headers || {};
+  const _token = (_h.authorization || _h.Authorization || '').replace(/^Bearer /i, '');
+  const _user = await getUser(_token);
+  if (!_user || !adminEmails().includes(String(_user.email || '').toLowerCase())) {
+    return { statusCode: 403, body: JSON.stringify({ erro: 'Acesso restrito ao admin.' }) };
   }
 
   const apiKey = process.env.GEMINI_API_KEY;
@@ -109,7 +135,7 @@ ${textoLimitado}`;
     if (resposta.error) {
       return {
         statusCode: 502,
-        body: JSON.stringify({ erro: 'Gemini retornou erro: ' + (resposta.error.message || 'desconhecido') })
+        body: JSON.stringify({ erro: 'A IA nao conseguiu processar agora. Tente de novo.' })
       };
     }
 
@@ -141,7 +167,7 @@ ${textoLimitado}`;
 
     return {
       statusCode: 200,
-      headers: { 'Access-Control-Allow-Origin': '*' },
+      headers: { 'Access-Control-Allow-Origin': 'https://zipshop01.netlify.app' },
       body: JSON.stringify({
         name: String(dados.name || '').slice(0, 120),
         brand: String(dados.brand || ''),
