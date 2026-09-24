@@ -26,6 +26,18 @@
 <script src="js/main.js"></script>
 <script src="js/validadores.js"></script>
 <script>
+// Escapa texto antes de colocar no HTML (evita XSS). Fica aqui, no script
+// normal, para ser global: o renderCheckout e o <script type="module"> usam.
+function esc(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 function formatPrice(v) { return Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }); }
 
 // Animação de comemoração do pedido confirmado: chuva de moedas + confete,
@@ -1126,15 +1138,7 @@ async function finalizarPedido() {
 </script>
 
 <script type="module">
-function esc(str) {
-  if (str === null || str === undefined) return '';
-  return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
-}
+// esc() agora fica no <script> normal (global), para o renderCheckout também enxergar
 
 // Verifica retorno do Mercado Pago
 const urlParams = new URLSearchParams(window.location.search);
@@ -1268,9 +1272,19 @@ if (statusMP) {
         </div>
       </div>`;
 
-      document.getElementById('btn-confirmar-dados-checkout').addEventListener('click', () => {
-        renderCheckout();
-        selectPayment('pix');
+      document.getElementById('btn-confirmar-dados-checkout').addEventListener('click', async (e) => {
+        const btn = e.currentTarget;
+        btn.disabled = true;
+        btn.textContent = 'Carregando...';
+        try {
+          await renderCheckout();
+          selectPayment('pix');
+        } catch (erro) {
+          console.error(erro);
+          btn.disabled = false;
+          btn.textContent = 'Sim, confirmar';
+          alert('Não foi possível abrir o checkout. Tente novamente.');
+        }
       });
     }
   }
