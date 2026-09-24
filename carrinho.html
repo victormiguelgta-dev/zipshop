@@ -53,8 +53,31 @@ function descricaoCupom(c) {
   return 'Frete Grátis';
 }
 
+// Itens adicionados antes desta correção não têm foto salva no
+// carrinho. Busca as fotos no Supabase UMA vez, grava no carrinho e
+// redesenha — assim ninguém precisa esvaziar o carrinho.
+let _fotosCarrinhoBuscadas = false;
+async function completarFotosDoCarrinho() {
+  if (_fotosCarrinhoBuscadas) return;
+  _fotosCarrinhoBuscadas = true;
+  const cart = getCart();
+  const semFoto = [...new Set(cart.filter(i => !i.image).map(i => i.id))];
+  if (!semFoto.length) return;
+  const { data, error } = await supabase
+    .from('produtos').select('id, image_url, image_thumb_url').in('id', semFoto);
+  if (error || !data?.length) return;
+  const fotos = Object.fromEntries(data.map(p => [p.id, p.image_thumb_url || p.image_url]));
+  let mudou = false;
+  const atual = getCart().map(i => {
+    if (!i.image && fotos[i.id]) { mudou = true; return { ...i, image: fotos[i.id] }; }
+    return i;
+  });
+  if (mudou) { saveCart(atual); renderCart(); }
+}
+
 window.renderCart = async function() {
   _cuponsCarrinhoCarregados = false;
+  completarFotosDoCarrinho();
   const cart = getCart();
   const el = document.getElementById('cart-content');
 
@@ -74,12 +97,13 @@ window.renderCart = async function() {
   const total = subtotal - discount + freight;
 
   const items = cart.map(item => {
-    const nome = item.name || 'Produto';
-    const emoji = item.emoji || '📦';
-    const brand = item.brand || '';
+    // esc(): nome e marca vêm do cadastro do produto — nunca colocar
+    // texto do banco direto no innerHTML sem escapar (evita XSS)
+    const nome = esc(item.name || 'Produto');
+    const brand = esc(item.brand || '');
     const price = item.price || 0;
     return `<div class="cart-item" id="item-${item.id}">
-      <div class="cart-item-img" style="background:linear-gradient(135deg,#1e3a6e,#2563eb);font-size:40px;display:flex;align-items:center;justify-content:center">${emoji}</div>
+      ${cartItemImgHTML(item, 80)}
       <div class="cart-item-info">
         <div class="cart-item-brand">${brand}</div>
         <div class="cart-item-name">${nome}</div>

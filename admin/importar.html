@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Importar da Shopee — Zipshop Admin</title>
+  <title>Cadastrar com IA — Zipshop Admin</title>
   <link rel="stylesheet" href="../css/style.css">
 
 <style>
@@ -131,7 +131,7 @@
     <nav class="admin-nav">
       <a href="index.html" class="admin-nav-item">📊 Dashboard</a>
       <a href="produtos.html" class="admin-nav-item">📦 Produtos</a>
-      <a href="importar.html" class="admin-nav-item active">🛍️ Importar da Shopee</a>
+      <a href="importar.html" class="admin-nav-item active">✨ Cadastrar com IA</a>
       <a href="pedidos.html" class="admin-nav-item">🛒 Pedidos</a>
       <a href="clientes.html" class="admin-nav-item">👥 Clientes</a>
       <a href="categorias.html" class="admin-nav-item">🏷️ Categorias</a>
@@ -158,29 +158,23 @@
   </div>
   <div class="admin-overlay" id="admin-overlay" onclick="toggleAdminMenu()"></div>
 
-    <h1 class="admin-page-title">🛍️ Importar da Shopee</h1>
-    <p class="admin-page-sub">Cole o conteúdo da página do produto e a IA organiza os dados pra você.</p>
+    <h1 class="admin-page-title">✨ Cadastrar com IA</h1>
+    <p class="admin-page-sub">Para produtos de estoque próprio (sem dropshipping). Cole as informações do produto e a IA organiza os dados pra você.</p>
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start" id="layout-grid">
 
       <!-- COLUNA ESQUERDA: entrada -->
       <div class="card" style="padding:20px">
-        <div class="passo-titulo"><span class="passo-num">1</span> Link do produto na Shopee</div>
-        <div class="passo-dica">Esse link fica guardado. Quando alguém comprar, você clica nele pra comprar na Shopee.</div>
-        <input type="text" class="form-input" id="in-link" placeholder="https://shopee.com.br/...">
-
-        <div style="height:20px"></div>
-
-        <div class="passo-titulo"><span class="passo-num">2</span> Cole o texto da página</div>
-        <div class="passo-dica">Na página do produto: Ctrl+A (selecionar tudo) → Ctrl+C (copiar) → cole aqui.</div>
-        <textarea class="form-input" id="in-texto" rows="8" placeholder="Cole aqui o conteúdo copiado da página do produto..." style="resize:vertical;font-size:12px"></textarea>
+        <div class="passo-titulo"><span class="passo-num">1</span> Informações do produto</div>
+        <div class="passo-dica">Cole o texto de onde tiver: site do fabricante ou fornecedor, catálogo, caixa do produto — ou escreva você mesmo (nome, marca, características). A IA organiza.</div>
+        <textarea class="form-input" id="in-texto" rows="8" placeholder="Ex: Fone Bluetooth JBL Tune 520BT, até 57h de bateria, carregamento rápido, cor preta..." style="resize:vertical;font-size:12px"></textarea>
         <button class="btn btn-primary btn-full" id="btn-analisar" onclick="analisar()" style="margin-top:10px">✨ Analisar com IA</button>
         <div id="status-analise" style="font-size:12px;margin-top:8px;text-align:center;color:var(--text-muted)"></div>
 
         <div style="height:20px"></div>
 
-        <div class="passo-titulo"><span class="passo-num">3</span> Imagens</div>
-        <div class="passo-dica">Arraste as imagens ou clique pra escolher. A primeira vira a foto principal.</div>
+        <div class="passo-titulo"><span class="passo-num">2</span> Imagens</div>
+        <div class="passo-dica">Arraste as imagens ou clique pra escolher. A primeira vira a foto principal. Todas são ajustadas para o quadrado padrão da loja.</div>
         <div class="dropzone" id="dropzone" onclick="document.getElementById('in-imagens').click()">
           📷 Arraste as imagens aqui ou clique pra escolher
         </div>
@@ -190,7 +184,7 @@
 
       <!-- COLUNA DIREITA: revisão -->
       <div class="card" style="padding:20px">
-        <div class="passo-titulo"><span class="passo-num">4</span> Confira e ajuste</div>
+        <div class="passo-titulo"><span class="passo-num">3</span> Confira e ajuste</div>
         <div class="passo-dica">A IA preenche, você revisa antes de salvar.</div>
 
         <div class="form-group">
@@ -223,7 +217,7 @@
 
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
           <div class="form-group">
-            <label class="form-label">Custo Shopee (R$) *</label>
+            <label class="form-label">Custo (quanto você pagou) *</label>
             <input type="number" class="form-input" id="in-custo" step="0.01" placeholder="0,00" oninput="calcularPreco()">
           </div>
           <div class="form-group">
@@ -237,7 +231,7 @@
         </div>
 
         <div class="preco-box">
-          <div class="preco-linha"><span>Custo na Shopee</span><span id="lbl-custo">R$ 0,00</span></div>
+          <div class="preco-linha"><span>Custo do produto</span><span id="lbl-custo">R$ 0,00</span></div>
           <div class="preco-linha"><span>Seu lucro</span><span id="lbl-lucro" style="color:var(--primary);font-weight:700">R$ 0,00</span></div>
           <div class="preco-linha" style="margin-bottom:0;padding-top:8px;border-top:1px solid var(--border)">
             <span style="font-weight:700">Preço de venda</span>
@@ -248,11 +242,11 @@
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px">
           <div class="form-group">
             <label class="form-label">Prazo de entrega (dias)</label>
-            <input type="number" class="form-input" id="in-prazo" value="15" min="1">
+            <input type="number" class="form-input" id="in-prazo" value="1" min="0">
           </div>
           <div class="form-group">
             <label class="form-label">Estoque</label>
-            <input type="number" class="form-input" id="in-estoque" value="99" min="0">
+            <input type="number" class="form-input" id="in-estoque" value="1" min="0">
           </div>
         </div>
 
@@ -268,6 +262,7 @@
   </main>
 </div>
 
+<script src="../js/imagem.js"></script>
 <script type="module">
 import { isAdmin, supabase } from '../js/admin-guard.js';
 if (!isAdmin) throw new Error('not admin');
@@ -289,19 +284,9 @@ window.addEventListener('resize', ajustarLayout);
 // ---------- IMAGENS ----------
 let imagens = [];
 
-async function comprimirImagem(file, maxLado = 1400, qualidade = 0.82) {
-  if (file.type === 'image/gif' || file.size < 300 * 1024) return file;
-  try {
-    const bitmap = await createImageBitmap(file);
-    const escala = Math.min(1, maxLado / Math.max(bitmap.width, bitmap.height));
-    const canvas = document.createElement('canvas');
-    canvas.width = Math.round(bitmap.width * escala);
-    canvas.height = Math.round(bitmap.height * escala);
-    canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-    const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', qualidade));
-    if (!blob) return file;
-    return new File([blob], file.name.replace(/\.[^.]+$/, '') + '.jpg', { type: 'image/jpeg' });
-  } catch (e) { return file; }
+// Padroniza cada foto no quadrado 1000×1000 da loja (js/imagem.js)
+function comprimirImagem(file) {
+  return otimizarImagem(file, PRESET_IMAGEM.produto);
 }
 
 window.adicionarImagens = async function(files) {
@@ -359,7 +344,7 @@ window.analisar = async function() {
   const btn = document.getElementById('btn-analisar');
 
   if (texto.length < 20) {
-    status.textContent = '⚠️ Cole o texto da página do produto primeiro.';
+    status.textContent = '⚠️ Cole ou escreva as informações do produto primeiro.';
     return;
   }
 
@@ -369,7 +354,7 @@ window.analisar = async function() {
 
   try {
     const { data: { session: _sess } } = await supabase.auth.getSession();
-    const resp = await fetch('/.netlify/functions/analisar-produto-shopee', {
+    const resp = await fetch('/.netlify/functions/analisar-produto', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (_sess?.access_token || '') },
       body: JSON.stringify({ texto })
@@ -399,15 +384,27 @@ window.analisar = async function() {
 };
 
 // ---------- UPLOAD + SALVAR ----------
+async function uploadArquivo(path, file) {
+  const { error } = await supabase.storage.from('Produtos')
+    .upload(path, file, { cacheControl: '31536000', upsert: false });
+  if (error) return null;
+  return supabase.storage.from('Produtos').getPublicUrl(path).data.publicUrl;
+}
+
+// Sobe a foto e uma miniatura leve (480px) para os cards/carrinho
 async function uploadImagem(file, nomeBase, indice) {
-  const ext = file.name.split('.').pop();
   const seguro = nomeBase.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
     .replace(/[^a-zA-Z0-9]/g, '-').toLowerCase().slice(0, 40);
-  const path = `produtos/${seguro}-${Date.now()}-${indice}.${ext}`;
-  const { error } = await supabase.storage.from('Produtos').upload(path, file, { upsert: true });
-  if (error) return null;
-  const { data } = supabase.storage.from('Produtos').getPublicUrl(path);
-  return data.publicUrl;
+  const base = `produtos/${seguro}-${Date.now()}-${indice}`;
+  const url = await uploadArquivo(`${base}.${extensaoImagem(file)}`, file);
+  if (!url) return null;
+
+  let thumb = url;
+  const thumbFile = await otimizarImagem(file, PRESET_IMAGEM.miniatura);
+  if (thumbFile && thumbFile !== file) {
+    thumb = (await uploadArquivo(`${base}-thumb.${extensaoImagem(thumbFile)}`, thumbFile)) || url;
+  }
+  return { url, thumb };
 }
 
 window.salvarProduto = async function() {
@@ -417,16 +414,16 @@ window.salvarProduto = async function() {
   const btn = document.getElementById('btn-salvar');
 
   if (!nome) { status.textContent = '⚠️ O produto precisa de um nome.'; return; }
-  if (!custo) { status.textContent = '⚠️ Informe o custo na Shopee.'; return; }
+  if (!custo) { status.textContent = '⚠️ Informe o custo do produto.'; return; }
 
   btn.disabled = true;
   btn.textContent = 'Salvando...';
   status.textContent = 'Enviando imagens...';
 
-  const urls = [];
+  const enviadas = [];
   for (let i = 0; i < imagens.length; i++) {
-    const url = await uploadImagem(imagens[i].file, nome, i);
-    if (url) urls.push(url);
+    const r = await uploadImagem(imagens[i].file, nome, i);
+    if (r) enviadas.push(r);
   }
 
   status.textContent = 'Cadastrando produto...';
@@ -442,12 +439,18 @@ window.salvarProduto = async function() {
     price: Math.round(precoVenda * 100) / 100,
     stock: parseInt(document.getElementById('in-estoque').value) || 0,
     frete_gratis: document.getElementById('in-frete-gratis').checked,
-    link_shopee: document.getElementById('in-link').value.trim() || null,
-    custo_shopee: custo,
+    // Estoque próprio: sem link de fornecedor/dropshipping
+    tipo_estoque: 'proprio',
+    custo: custo,
     margem_percent: parseFloat(document.getElementById('in-margem').value) || 0,
-    prazo_entrega_dias: parseInt(document.getElementById('in-prazo').value) || 15,
+    prazo_entrega_dias: parseInt(document.getElementById('in-prazo').value) || 1,
     ativo: true,
-    ...(urls.length ? { image_url: urls[0], imagens: urls } : {})
+    ...(enviadas.length ? {
+      image_url: enviadas[0].url,
+      image_thumb_url: enviadas[0].thumb,
+      // mesmo formato do admin/produtos.html: só as fotos EXTRAS, como {url, thumb}
+      imagens: enviadas.slice(1)
+    } : {})
   };
 
   const { error } = await supabase.from('produtos').insert(dados);
@@ -465,7 +468,7 @@ window.salvarProduto = async function() {
 };
 
 function limparFormulario() {
-  ['in-link','in-texto','in-nome','in-marca','in-desc','in-custo','in-emoji'].forEach(id => {
+  ['in-texto','in-nome','in-marca','in-desc','in-custo','in-emoji'].forEach(id => {
     document.getElementById(id).value = '';
   });
   imagens = [];

@@ -186,10 +186,10 @@ async function renderCheckout() {
 
   const orderItems = cart.map(item => `
     <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border)">
-      <div style="display:flex;align-items:center;gap:10px">
-        <span style="font-size:24px">${item.emoji || '📦'}</span>
-        <div>
-          <div style="font-size:13px;font-weight:700">${item.name || 'Produto'}</div>
+      <div style="display:flex;align-items:center;gap:10px;min-width:0">
+        ${cartItemImgHTML(item, 44)}
+        <div style="min-width:0">
+          <div style="font-size:13px;font-weight:700;overflow-wrap:anywhere">${esc(item.name || 'Produto')}</div>
           <div style="font-size:12px;color:var(--text-muted)">Qtd: ${item.qty}</div>
         </div>
       </div>

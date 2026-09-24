@@ -57,6 +57,38 @@ function clearCupomAplicado() {
   localStorage.removeItem(CUPOM_KEY);
 }
 
+// Escapa texto antes de ir pro innerHTML (evita XSS). Global porque
+// o cart.js é carregado em todas as páginas.
+function esc(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+// Foto que vai pro carrinho: a miniatura leve se existir, senão a
+// principal. Antes o carrinho não guardava foto nenhuma e mostrava 📦.
+function imagemDoProduto(p) {
+  return (p && (p.image_thumb_url || p.image_url)) || null;
+}
+
+// HTML da foto de um item do carrinho (usado no carrinho e no checkout).
+// Sem foto salva, cai no emoji como antes. "tamanho" em px.
+function cartItemImgHTML(item, tamanho = 80) {
+  const url = String(item.image || '');
+  const fotoValida = /^https:\/\//i.test(url);
+  const base = `width:${tamanho}px;height:${tamanho}px;border-radius:10px;flex-shrink:0;overflow:hidden;`;
+  if (fotoValida) {
+    const src = url.replace(/"/g, '%22');
+    return `<div class="cart-item-img" style="${base}background:#fff"><img src="${src}" alt="" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:cover;display:block"></div>`;
+  }
+  const emoji = String(item.emoji || '📦').replace(/[<>&"']/g, '');
+  return `<div class="cart-item-img" style="${base}background:linear-gradient(135deg,#1e3a6e,#2563eb);display:flex;align-items:center;justify-content:center;font-size:${Math.round(tamanho / 2)}px">${emoji}</div>`;
+}
+
 function addToCart(productId, qty = 1, productData = null, event = null) {
   const cart = getCart();
   const existing = cart.find(i => i.id === productId);
@@ -68,6 +100,7 @@ function addToCart(productId, qty = 1, productData = null, event = null) {
       existing.name  = productData.name  || existing.name;
       existing.emoji = productData.emoji || existing.emoji;
       existing.brand = productData.brand || existing.brand;
+      existing.image = imagemDoProduto(productData) || existing.image;
     }
   } else {
     const item = { id: productId, qty };
@@ -76,6 +109,7 @@ function addToCart(productId, qty = 1, productData = null, event = null) {
       item.name  = productData.name;
       item.emoji = productData.emoji;
       item.brand = productData.brand;
+      item.image = imagemDoProduto(productData);
     }
     cart.push(item);
   }

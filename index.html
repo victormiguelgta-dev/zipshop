@@ -3,6 +3,9 @@
 <head>
 <link rel="preconnect" href="https://kkliwdphrdbguclsvxcw.supabase.co">
 <link rel="dns-prefetch" href="https://kkliwdphrdbguclsvxcw.supabase.co">
+<!-- a biblioteca do Supabase vem do jsDelivr: abrir a conexão cedo
+     economiza uma ida e volta antes do banner poder aparecer -->
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="base" content="">
@@ -29,8 +32,64 @@
 
 <!-- HERO SLIDER — carregado do Supabase -->
 <section class="hero" id="hero-section">
-  <div style="display:flex;align-items:center;justify-content:center;height:400px;color:var(--text-muted)">Carregando...</div>
+  <div class="hero-img-box"></div>
 </section>
+<script>
+// ===== BANNER INSTANTÂNEO =====
+// Script normal (não module) de propósito: roda na hora em que o
+// navegador lê esta linha, sem esperar a biblioteca do Supabase baixar.
+// Desenha o banner com a cópia salva da última visita; o module lá
+// embaixo busca a versão atual no Supabase e atualiza se mudou.
+function esc(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+// Só aceita links internos ou https — evita "javascript:" num href
+function linkSeguro(url, padrao) {
+  const u = String(url || '').trim();
+  return /^(https:\/\/|[a-z0-9_\-\/]+\.html)/i.test(u) ? u : padrao;
+}
+
+function heroHTML(banners) {
+  return banners.map((b, i) => `
+    <div class="hero-slide ${i === 0 ? 'active' : ''}" id="slide-${i}">
+      <div class="hero-img-box">
+        ${b.image_url
+          ? `<img src="${esc(b.image_url)}" alt="" decoding="async" ${i === 0 ? 'fetchpriority="high"' : 'fetchpriority="low"'} style="width:100%;height:100%;object-fit:contain">`
+          : `<span style='font-size:80px'>🛍️</span>`}
+        <div class="hero-text-wrap">
+          ${b.badge ? `<div class="hero-badge">${esc(b.badge)}</div>` : ''}
+          ${b.titulo ? `<h1 class="hero-title">${esc(b.titulo).replace(/\r?\n/g, '<br>')}</h1>` : ''}
+          ${b.subtitulo ? `<p class="hero-sub">${esc(b.subtitulo)}</p>` : ''}
+          ${b.preco ? `<p class="hero-price">${esc(b.preco)}</p>` : ''}
+          <div class="hero-btns">
+            <a href="${esc(linkSeguro(b.link_cat || b.link, 'produtos.html'))}" class="btn btn-primary btn-lg">Ver Produtos</a>
+          </div>
+        </div>
+      </div>
+    </div>`).join('') +
+    (banners.length > 1 ? `<button class="hero-nav-btn hero-prev" onclick="changeSlide(-1)">&#8249;</button>
+     <button class="hero-nav-btn hero-next" onclick="changeSlide(1)">&#8250;</button>` : '') +
+    `<div class="hero-dots" id="hero-dots"></div>`;
+}
+
+const HERO_CACHE_KEY = 'zipshop_banners_v1';
+(function () {
+  try {
+    const salvo = JSON.parse(localStorage.getItem(HERO_CACHE_KEY) || 'null');
+    if (Array.isArray(salvo) && salvo.length) {
+      document.getElementById('hero-section').innerHTML = heroHTML(salvo);
+      window._heroCacheJSON = JSON.stringify(salvo);
+    }
+  } catch (e) { /* sem cache: o module desenha quando o Supabase responder */ }
+})();
+</script>
 
 <!-- FEATURE STRIP -->
 <div class="feature-strip">
@@ -95,15 +154,7 @@
 <script src="js/cart.js"></script>
 <script src="js/main.js"></script>
 <script type="module">
-function esc(str) {
-  if (str === null || str === undefined) return '';
-  return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
-}
+// esc() e heroHTML() vêm do <script> normal logo abaixo do banner (globais)
 
 import { loadProducts, formatPrice, starsHTML } from './js/data.js';
 import { getFavoritosIds, toggleFavorito } from './js/favoritos.js';
@@ -119,26 +170,21 @@ const BANNERS = banners && banners.length > 0 ? banners : [
 ];
 const totalSlides = BANNERS.length;
 
+// Só guarda no cache o que o banner usa (nada de dados extras)
+const bannersParaCache = BANNERS.filter(b => b.id).map(b => ({
+  id: b.id, image_url: b.image_url, titulo: b.titulo, subtitulo: b.subtitulo,
+  badge: b.badge, preco: b.preco, link: b.link, link_cat: b.link_cat
+}));
+
 function renderHero() {
-  const section = document.getElementById('hero-section');
-  section.innerHTML = BANNERS.map((b, i) => `
-    <div class="hero-slide ${i === 0 ? 'active' : ''}" id="slide-${i}">
-      <div class="hero-img-box">
-        ${b.image_url ? `<img src="${b.image_url}" style="width:100%;height:100%;object-fit:contain">` : `<span style='font-size:80px'>🛍️</span>`}
-        <div class="hero-text-wrap">
-          ${b.badge ? `<div class="hero-badge">${esc(b.badge)}</div>` : ''}
-          <h1 class="hero-title">${esc(b.titulo||'').replace(' ', '<br>')}</h1>
-          ${b.subtitulo ? `<p class="hero-sub">${esc(b.subtitulo)}</p>` : ''}
-          ${b.preco ? `<p class="hero-price">${esc(b.preco)}</p>` : ''}
-          <div class="hero-btns">
-            <a href="${b.link_cat || 'produtos.html'}" class="btn btn-primary btn-lg">Ver Produtos</a>
-          </div>
-        </div>
-      </div>
-    </div>`).join('') +
-    `<button class="hero-nav-btn hero-prev" onclick="changeSlide(-1)">&#8249;</button>
-     <button class="hero-nav-btn hero-next" onclick="changeSlide(1)">&#8250;</button>
-     <div class="hero-dots" id="hero-dots"></div>`;
+  const novoJSON = JSON.stringify(bannersParaCache);
+  try {
+    if (bannersParaCache.length) localStorage.setItem(HERO_CACHE_KEY, novoJSON);
+    else localStorage.removeItem(HERO_CACHE_KEY);
+  } catch (e) {}
+  // Já desenhado com o cache e nada mudou? Não redesenha (evita piscar)
+  if (window._heroCacheJSON && window._heroCacheJSON === novoJSON) return;
+  document.getElementById('hero-section').innerHTML = heroHTML(BANNERS);
 }
 
 function renderDots() {

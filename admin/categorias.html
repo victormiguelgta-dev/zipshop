@@ -66,7 +66,7 @@
     <nav class="admin-nav">
       <a href="index.html" class="admin-nav-item">📊 Dashboard</a>
       <a href="produtos.html" class="admin-nav-item">📦 Produtos</a>
-      <a href="importar.html" class="admin-nav-item">🛍️ Importar da Shopee</a>
+      <a href="importar.html" class="admin-nav-item">✨ Cadastrar com IA</a>
       <a href="pedidos.html" class="admin-nav-item">🛒 Pedidos</a>
       <a href="clientes.html" class="admin-nav-item">👥 Clientes</a>
       <a href="categorias.html" class="admin-nav-item active">🏷️ Categorias</a>
@@ -151,15 +151,17 @@
   </div>
 </div>
 
+<script src="../js/imagem.js"></script>
 <script type="module">
 import { isAdmin, supabase } from '../js/admin-guard.js';
 if (!isAdmin) throw new Error('acesso negado');
 
 let fotoFile = null;
 
-window.previewFoto = function(input) {
-  fotoFile = input.files[0];
-  if (!fotoFile) return;
+window.previewFoto = async function(input) {
+  if (!input.files[0]) return;
+  // Ícone de categoria: quadrado 400×400 leve (js/imagem.js)
+  fotoFile = await otimizarImagem(input.files[0], PRESET_IMAGEM.categoria);
   const reader = new FileReader();
   reader.onload = e => {
     document.getElementById('foto-img').src = e.target.result;
@@ -172,10 +174,10 @@ window.previewFoto = function(input) {
 async function uploadFoto(file, nome) {
   document.getElementById('upload-progress').style.display = 'block';
   document.getElementById('progress-bar').style.width = '40%';
-  const ext = file.name.split('.').pop();
+  const ext = extensaoImagem(file);
   const nomeSeguro = nome.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9]/g, '-').toLowerCase();
   const fileName = `categorias/${nomeSeguro}-${Date.now()}.${ext}`;
-  const { error } = await supabase.storage.from('Produtos').upload(fileName, file, { upsert: true });
+  const { error } = await supabase.storage.from('Produtos').upload(fileName, file, { upsert: true, cacheControl: '31536000' });
   document.getElementById('progress-bar').style.width = '100%';
   setTimeout(() => document.getElementById('upload-progress').style.display = 'none', 500);
   if (error) { alert('Erro no upload: ' + error.message); return null; }

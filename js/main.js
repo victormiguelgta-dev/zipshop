@@ -25,10 +25,25 @@ function aplicarTextosEm(el) {
     .catch(() => {});
 }
 
+// Ícone do usuário na navbar: a foto de perfil (se tiver) ou 👤
+function navAvatarHTML(url) {
+  return (url && /^https:\/\//i.test(url))
+    ? `<img src="${String(url).replace(/"/g, '%22')}" alt="" class="nav-avatar" id="nav-avatar">`
+    : `<span id="nav-avatar">👤</span>`;
+}
+
+// Chamado pela conta.html quando a pessoa troca/remove a foto
+window.atualizarAvatarNavbar = function(url) {
+  const el = document.getElementById('nav-avatar');
+  if (el) el.outerHTML = navAvatarHTML(url);
+};
+
 function navbarHTML(user, isAdmin = false) {
+  const primeiroNome = (user?.user_metadata?.full_name || user?.email || '').split(' ')[0].split('@')[0]
+    .replace(/[<>&"']/g, '');
   const userBtn = user
-    ? `<a href="${BASE}/conta.html" class="nav-btn" style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
-        👤 ${(user.user_metadata?.full_name || user.email || '').split(' ')[0].split('@')[0]}
+    ? `<a href="${BASE}/conta.html" class="nav-btn" style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-flex;align-items:center">
+        ${navAvatarHTML(user.user_metadata?.avatar_url)} ${primeiroNome}
        </a>`
     : `<a href="${BASE}/login.html" class="nav-btn" data-texto="navbar_btn_entrar">👤 Entrar</a>`;
 

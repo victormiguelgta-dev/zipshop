@@ -19,7 +19,7 @@
     <nav class="admin-nav">
       <a href="index.html" class="admin-nav-item">📊 Dashboard</a>
       <a href="produtos.html" class="admin-nav-item active">📦 Produtos</a>
-      <a href="importar.html" class="admin-nav-item">🛍️ Importar da Shopee</a>
+      <a href="importar.html" class="admin-nav-item">✨ Cadastrar com IA</a>
       <a href="pedidos.html" class="admin-nav-item">🛒 Pedidos</a>
       <a href="clientes.html" class="admin-nav-item">👥 Clientes</a>
       <a href="categorias.html" class="admin-nav-item">🏷️ Categorias</a>
@@ -214,6 +214,7 @@
   </div>
 </div>
 
+<script src="../js/imagem.js"></script>
 <script type="module">
 import { isAdmin, supabase } from '../js/admin-guard.js';
 if (!isAdmin) throw new Error('not admin');
@@ -224,55 +225,18 @@ let fotoFile = null;
 let galeriaNovas = []; // arquivos novos (ainda não subidos) selecionados nesta edição
 let galeriaExistente = []; // fotos já salvas no produto ({url, thumb}) sendo editado
 
-// Reduz o tamanho da imagem no navegador ANTES de enviar pro Supabase.
-// Fotos direto do celular costumam vir com vários MB — sem isso, as
-// páginas de produto e listagem ficam lentas pra carregar.
-async function comprimirImagem(file, maxLado = 1600, qualidade = 0.82) {
-  if (file.type === 'image/gif' || file.size < 300 * 1024) return file;
-
-  try {
-    const bitmap = await createImageBitmap(file);
-    const escala = Math.min(1, maxLado / Math.max(bitmap.width, bitmap.height));
-    const largura = Math.round(bitmap.width * escala);
-    const altura = Math.round(bitmap.height * escala);
-
-    const canvas = document.createElement('canvas');
-    canvas.width = largura;
-    canvas.height = altura;
-    canvas.getContext('2d').drawImage(bitmap, 0, 0, largura, altura);
-
-    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', qualidade));
-    if (!blob) return file;
-
-    const nomeBase = file.name.replace(/\.[^.]+$/, '');
-    return new File([blob], `${nomeBase}.jpg`, { type: 'image/jpeg' });
-  } catch (e) {
-    return file;
-  }
+// Padroniza as fotos ANTES de enviar pro Supabase (js/imagem.js):
+// toda foto de produto vira um quadrado de 1000×1000 (corte pelo
+// centro) em WebP. Assim os cards da vitrine ficam todos alinhados,
+// sem "moldura" branca, e os arquivos ficam leves pro celular.
+function comprimirImagem(file) {
+  return otimizarImagem(file, PRESET_IMAGEM.produto);
 }
 
-// CORREÇÃO PERFORMANCE: os cards da vitrine (grade de produtos) mostram
-// a foto bem pequena, mas antes carregavam o mesmo arquivo grande da
-// página do produto — desperdiçando dados e deixando o site lento,
-// principalmente no celular. Agora geramos uma miniatura leve (320px)
-// só pra esses cards.
-async function gerarMiniatura(file, maxLado = 320, qualidade = 0.72) {
-  try {
-    const bitmap = await createImageBitmap(file);
-    const escala = Math.min(1, maxLado / Math.max(bitmap.width, bitmap.height));
-    const largura = Math.round(bitmap.width * escala);
-    const altura = Math.round(bitmap.height * escala);
-
-    const canvas = document.createElement('canvas');
-    canvas.width = largura;
-    canvas.height = altura;
-    canvas.getContext('2d').drawImage(bitmap, 0, 0, largura, altura);
-
-    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', qualidade));
-    return blob ? new File([blob], 'thumb.jpg', { type: 'image/jpeg' }) : null;
-  } catch (e) {
-    return null;
-  }
+// Miniatura quadrada leve (480px) só pros cards da vitrine e carrinho.
+async function gerarMiniatura(file) {
+  const thumb = await otimizarImagem(file, PRESET_IMAGEM.miniatura);
+  return thumb && thumb !== file ? thumb : null;
 }
 
 // ===== GALERIA (fotos adicionais do produto) =====
@@ -293,7 +257,7 @@ function renderGaleriaGrid() {
 
 window.adicionarFotosGaleria = async function(input) {
   for (const file of input.files) {
-    const comprimido = await comprimirImagem(file, 1200, 0.8);
+    const comprimido = await comprimirImagem(file);
     const preview = await new Promise(resolve => {
       const reader = new FileReader();
       reader.onload = e => resolve(e.target.result);
@@ -317,17 +281,17 @@ window.removerFotoGaleriaExistente = function(i) {
 async function uploadGaleria(nomeProduto) {
   const enviadas = [...galeriaExistente];
   for (const item of galeriaNovas) {
-    const ext = 'jpg';
+    const ext = extensaoImagem(item.file);
     const base = `${Date.now()}-${Math.random().toString(36).slice(2,7)}-${nomeProduto.replace(/\s/g,'-')}`;
-    const { error } = await supabase.storage.from('Produtos').upload(`${base}.${ext}`, item.file, { cacheControl: '3600', upsert: false });
+    const { error } = await supabase.storage.from('Produtos').upload(`${base}.${ext}`, item.file, { cacheControl: '31536000', upsert: false });
     if (error) continue;
     const url = supabase.storage.from('Produtos').getPublicUrl(`${base}.${ext}`).data.publicUrl;
 
     let thumbUrl = url;
     const thumbFile = await gerarMiniatura(item.file);
     if (thumbFile) {
-      const thumbName = `${base}-thumb.jpg`;
-      const { error: erroThumb } = await supabase.storage.from('Produtos').upload(thumbName, thumbFile, { cacheControl: '3600', upsert: false });
+      const thumbName = `${base}-thumb.${extensaoImagem(thumbFile)}`;
+      const { error: erroThumb } = await supabase.storage.from('Produtos').upload(thumbName, thumbFile, { cacheControl: '31536000', upsert: false });
       if (!erroThumb) thumbUrl = supabase.storage.from('Produtos').getPublicUrl(thumbName).data.publicUrl;
     }
     enviadas.push({ url, thumb: thumbUrl });
@@ -358,13 +322,13 @@ async function uploadFoto(file, nomeProduto) {
   document.getElementById('upload-progress').style.display = 'block';
   document.getElementById('progress-bar').style.width = '30%';
 
-  const ext = file.name.split('.').pop();
+  const ext = extensaoImagem(file);
   const baseName = `${Date.now()}-${nomeProduto.replace(/\s/g,'-')}`;
   const fileName = `${baseName}.${ext}`;
 
   const { error } = await supabase.storage
     .from('Produtos')
-    .upload(fileName, file, { cacheControl: '3600', upsert: false });
+    .upload(fileName, file, { cacheControl: '31536000', upsert: false });
 
   document.getElementById('progress-bar').style.width = '65%';
 
@@ -381,10 +345,10 @@ async function uploadFoto(file, nomeProduto) {
   let thumbUrl = null;
   const thumbFile = await gerarMiniatura(file);
   if (thumbFile) {
-    const thumbName = `${baseName}-thumb.jpg`;
+    const thumbName = `${baseName}-thumb.${extensaoImagem(thumbFile)}`;
     const { error: erroThumb } = await supabase.storage
       .from('Produtos')
-      .upload(thumbName, thumbFile, { cacheControl: '3600', upsert: false });
+      .upload(thumbName, thumbFile, { cacheControl: '31536000', upsert: false });
     if (!erroThumb) {
       thumbUrl = supabase.storage.from('Produtos').getPublicUrl(thumbName).data.publicUrl;
     }

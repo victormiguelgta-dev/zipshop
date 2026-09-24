@@ -69,7 +69,7 @@
     <nav class="admin-nav">
       <a href="index.html" class="admin-nav-item">📊 Dashboard</a>
       <a href="produtos.html" class="admin-nav-item">📦 Produtos</a>
-      <a href="importar.html" class="admin-nav-item">🛍️ Importar da Shopee</a>
+      <a href="importar.html" class="admin-nav-item">✨ Cadastrar com IA</a>
       <a href="pedidos.html" class="admin-nav-item">🛒 Pedidos</a>
       <a href="clientes.html" class="admin-nav-item">👥 Clientes</a>
       <a href="categorias.html" class="admin-nav-item">🏷️ Categorias</a>
@@ -144,8 +144,19 @@
                margin-bottom:8px;overflow:hidden;background:var(--bg-muted)">
         <span style="color:var(--text-muted);font-size:13px">📷 Clique para escolher imagem</span>
       </div>
-      <p style="font-size:11px;color:var(--text-muted)">JPG, PNG ou WebP. Tamanho recomendado: 800x400px</p>
+      <p style="font-size:11px;color:var(--text-muted)">JPG, PNG ou WebP. Tamanho recomendado: 1920×800px (é otimizada automaticamente ao enviar)</p>
       <input type="file" id="foto-input" accept="image/*" style="display:none" onchange="previewFoto(this)">
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Título (texto grande sobre o banner)</label>
+      <textarea class="form-input" id="edit-titulo" rows="2" placeholder="Ex: A loja de eletrônicos mais rápida do Brasil." style="resize:vertical"></textarea>
+      <p style="font-size:11px;color:var(--text-muted);margin-top:4px">Aperte Enter onde quiser quebrar a linha. Sem Enter, o texto quebra sozinho conforme o tamanho da tela.</p>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Subtítulo (opcional)</label>
+      <input type="text" class="form-input" id="edit-subtitulo" placeholder="Ex: Entrega no mesmo dia em Santa Maria">
     </div>
 
     <div class="form-group">
@@ -173,39 +184,19 @@
   </div>
 </div>
 
+<script src="../js/imagem.js"></script>
 <script type="module">
 import { isAdmin, supabase } from '../js/admin-guard.js';
 if (!isAdmin) throw new Error('not admin');
 
 let fotoFile = null;
 
-// Reduz o tamanho da imagem no navegador ANTES de enviar pro Supabase.
-// Fotos direto do celular costumam vir com vários MB — sem isso, o
-// banner inteiro do site fica lento pra carregar pra qualquer visitante.
-// Gifs não são recomprimidos (perderiam a animação) e imagens já
-// pequenas (<300KB) também são ignoradas.
-async function comprimirImagem(file, maxLado = 1600, qualidade = 0.82) {
-  if (file.type === 'image/gif' || file.size < 300 * 1024) return file;
-
-  try {
-    const bitmap = await createImageBitmap(file);
-    const escala = Math.min(1, maxLado / Math.max(bitmap.width, bitmap.height));
-    const largura = Math.round(bitmap.width * escala);
-    const altura = Math.round(bitmap.height * escala);
-
-    const canvas = document.createElement('canvas');
-    canvas.width = largura;
-    canvas.height = altura;
-    canvas.getContext('2d').drawImage(bitmap, 0, 0, largura, altura);
-
-    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', qualidade));
-    if (!blob) return file;
-
-    const nomeBase = file.name.replace(/\.[^.]+$/, '');
-    return new File([blob], `${nomeBase}.jpg`, { type: 'image/jpeg' });
-  } catch (e) {
-    return file; // se algo der errado, manda o arquivo original em vez de travar
-  }
+// Banner: 1920px de largura em WebP (js/imagem.js). Diferente da
+// versão antiga, SEMPRE recomprime — antes, imagens abaixo de 300KB e
+// PNGs grandes de arte passavam direto, e o banner é a primeira coisa
+// que o visitante vê: cada KB aqui atrasa a página inicial.
+function comprimirImagem(file) {
+  return otimizarImagem(file, PRESET_IMAGEM.banner);
 }
 
 document.getElementById('btn-logout').addEventListener('click', async (e) => {
@@ -227,7 +218,7 @@ window.previewFoto = async function(input) {
 };
 
 async function uploadFoto(file, titulo) {
-  const ext = file.name.split('.').pop();
+  const ext = extensaoImagem(file);
   // Remove acentos e caracteres especiais
   const nomeSeguro = titulo
     .normalize('NFD')
@@ -235,7 +226,7 @@ async function uploadFoto(file, titulo) {
     .replace(/[^a-zA-Z0-9]/g, '-')
     .toLowerCase();
   const fileName = `banners/${nomeSeguro}-${Date.now()}.${ext}`;
-  const { data, error } = await supabase.storage.from('Produtos').upload(fileName, file, { upsert: true });
+  const { data, error } = await supabase.storage.from('Produtos').upload(fileName, file, { upsert: true, cacheControl: '31536000' });
   if (error) { alert('Erro no upload: ' + error.message); return null; }
   const { data: urlData } = supabase.storage.from('Produtos').getPublicUrl(fileName);
   return urlData.publicUrl;
@@ -283,6 +274,8 @@ window.abrirModal = function() {
   document.getElementById('modal-title').textContent = 'Novo Banner';
   document.getElementById('edit-id').value = '';
   document.getElementById('edit-link').value = '';
+  document.getElementById('edit-titulo').value = '';
+  document.getElementById('edit-subtitulo').value = '';
   document.getElementById('edit-ordem').value = '1';
   document.getElementById('edit-ativo').checked = true;
   document.getElementById('foto-preview').innerHTML = '<span style="color:var(--text-muted);font-size:13px">📷 Clique para escolher imagem</span>';
@@ -301,6 +294,8 @@ window.openEdit = async function(id) {
   document.getElementById('modal-title').textContent = 'Editar Banner';
   document.getElementById('edit-id').value = b.id;
   document.getElementById('edit-link').value = b.link || '';
+  document.getElementById('edit-titulo').value = b.titulo || '';
+  document.getElementById('edit-subtitulo').value = b.subtitulo || '';
   document.getElementById('edit-ordem').value = b.ordem || 1;
   document.getElementById('edit-ativo').checked = b.ativo;
   const preview = document.getElementById('foto-preview');
@@ -323,6 +318,8 @@ window.salvarBanner = async function() {
 
   const dados = {
     link: document.getElementById('edit-link').value,
+    titulo: document.getElementById('edit-titulo').value.trim(),
+    subtitulo: document.getElementById('edit-subtitulo').value.trim(),
     ordem: parseInt(document.getElementById('edit-ordem').value) || 1,
     ativo: document.getElementById('edit-ativo').checked,
     ...(imageUrl ? { image_url: imageUrl } : {})

@@ -544,11 +544,14 @@ ul { list-style: none; }
   overflow: hidden;
   background: var(--bg-muted);
 }
+/* Foto preenche o quadrado inteiro. As fotos novas já são enviadas
+   quadradas (1000×1000, ver js/imagem.js), então nada é cortado; nas
+   antigas o "cover" corta só as sobras, sem a moldura branca de antes. */
 .product-card-img img {
   width: 100%;
   height: 100%;
-  object-fit: contain;
-  padding: 8px;
+  object-fit: cover;
+  display: block;
   background: #fff;
 }
 .product-card-body { padding: 14px; flex: 1; display: flex; flex-direction: column; gap: 6px; }
@@ -681,19 +684,20 @@ footer {
 .spec-table td:first-child { color: var(--text-muted); width: 45%; }
 
 /* ===== CART ===== */
-.cart-layout { display: grid; grid-template-columns: 1fr 360px; gap: 24px; max-width: 1200px; margin: 0 auto; padding: 32px 16px; }
+.cart-layout { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 24px; max-width: 1200px; margin: 0 auto; padding: 32px 16px; }
 .cart-item { display: flex; gap: 16px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 16px; margin-bottom: 12px; }
 .cart-item-img { width: 80px; height: 80px; border-radius: var(--radius); display: flex; align-items: center; justify-content: center; font-size: 36px; flex-shrink: 0; }
-.cart-item-info { flex: 1; }
-.cart-item-name { font-size: 14px; font-weight: 700; margin-bottom: 4px; }
+.cart-item-info { flex: 1; min-width: 0; } /* min-width:0 deixa o flex encolher em vez de estourar a tela */
+.cart-item-name { font-size: 14px; font-weight: 700; margin-bottom: 4px; overflow-wrap: anywhere; }
 .cart-item-brand { font-size: 12px; color: var(--text-muted); margin-bottom: 8px; }
-.cart-item-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 8px; }
+.cart-item-footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 12px; margin-top: 8px; }
+.cart-item-footer > :last-child { margin-left: auto; } /* preço + lixeira ficam à direita, mesmo quando descem de linha */
 .cart-item-price { font-size: 18px; font-weight: 900; color: var(--primary); }
 .cart-summary { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 20px; position: sticky; top: 80px; height: fit-content; }
 .summary-row { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 10px; }
 .summary-total { display: flex; justify-content: space-between; font-size: 18px; font-weight: 900; border-top: 1px solid var(--border); padding-top: 16px; margin-top: 8px; }
 .coupon-form { display: flex; gap: 8px; margin-bottom: 16px; }
-.coupon-form input { flex: 1; background: var(--bg-muted); border: 1px solid var(--border); color: var(--text); border-radius: 10px; padding: 10px 12px; font-size: 13px; outline: none; }
+.coupon-form input { flex: 1; min-width: 0; width: 100%; background: var(--bg-muted); border: 1px solid var(--border); color: var(--text); border-radius: 10px; padding: 10px 12px; font-size: 13px; outline: none; }
 .coupon-form input:focus { border-color: var(--primary); }
 .empty-state { text-align: center; padding: 80px 16px; }
 .empty-icon { font-size: 64px; margin-bottom: 16px; }
@@ -966,7 +970,7 @@ tr:hover td { background: rgba(255,255,255,0.02); }
   .detail-layout { grid-template-columns: 1fr; }
 
   /* Carrinho: resumo vai para baixo dos itens, com largura igual ao card do produto */
-  .cart-layout { grid-template-columns: 1fr; }
+  .cart-layout { grid-template-columns: minmax(0, 1fr); }
   .cart-item, .cart-summary { width: 100%; box-sizing: border-box; padding: 16px; }
 
   /* Checkout: resumo vai para baixo do formulário */
@@ -1228,3 +1232,38 @@ tr:hover td { background: rgba(255,255,255,0.02); }
 body.has-float-cart {
   padding-bottom: 72px;
 }
+
+/* ===== CARRINHO NO CELULAR =====
+   Antes, um preço grande ("R$ 8.299,90") empurrava a linha pra fora
+   da tela e o Safari encolhia a página inteira. */
+@media (max-width: 600px) {
+  .cart-layout { padding: 20px 12px; gap: 16px; }
+  .cart-item { gap: 12px; padding: 12px; }
+  .cart-item-img { width: 64px !important; height: 64px !important; }
+  .cart-item-price { font-size: 16px; }
+  .qty-btn { width: 36px; height: 36px; }
+  .qty-num { min-width: 32px; }
+  .coupon-form .btn { flex-shrink: 0; }
+  .summary-row span:last-child, .summary-total span:last-child { white-space: nowrap; }
+}
+
+/* ===== FOTO DE PERFIL ===== */
+.avatar-btn { position: relative; width: 72px; height: 72px; margin: 0 auto 12px; padding: 0; border: none; border-radius: 50%; background: var(--primary); cursor: pointer; display: block; }
+.avatar-conteudo { width: 100%; height: 100%; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center; font-size: 30px; }
+.avatar-conteudo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.avatar-editar { position: absolute; right: -2px; bottom: -2px; width: 26px; height: 26px; border-radius: 50%; background: var(--bg-card); border: 2px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 13px; }
+.avatar-btn.carregando { opacity: 0.5; pointer-events: none; }
+.avatar-remover { background: none; border: none; color: var(--text-muted); font-size: 12px; text-decoration: underline; cursor: pointer; margin-bottom: 8px; }
+.nav-avatar { width: 22px; height: 22px; border-radius: 50%; object-fit: cover; vertical-align: middle; margin-right: 4px; flex-shrink: 0; }
+
+/* ===== TERMOS DE USO (conteúdo editável pelo admin) =====
+   O texto vem do editor sem estilos inline, então a aparência fica aqui. */
+.termos-data { color: var(--text-muted); font-size: 13px; margin-bottom: 24px; }
+.termos-conteudo h2 { font-size: 18px; font-weight: 900; margin: 0 0 12px; }
+.termos-conteudo h3 { font-size: 15px; font-weight: 800; margin: 0 0 8px; }
+.termos-conteudo p { margin: 0 0 20px; }
+.termos-conteudo p:has(+ ul), .termos-conteudo p:has(+ ol) { margin-bottom: 8px; }
+.termos-conteudo ul, .termos-conteudo ol { margin: 0 0 20px 20px; color: var(--text-muted); }
+.termos-conteudo a { color: var(--primary); }
+.termos-conteudo blockquote { background: var(--bg-muted); border-radius: 12px; padding: 16px; margin: 32px 0 0; font-size: 13px; color: var(--text-muted); }
+.termos-conteudo blockquote p { margin: 0; }

@@ -22,7 +22,13 @@
 <div class="account-layout">
   <aside>
     <div class="card" style="margin-bottom:16px;padding:20px;text-align:center">
-      <div style="width:64px;height:64px;border-radius:50%;background:var(--primary);display:flex;align-items:center;justify-content:center;font-size:28px;margin:0 auto 12px">👤</div>
+      <!-- Foto de perfil: toque para trocar -->
+      <button type="button" id="avatar-btn" class="avatar-btn" onclick="document.getElementById('avatar-input').click()" aria-label="Trocar foto de perfil">
+        <span id="avatar-conteudo" class="avatar-conteudo">👤</span>
+        <span class="avatar-editar" aria-hidden="true">📷</span>
+      </button>
+      <input type="file" id="avatar-input" accept="image/*" style="display:none">
+      <button type="button" id="avatar-remover" class="avatar-remover" hidden>Remover foto</button>
       <p id="user-name" style="font-weight:700">Carregando...</p>
       <p id="user-email" style="font-size:13px;color:var(--text-muted)"></p>
     </div>
@@ -45,6 +51,7 @@
 <script src="js/cart.js"></script>
 <script src="js/main.js"></script>
 <script src="js/validadores.js"></script>
+<script src="js/imagem.js"></script>
 <script type="module">
 import { supabase } from './js/supabase-config.js';
 
@@ -74,6 +81,83 @@ const user = session.user;
 const nome = user.user_metadata?.full_name || user.email.split('@')[0];
 document.getElementById('user-name').textContent = nome;
 document.getElementById('user-email').textContent = user.email;
+
+// ===== FOTO DE PERFIL =====
+// A foto vai pro bucket "avatares", sempre dentro da pasta com o id do
+// usuário (avatares/<id>/...). As políticas do sql-foto-perfil.sql só
+// deixam cada pessoa mexer na PRÓPRIA pasta — é o banco que garante
+// isso, não este código (que qualquer um pode alterar no navegador).
+const avatarConteudo = document.getElementById('avatar-conteudo');
+const avatarRemover = document.getElementById('avatar-remover');
+
+function mostrarAvatar(url) {
+  if (url && /^https:\/\//i.test(url)) {
+    avatarConteudo.innerHTML = `<img src="${esc(url)}" alt="Foto de perfil">`;
+    avatarRemover.hidden = false;
+  } else {
+    avatarConteudo.textContent = '👤';
+    avatarRemover.hidden = true;
+  }
+}
+mostrarAvatar(user.user_metadata?.avatar_url);
+
+// Salva a URL em dois lugares: no próprio login (user_metadata, que a
+// navbar lê sem precisar de consulta extra) e na tabela usuarios.
+async function salvarUrlAvatar(url) {
+  const { error: e1 } = await supabase.auth.updateUser({ data: { avatar_url: url } });
+  const { error: e2 } = await supabase.from('usuarios').upsert({ id: user.id, email: user.email, avatar_url: url });
+  return e1 || e2;
+}
+
+// Apaga as fotos antigas da pasta do usuário (menos a que acabou de subir)
+async function limparAvataresAntigos(manterPath = null) {
+  const { data: arquivos } = await supabase.storage.from('avatares').list(user.id);
+  const apagar = (arquivos || [])
+    .map(a => `${user.id}/${a.name}`)
+    .filter(path => path !== manterPath);
+  if (apagar.length) await supabase.storage.from('avatares').remove(apagar);
+}
+
+document.getElementById('avatar-input').addEventListener('change', async (e) => {
+  const original = e.target.files[0];
+  e.target.value = '';
+  if (!original) return;
+  if (!original.type.startsWith('image/')) { showToast('Escolha um arquivo de imagem.', 'error'); return; }
+
+  const btn = document.getElementById('avatar-btn');
+  btn.classList.add('carregando');
+  try {
+    // Quadrado 256×256 leve (js/imagem.js)
+    const foto = await otimizarImagem(original, PRESET_IMAGEM.avatar);
+    if (foto.size > 2 * 1024 * 1024) { showToast('Imagem muito grande. Tente outra foto.', 'error'); return; }
+
+    const path = `${user.id}/avatar-${Date.now()}.${extensaoImagem(foto)}`;
+    const { error: erroUpload } = await supabase.storage.from('avatares')
+      .upload(path, foto, { cacheControl: '31536000', upsert: false, contentType: foto.type });
+    if (erroUpload) { console.error(erroUpload); showToast('Não foi possível enviar a foto.', 'error'); return; }
+
+    const url = supabase.storage.from('avatares').getPublicUrl(path).data.publicUrl;
+    const erroSalvar = await salvarUrlAvatar(url);
+    if (erroSalvar) { console.error(erroSalvar); showToast('Foto enviada, mas não consegui salvar no perfil.', 'error'); return; }
+
+    mostrarAvatar(url);
+    limparAvataresAntigos(path);
+    window.atualizarAvatarNavbar?.(url);
+    showToast('Foto de perfil atualizada!', 'success');
+  } finally {
+    btn.classList.remove('carregando');
+  }
+});
+
+avatarRemover.addEventListener('click', async () => {
+  if (!confirm('Remover sua foto de perfil?')) return;
+  const erro = await salvarUrlAvatar(null);
+  if (erro) { showToast('Não foi possível remover a foto.', 'error'); return; }
+  await limparAvataresAntigos();
+  mostrarAvatar(null);
+  window.atualizarAvatarNavbar?.(null);
+  showToast('Foto removida.', 'success');
+});
 
 // Trata o retorno do link de "esqueci minha senha" enviado por e-mail.
 // Antes essa página ignorava completamente esse link — por isso não

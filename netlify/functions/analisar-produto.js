@@ -1,13 +1,16 @@
 /**
- * analisar-produto-shopee.js
+ * analisar-produto.js
  *
- * Recebe o texto que o admin copiou da página de um produto na Shopee
- * e devolve os dados organizados (nome, marca, preço, descrição...).
+ * Cadastro de produto de ESTOQUE PRÓPRIO com ajuda da IA.
+ * Recebe um texto sobre o produto (copiado do site do fabricante ou
+ * fornecedor, de um catálogo, da caixa, ou escrito pelo próprio admin)
+ * e devolve os dados organizados (nome, marca, categoria, descrição...).
  *
  * A chave do Gemini fica só aqui no servidor (variável de ambiente
  * GEMINI_API_KEY no Netlify) — nunca vai pro navegador.
  *
- * Só o admin usa essa função, a partir da tela admin/importar.html.
+ * Só o admin usa essa função, a partir da tela admin/importar.html
+ * ("Cadastrar com IA").
  */
 
 const https = require('https');
@@ -98,7 +101,7 @@ exports.handler = async (event) => {
     if (!texto || texto.trim().length < 20) {
       return {
         statusCode: 400,
-        body: JSON.stringify({ erro: 'Cole o texto da página do produto (parece muito curto ou vazio).' })
+        body: JSON.stringify({ erro: 'Cole ou escreva as informações do produto (parece muito curto ou vazio).' })
       };
     }
 
@@ -107,7 +110,7 @@ exports.handler = async (event) => {
     // o que interessa, e isso segura o custo/tempo da chamada.
     const textoLimitado = texto.slice(0, 12000);
 
-    const prompt = `Você recebe o texto bruto copiado da página de um produto na Shopee (site de e-commerce brasileiro). O texto vem bagunçado, com menus, avaliações e outras informações misturadas.
+    const prompt = `Você recebe um texto sobre UM produto que uma loja de eletrônicos brasileira vai cadastrar no próprio estoque. O texto pode ter sido copiado de um site (fabricante, fornecedor, marketplace), de um catálogo, da caixa do produto, ou escrito à mão pelo dono da loja. Pode vir bagunçado, com menus, avaliações e outras informações misturadas.
 
 Extraia APENAS as informações do produto principal e devolva um JSON com exatamente estas chaves:
 
@@ -115,7 +118,7 @@ Extraia APENAS as informações do produto principal e devolva um JSON com exata
   "name": "nome do produto, limpo e sem emojis de propaganda, no máximo 80 caracteres",
   "brand": "marca do produto, ou string vazia se não identificar",
   "category": "uma destas opções exatas: ${CATEGORIAS_VALIDAS.join(' | ')}",
-  "custo": número decimal do preço de venda na Shopee, sem R$ e sem separador de milhar (ex: 1299.90). Se houver faixa de preço, use o MENOR valor. Se não achar, use 0,
+  "custo": número decimal do preço que aparece no texto, sem R$ e sem separador de milhar (ex: 1299.90). Se houver faixa de preço, use o MENOR valor. Se não houver preço no texto, use 0,
   "description": "descrição do produto em português, clara e vendedora, 2 a 4 frases. Reescreva com suas palavras, não copie literalmente",
   "emoji": "um único emoji que represente o produto",
   "cores": ["lista de variações de cor mencionadas, ou lista vazia"]
@@ -126,8 +129,9 @@ Regras:
 - Se um campo não for identificável, use string vazia, 0 ou lista vazia conforme o tipo
 - A categoria DEVE ser uma das opções listadas. Escolha a mais próxima
 - Não invente especificações que não estejam no texto
+- Não mencione nomes de lojas ou marketplaces (Shopee, Mercado Livre, Amazon etc.) no nome nem na descrição
 
-TEXTO DA PÁGINA:
+TEXTO SOBRE O PRODUTO:
 ${textoLimitado}`;
 
     const resposta = await chamarGemini(prompt, apiKey);

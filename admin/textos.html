@@ -68,6 +68,18 @@
   font-family: monospace;
   font-size: 13px;
 }
+/* ===== Editor com formatação (Termos de Uso) ===== */
+.editor-barra { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.editor-barra button { background: var(--bg-muted); border: 1px solid var(--border); color: var(--text); border-radius: 8px; padding: 6px 10px; font-size: 12px; font-weight: 700; cursor: pointer; }
+.editor-barra button:hover { border-color: var(--primary); }
+.editor-rico { min-height: 320px; max-height: 60vh; overflow-y: auto; background: var(--bg-muted); border: 1px solid var(--border); border-radius: 10px; padding: 14px; line-height: 1.7; outline: none; font-size: 14px; }
+.editor-rico:focus { border-color: var(--primary); }
+.editor-rico h2 { font-size: 18px; font-weight: 900; margin: 12px 0 8px; }
+.editor-rico h3 { font-size: 15px; font-weight: 800; margin: 10px 0 6px; }
+.editor-rico p { margin: 0 0 12px; }
+.editor-rico ul, .editor-rico ol { margin: 0 0 12px 20px; }
+.editor-rico a { color: var(--primary); }
+.editor-rico blockquote { background: var(--bg-card); border-radius: 8px; padding: 10px; margin: 12px 0; }
 </style>
 </head>
 <body>
@@ -83,7 +95,7 @@
     <nav class="admin-nav">
       <a href="index.html" class="admin-nav-item">📊 Dashboard</a>
       <a href="produtos.html" class="admin-nav-item">📦 Produtos</a>
-      <a href="importar.html" class="admin-nav-item">🛍️ Importar da Shopee</a>
+      <a href="importar.html" class="admin-nav-item">✨ Cadastrar com IA</a>
       <a href="pedidos.html" class="admin-nav-item">🛒 Pedidos</a>
       <a href="clientes.html" class="admin-nav-item">👥 Clientes</a>
       <a href="categorias.html" class="admin-nav-item">🏷️ Categorias</a>
@@ -161,6 +173,22 @@
     <div class="form-group">
       <label class="form-label">Valor (o texto/emoji que aparece no site)</label>
       <textarea class="form-input" id="edit-valor" rows="3" placeholder="Ex: ⚡ Ofertas do Dia"></textarea>
+      <!-- Editor com formatação: aparece só para chaves de conteúdo longo (ex: termos_conteudo) -->
+      <div id="editor-rico-wrap" hidden>
+        <div class="editor-barra">
+          <button type="button" onclick="formatar('formatBlock','H2')">Título</button>
+          <button type="button" onclick="formatar('formatBlock','H3')">Subtítulo</button>
+          <button type="button" onclick="formatar('formatBlock','P')">Parágrafo</button>
+          <button type="button" onclick="formatar('bold')"><b>N</b></button>
+          <button type="button" onclick="formatar('italic')"><i>I</i></button>
+          <button type="button" onclick="formatar('insertUnorderedList')">• Lista</button>
+          <button type="button" onclick="formatar('insertOrderedList')">1. Lista</button>
+          <button type="button" onclick="inserirLink()">🔗 Link</button>
+          <button type="button" onclick="formatar('removeFormat')">Limpar</button>
+        </div>
+        <div id="editor-rico" class="editor-rico" contenteditable="true"></div>
+        <p style="font-size:11px;color:var(--text-muted);margin-top:6px">Selecione um trecho e use os botões. A data de "Última atualização" da página muda sozinha quando você salva.</p>
+      </div>
     </div>
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
@@ -190,6 +218,34 @@ document.getElementById('btn-logout').addEventListener('click', async (e) => {
   await supabase.auth.signOut();
   window.location.href = '../login.html';
 });
+
+// ===== EDITOR COM FORMATAÇÃO =====
+// Chaves que guardam HTML (bloco com títulos, listas, links).
+const CHAVES_HTML = ['termos_conteudo'];
+const PURIFY_CONFIG = {
+  ALLOWED_TAGS: ['h2', 'h3', 'p', 'br', 'strong', 'b', 'em', 'i', 'u', 'ul', 'ol', 'li', 'a', 'blockquote'],
+  ALLOWED_ATTR: ['href', 'target'],
+};
+let _purify = null;
+async function purify() {
+  if (!_purify) _purify = (await import('https://cdn.jsdelivr.net/npm/dompurify@3.2.4/+esm')).default;
+  return _purify;
+}
+function modoHtml(ativo) {
+  document.getElementById('editor-rico-wrap').hidden = !ativo;
+  document.getElementById('edit-valor').hidden = ativo;
+  document.getElementById('modal').firstElementChild.style.maxWidth = ativo ? '860px' : '560px';
+}
+window.formatar = function(cmd, valor = null) {
+  document.getElementById('editor-rico').focus();
+  document.execCommand(cmd, false, valor);
+};
+window.inserirLink = function() {
+  const url = prompt('Endereço do link (https://...)');
+  if (!url) return;
+  if (!/^(https:\/\/|mailto:|tel:)/i.test(url.trim())) { alert('Use um link começando com https://'); return; }
+  formatar('createLink', url.trim());
+};
 
 function esc(str) {
   if (str === null || str === undefined) return '';
@@ -247,6 +303,7 @@ window.abrirModal = function() {
   document.getElementById('edit-chave').value = '';
   document.getElementById('edit-chave').disabled = false;
   document.getElementById('edit-valor').value = '';
+  modoHtml(false);
   document.getElementById('edit-secao').value = '';
   document.getElementById('edit-descricao').value = '';
   document.getElementById('modal').style.display = 'block';
@@ -264,6 +321,12 @@ window.openEdit = async function(id) {
   document.getElementById('edit-chave').value = t.chave;
   document.getElementById('edit-chave').disabled = true; // chave não muda depois de criada
   document.getElementById('edit-valor').value = t.valor || '';
+  const ehHtml = CHAVES_HTML.includes(t.chave);
+  modoHtml(ehHtml);
+  if (ehHtml) {
+    const DOMPurify = await purify();
+    document.getElementById('editor-rico').innerHTML = DOMPurify.sanitize(t.valor || '', PURIFY_CONFIG);
+  }
   document.getElementById('edit-secao').value = t.secao || '';
   document.getElementById('edit-descricao').value = t.descricao || '';
   document.getElementById('modal').style.display = 'block';
@@ -277,9 +340,16 @@ window.salvarTexto = async function() {
   const btn = document.getElementById('btn-salvar');
   btn.disabled = true; btn.textContent = 'Salvando...';
 
+  let valor = document.getElementById('edit-valor').value;
+  if (CHAVES_HTML.includes(chave)) {
+    // Limpa também ao SALVAR (a página pública limpa de novo ao mostrar)
+    const DOMPurify = await purify();
+    valor = DOMPurify.sanitize(document.getElementById('editor-rico').innerHTML, PURIFY_CONFIG);
+  }
+
   const dados = {
     chave,
-    valor: document.getElementById('edit-valor').value,
+    valor,
     secao: document.getElementById('edit-secao').value.trim() || 'geral',
     descricao: document.getElementById('edit-descricao').value.trim(),
   };
