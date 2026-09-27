@@ -381,6 +381,13 @@ window.deletar = async function(id) {
 };
 
 await carregar();
+
+// Abre direto a edição quando a URL vem com ?chave=... (ex: atalho "Editar Termos")
+const chaveUrl = new URLSearchParams(location.search).get('chave');
+if (chaveUrl) {
+  const { data } = await supabase.from('textos_site').select('id').eq('chave', chaveUrl).maybeSingle();
+  if (data) openEdit(data.id);
+}
 </script>
 
 <script>
