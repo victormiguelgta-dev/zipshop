@@ -184,7 +184,7 @@ function renderTabela(lista) {
     return;
   }
   tbody.innerHTML = lista.map(p => {
-    const itens = (p.itens||[]).map(i => i.emoji||'📦').join(' ');
+    const itens = (p.itens||[]).map(i => esc(i.emoji||'📦')).join(' ');
     return `<tr>
       <td style="font-weight:700">
         #${p.id.slice(0,8).toUpperCase()}
@@ -198,7 +198,7 @@ function renderTabela(lista) {
       <td style="color:var(--text-muted)">${formatDate(p.created_at)}</td>
       <td style="font-size:18px">${itens}</td>
       <td style="font-weight:700">${formatPrice(p.total)}</td>
-      <td style="font-size:12px;color:var(--text-muted)">${p.pagamento||'—'}</td>
+      <td style="font-size:12px;color:var(--text-muted)">${esc(p.pagamento||'—')}</td>
       <td>
         <select onchange="updateStatus('${p.id}', this.value)"
           style="background:var(--bg-muted);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:4px 8px;font-size:12px">
@@ -275,7 +275,7 @@ window.abrirDetalhesPedido = function(id) {
       ${end.horario_preferido ? `<p style="font-size:13px;color:var(--text-muted);margin-bottom:14px">Janela/Previsão: ${esc(end.horario_preferido)}</p>` : ''}
 
       <p style="font-size:11px;color:var(--text-muted);text-transform:uppercase;font-weight:700;margin-bottom:4px">Pagamento / Entrega</p>
-      <p style="font-size:13px;margin-bottom:14px">${p.pagamento || '—'} · ${p.tipo_entrega || '—'}${p.codigo_confirmacao ? ` · Código de confirmação: <strong>${p.codigo_confirmacao}</strong>` : ''}</p>
+      <p style="font-size:13px;margin-bottom:14px">${esc(p.pagamento || '—')} · ${esc(p.tipo_entrega || '—')}${p.codigo_confirmacao ? ` · Código de confirmação: <strong>${esc(p.codigo_confirmacao)}</strong>` : ''}</p>
 
       <p style="font-size:11px;color:var(--text-muted);text-transform:uppercase;font-weight:700;margin-bottom:6px">Itens</p>
       ${itensHTML || '<p style="font-size:13px;color:var(--text-muted)">Nenhum item registrado.</p>'}

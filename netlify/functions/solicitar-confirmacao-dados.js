@@ -33,6 +33,21 @@ function supabaseRequest(method, path, body) {
   });
 }
 
+// Confere o token de login e devolve o usuário (ou null)
+function getUser(token) {
+  return new Promise((resolve) => {
+    if (!token) return resolve(null);
+    const url = new URL(`${process.env.SUPABASE_URL}/auth/v1/user`);
+    const req = https.request({ hostname: url.hostname, path: url.pathname, method: 'GET',
+      headers: { 'apikey': process.env.SUPABASE_SERVICE_KEY, 'Authorization': `Bearer ${token}` } }, (res) => {
+      let b = ''; res.on('data', c => b += c);
+      res.on('end', () => { try { const u = JSON.parse(b); resolve(u && u.id ? u : null); } catch (e) { resolve(null); } });
+    });
+    req.on('error', () => resolve(null));
+    req.end();
+  });
+}
+
 function enviarEmail(destinatario, assunto, html) {
   return new Promise((resolve, reject) => {
     const data = JSON.stringify({ from: 'Zipshop <onboarding@resend.dev>', to: [destinatario], subject: assunto, html });
@@ -80,6 +95,13 @@ exports.handler = async (event) => {
 
     if (!usuario_id || !uuidRegex.test(String(usuario_id)) || !['cpf', 'telefone'].includes(campo) || !valor_novo) {
       return { statusCode: 400, headers: CORS, body: JSON.stringify({ erro: 'Dados inválidos.' }) };
+    }
+
+    // Só o dono logado pode pedir código para a própria conta
+    const _token = (event.headers.authorization || event.headers.Authorization || '').replace(/^Bearer /i, '');
+    const _user = await getUser(_token);
+    if (!_user || _user.id !== usuario_id) {
+      return { statusCode: 403, headers: CORS, body: JSON.stringify({ erro: 'Não autorizado.' }) };
     }
 
     const valorLimpo = String(valor_novo).replace(/\D/g, '');

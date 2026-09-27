@@ -977,24 +977,9 @@ async function finalizarPedido() {
     return;
   }
 
-  // Registra uso do cupom
-  if (_cupomAplicado) {
-    await supabase.from('cupons_usos').insert({ cupom_id: _cupomAplicado.id, usuario_id: user.id, pedido_id: pedido.id });
-    await supabase.from('cupons').update({ uso_atual: supabase.rpc ? undefined : undefined }).eq('id', _cupomAplicado.id);
-    await supabase.rpc('incrementar_uso_cupom', { cupom_id_param: _cupomAplicado.id }).catch(() => {});
-  }
+  // Uso do cupom e resgate de saldo são registrados pelo próprio banco
+  // (trigger trg_z_registrar_consumos), não pelo navegador.
 
-  // Registra o resgate do saldo (cashback/indicação) usado nessa compra —
-  // entra negativo no extrato, abatendo do saldo disponível.
-  if (descontoSaldo > 0) {
-    await supabase.from('saldo_extrato').insert({
-      usuario_id: user.id,
-      pedido_id: pedido.id,
-      tipo: 'resgate',
-      valor: -descontoSaldo,
-      descricao: `Usado no pedido #${pedido.id.slice(0,8).toUpperCase()}`
-    }).catch(() => {});
-  }
   // O código de indicação só vale pra essa compra — limpa pra não
   // continuar sendo aplicado nos próximos pedidos do mesmo navegador.
   if (codigoIndicacaoUsado) localStorage.removeItem('codigo_indicacao');

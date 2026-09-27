@@ -182,10 +182,20 @@ exports.handler = async (event) => {
       },
       auto_return: 'approved',
       notification_url: `${SITE_URL}/.netlify/functions/webhook-mp`,
-      payment_methods: {
-        excluded_payment_types: [{ id: 'ticket' }],
-        installments: 12
-      },
+      // Desconto de PIX só vale pagando com PIX: se o pedido foi feito
+      // como 'pix', o Mercado Pago não oferece cartão nessa cobrança.
+      payment_methods: pedido.pagamento === 'pix'
+        ? {
+            excluded_payment_types: [
+              { id: 'credit_card' }, { id: 'debit_card' }, { id: 'prepaid_card' },
+              { id: 'ticket' }, { id: 'atm' }
+            ],
+            installments: 1
+          }
+        : {
+            excluded_payment_types: [{ id: 'ticket' }],
+            installments: 12
+          },
       statement_descriptor: 'ZIPSHOP'
     };
 
