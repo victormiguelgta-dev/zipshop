@@ -441,8 +441,6 @@ window.salvarProduto = async function() {
     frete_gratis: document.getElementById('in-frete-gratis').checked,
     // Estoque próprio: sem link de fornecedor/dropshipping
     tipo_estoque: 'proprio',
-    custo: custo,
-    margem_percent: parseFloat(document.getElementById('in-margem').value) || 0,
     prazo_entrega_dias: parseInt(document.getElementById('in-prazo').value) || 1,
     ativo: true,
     ...(enviadas.length ? {
@@ -453,7 +451,19 @@ window.salvarProduto = async function() {
     } : {})
   };
 
-  const { error } = await supabase.from('produtos').insert(dados);
+  const { data: novo, error } = await supabase
+    .from('produtos').insert(dados).select('id').single();
+
+  // Custo e margem ficam numa tabela só do admin (produtos_custos),
+  // pra nunca serem expostos pela API pública de produtos.
+  if (!error) {
+    const { error: erroCusto } = await supabase.from('produtos_custos').insert({
+      produto_id: novo.id,
+      custo: custo,
+      margem_percent: parseFloat(document.getElementById('in-margem').value) || 0
+    });
+    if (erroCusto) console.error('Produto salvo, mas o custo não:', erroCusto.message);
+  }
 
   btn.disabled = false;
   btn.textContent = '💾 Cadastrar Produto';

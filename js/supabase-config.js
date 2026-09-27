@@ -17,7 +17,7 @@ export async function salvarPerfil(user, extra = {}) {
     id: user.id,
     email: user.email,
     nome: user.user_metadata?.full_name || extra.nome || '',
-    avatar: user.user_metadata?.avatar_url || '',
+    avatar_url: user.user_metadata?.avatar_url || null,
     ...extra
-  });
+  }, { onConflict: 'id', ignoreDuplicates: true }); // só cria se ainda não existir
 }

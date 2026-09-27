@@ -150,7 +150,7 @@
     }
 
     if (data.user) {
-      const { error: erroPerfil } = await supabase.from('usuarios').upsert({ id: data.user.id, email, nome, cpf });
+      const { error: erroPerfil } = await supabase.from('usuarios').insert({ id: data.user.id, email, nome, cpf });
       if (erroPerfil) {
         // Alguém cadastrou o mesmo CPF entre a checagem acima e agora
         // (caso raro). A conta de login já foi criada, mas o perfil

@@ -897,20 +897,9 @@ async function finalizarPedido() {
   const descontoSaldo = calcDescontoSaldo(subtotalComDesconto - descontoCupom);
   const total = subtotalComDesconto - descontoCupom - descontoSaldo + frete;
 
-  // Indicação: resolve o código guardado no navegador pro id de quem indicou
-  // (nunca credita o próprio comprador se ele usar o próprio link)
-  let indicadorId = null;
-  let codigoIndicacaoUsado = null;
-  try {
-    const codigoRef = localStorage.getItem('codigo_indicacao');
-    if (codigoRef) {
-      const { data: indicador } = await supabase.from('usuarios').select('id').eq('codigo_indicacao', codigoRef).maybeSingle();
-      if (indicador && indicador.id !== user.id) {
-        indicadorId = indicador.id;
-        codigoIndicacaoUsado = codigoRef;
-      }
-    }
-  } catch (e) { /* indicação é um bônus — se falhar, o pedido segue normal */ }
+  // Indicação: o banco (trigger trg_a_blindar_pedido) descobre quem indicou
+  // a partir do código e ignora se for o próprio comprador.
+  const codigoIndicacaoUsado = localStorage.getItem('codigo_indicacao') || null;
 
   const itens = cart.map(item => ({
     produto_id: item.id,
@@ -962,7 +951,6 @@ async function finalizarPedido() {
         cupom_desconto: descontoCupom || 0,
         codigo_confirmacao: codigoConfirmacao,
         saldo_usado: descontoSaldo || 0,
-        indicador_id: indicadorId,
         codigo_indicacao_usado: codigoIndicacaoUsado
       }).select().single(),
       20000, 'Não conseguimos confirmar seu pedido a tempo. Verifique sua conexão e tente novamente.'
