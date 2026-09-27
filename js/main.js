@@ -205,7 +205,11 @@ window.buscarSugestoes = function(termo, containerId) {
     import('/js/analytics.js').then(m => m.registrarEvento('busca', { termoBusca: q, meta: { resultados: data?.length || 0 } })).catch(() => {});
 
     if (!data || !data.length) {
-      box.innerHTML = `<div class="search-suggest-empty">Nenhum produto encontrado para "${q}"</div>`;
+      box.innerHTML = '';
+      const vazio = document.createElement('div');
+      vazio.className = 'search-suggest-empty';
+      vazio.textContent = `Nenhum produto encontrado para "${q}"`; // textContent nunca interpreta HTML
+      box.appendChild(vazio);
       box.classList.add('active');
       return;
     }
@@ -213,7 +217,7 @@ window.buscarSugestoes = function(termo, containerId) {
       <a href="${BASE}/produto.html?id=${p.id}" class="search-suggest-item">
         <div class="search-suggest-thumb">${p.image_url ? `<img src="${p.image_thumb_url || p.image_url}" loading="lazy">` : (p.emoji || '📦')}</div>
         <div>
-          <div class="search-suggest-name">${p.name}</div>
+          <div class="search-suggest-name">${String(p.name||'').replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'})[c])}</div>
           <div class="search-suggest-price">${Number(p.price).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</div>
         </div>
       </a>`).join('') + `
