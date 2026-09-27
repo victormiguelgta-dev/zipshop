@@ -82,6 +82,21 @@ function gerarHTMLPedido(pedido) {
   </div>`;
 }
 
+// Confere o token de login e devolve o usuário (ou null)
+function getUser(token) {
+  return new Promise((resolve) => {
+    if (!token) return resolve(null);
+    const url = new URL(`${process.env.SUPABASE_URL}/auth/v1/user`);
+    const req = https.request({ hostname: url.hostname, path: url.pathname, method: 'GET',
+      headers: { 'apikey': process.env.SUPABASE_SERVICE_KEY, 'Authorization': `Bearer ${token}` } }, (res) => {
+      let b = ''; res.on('data', c => b += c);
+      res.on('end', () => { try { const u = JSON.parse(b); resolve(u && u.id ? u : null); } catch (e) { resolve(null); } });
+    });
+    req.on('error', () => resolve(null));
+    req.end();
+  });
+}
+
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') return { statusCode: 405, body: 'Method Not Allowed' };
   try {
@@ -97,6 +112,19 @@ exports.handler = async (event) => {
     if (!pedido || !pedido.usuario_email) {
       return { statusCode: 404, headers: CORS, body: JSON.stringify({ erro: 'Pedido nao encontrado' }) };
     }
+    // Quem pode disparar: o webhook do Mercado Pago (segredo interno)
+    // ou o próprio dono do pedido, logado.
+    const h = event.headers || {};
+    const segredo = process.env.INTERNAL_SECRET;
+    const chamadaInterna = !!segredo && (h['x-internal-secret'] || h['X-Internal-Secret']) === segredo;
+    if (!chamadaInterna) {
+      const token = (h.authorization || h.Authorization || '').replace(/^Bearer /i, '');
+      const user = await getUser(token);
+      if (!user || user.id !== pedido.usuario_id) {
+        return { statusCode: 403, headers: CORS, body: JSON.stringify({ erro: 'Não autorizado.' }) };
+      }
+    }
+
     const html = gerarHTMLPedido(pedido);
     await enviarEmail(pedido.usuario_email, `Pedido Confirmado #${String(pedido.id).slice(0,8).toUpperCase()} — Zipshop`, html);
     return { statusCode: 200, headers: CORS, body: JSON.stringify({ sucesso: true }) };

@@ -71,7 +71,7 @@ async function carregarTextos() {
 let purifyPromise = null;
 function carregarPurify() {
   if (!purifyPromise) {
-    purifyPromise = import('https://cdn.jsdelivr.net/npm/dompurify@3.2.4/+esm')
+    purifyPromise = import('https://cdn.jsdelivr.net/npm/dompurify@3.4.16/+esm')
       .then(m => {
         const DOMPurify = m.default;
         // Links que abrem em outra aba ganham rel="noopener" (segurança)

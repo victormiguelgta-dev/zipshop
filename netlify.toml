@@ -24,3 +24,23 @@
     Access-Control-Allow-Origin = "https://zipshop01.netlify.app"
     Access-Control-Allow-Methods = "GET, POST, OPTIONS"
     Access-Control-Allow-Headers = "Content-Type"
+
+# Arquivos internos (SQL, anotações, planejamento) ficam no repositório,
+# mas NUNCA são servidos pelo site. force = true vale mesmo se o arquivo existir.
+[[redirects]]
+  from = "/_interno/*"
+  to = "/404.html"
+  status = 404
+  force = true
+
+[[redirects]]
+  from = "/README.md"
+  to = "/404.html"
+  status = 404
+  force = true
+
+[[redirects]]
+  from = "/netlify.toml"
+  to = "/404.html"
+  status = 404
+  force = true

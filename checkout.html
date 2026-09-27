@@ -164,7 +164,7 @@ async function renderCheckout() {
   let enderecosSalvos = [];
   let perfilUsuario = null;
   try {
-    const { createClient: _cc } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm');
+    const { createClient: _cc } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/+esm');
     const _sb = _cc('https://kkliwdphrdbguclsvxcw.supabase.co', 'sb_publishable_OMXANLsZK98fPWygp8ZHfA_xzSpWgYb');
     const { data: { session: _s } } = await _sb.auth.getSession();
     const _u = _s?.user || null;
@@ -550,7 +550,7 @@ window.aplicarCupom = async function() {
 
   feedback.style.display='block'; feedback.style.color='var(--text-muted)'; feedback.textContent='Verificando cupom...';
 
-  const { createClient: _cc } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm');
+  const { createClient: _cc } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/+esm');
   const _sb = _cc('https://kkliwdphrdbguclsvxcw.supabase.co', 'sb_publishable_OMXANLsZK98fPWygp8ZHfA_xzSpWgYb');
   const { data: { session: _sessCupom } } = await _sb.auth.getSession();
   const user = _sessCupom?.user || null;
@@ -820,12 +820,15 @@ function selectPayment(type) {
   if (btn) btn.textContent = `⚡ Confirmar Pedido — ${formatPrice(total)}`;
 }
 
-async function enviarEmailPedido(pedido) {
+async function enviarEmailPedido(pedido, accessToken) {
   try {
     await fetch('/.netlify/functions/enviar-email-pedido', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pedido })
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken || ''}`
+      },
+      body: JSON.stringify({ pedidoId: pedido.id })
     });
   } catch(e) { console.error('Erro ao enviar email:', e); }
 }
@@ -858,7 +861,7 @@ async function finalizarPedido() {
   const btn = document.getElementById('btn-confirmar');
   btn.disabled = true; btn.textContent = 'Verificando...';
 
-  const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm');
+  const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/+esm');
   const supabase = createClient('https://kkliwdphrdbguclsvxcw.supabase.co', 'sb_publishable_OMXANLsZK98fPWygp8ZHfA_xzSpWgYb');
   const { data: { session: sessaoConfirmar } } = await supabase.auth.getSession();
   const user = sessaoConfirmar?.user || null;
@@ -990,7 +993,8 @@ async function finalizarPedido() {
   // Pagamento na entrega — confirma direto
   if (selectedPayment === 'dinheiro') {
     clearCart();
-    enviarEmailPedido({ ...pedido, usuario_email: user.email });
+    const { data: { session: _sessaoEmail } } = await supabase.auth.getSession();
+    enviarEmailPedido(pedido, _sessaoEmail?.access_token);
     document.getElementById('main-content').innerHTML = `
     <div class="success-box">
       <div class="success-check-wrap">
@@ -1127,7 +1131,7 @@ if (statusMP) {
   let codigoConfirmacao = null;
   if (statusMP === 'aprovado' && pedidoMP) {
     try {
-      const { createClient: createClientCod } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm');
+      const { createClient: createClientCod } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/+esm');
       const supabaseCod = createClientCod('https://kkliwdphrdbguclsvxcw.supabase.co', 'sb_publishable_OMXANLsZK98fPWygp8ZHfA_xzSpWgYb');
       const { data: pedidoInfo } = await supabaseCod.from('pedidos').select('codigo_confirmacao').eq('id', pedidoMP).single();
       codigoConfirmacao = pedidoInfo?.codigo_confirmacao || null;
@@ -1185,7 +1189,7 @@ if (statusMP) {
   // tela ficava em branco pra sempre, sem nenhum aviso. Agora qualquer
   // falha aqui cai numa tela de erro com botão de "Tentar novamente".
   try {
-    const { createClient: createClientCheck } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm');
+    const { createClient: createClientCheck } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/+esm');
     const supabaseCheck = createClientCheck('https://kkliwdphrdbguclsvxcw.supabase.co', 'sb_publishable_OMXANLsZK98fPWygp8ZHfA_xzSpWgYb');
 
     const { data: { session: sessionCheck } } = await comTimeout(supabaseCheck.auth.getSession(), 15000);

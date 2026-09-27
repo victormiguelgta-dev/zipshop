@@ -10,7 +10,7 @@
  * Para adicionar um admin novo, acrescente o e-mail na lista ADMIN_EMAILS abaixo.
  */
 
-import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/+esm';
 
 const supabase = createClient(
   'https://kkliwdphrdbguclsvxcw.supabase.co',

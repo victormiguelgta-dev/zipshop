@@ -125,7 +125,7 @@ async function initPage() {
   let isAdmin = false;
   let sb = null;
   try {
-    const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm');
+    const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/+esm');
     sb = createClient('https://kkliwdphrdbguclsvxcw.supabase.co', 'sb_publishable_OMXANLsZK98fPWygp8ZHfA_xzSpWgYb');
     // getSession() lê a sessão salva localmente (sem depender de uma
     // chamada de rede terminar a tempo). getUser() faz essa chamada
