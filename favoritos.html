@@ -32,7 +32,7 @@
 <script src="js/main.js"></script>
 <script type="module">
 import { supabase } from './js/supabase-config.js';
-import { formatPrice } from './js/data.js';
+import { formatPrice, estaEsgotado } from './js/data.js';
 
 const { data: { session } } = await supabase.auth.getSession();
 const user = session?.user || null;
@@ -50,9 +50,10 @@ const lista = (favoritos || []).map(f => f.produtos).filter(Boolean);
 if (!lista.length) {
   document.getElementById('fav-empty').style.display = 'block';
 } else {
-  grid.innerHTML = lista.map(p => `
-    <a href="produto.html?id=${p.id}" class="product-card">
+  grid.innerHTML = lista.map(p => { const esgotado = estaEsgotado(p); return `
+    <a href="produto.html?id=${p.id}" class="product-card${esgotado ? ' esgotado' : ''}">
       <div class="product-card-img" style="background:linear-gradient(135deg,#1e3a6e,#2563eb)">
+        ${esgotado ? '<div class="esgotado-badge">Esgotado</div>' : ''}
         <button onclick="event.preventDefault(); removerFavorito(${p.id}, this)" class="fav-btn" aria-label="Remover">💚</button>
         ${p.image_url ? `<img src="${p.image_thumb_url || p.image_url}" loading="lazy" style="width:100%;height:100%;object-fit:cover">` : `<span style="font-size:64px">${p.emoji||'📦'}</span>`}
       </div>
@@ -62,9 +63,11 @@ if (!lista.length) {
         <div class="product-price">${formatPrice(p.price)}</div>
       </div>
       <div class="product-card-footer">
-        <button class="btn btn-primary btn-full btn-sm" onclick="event.preventDefault(); addToCart(${p.id}, 1, ${JSON.stringify(p).replace(/"/g,'&quot;')})">🛒 Adicionar</button>
+        ${esgotado
+          ? '<button class="btn btn-outline btn-full btn-sm" disabled onclick="event.preventDefault()">Sem estoque</button>'
+          : `<button class="btn btn-primary btn-full btn-sm" onclick="event.preventDefault(); addToCart(${p.id}, 1, ${JSON.stringify(p).replace(/"/g,'&quot;')})">🛒 Adicionar</button>`}
       </div>
-    </a>`).join('');
+    </a>`; }).join('');
 }
 
 window.removerFavorito = async function(produtoId, btn) {

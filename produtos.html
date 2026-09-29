@@ -88,7 +88,7 @@ function esc(str) {
     .replace(/'/g, '&#039;');
 }
 
-import { loadProducts, formatPrice, starsHTML, loadSinonimos } from './js/data.js';
+import { loadProducts, formatPrice, starsHTML, loadSinonimos, estaEsgotado, esgotadosNoFim } from './js/data.js';
 import { getFavoritosIds, toggleFavorito } from './js/favoritos.js';
 
 // Filtros retráteis: em telas maiores já vem aberto (comportamento antigo);
@@ -184,6 +184,9 @@ window.applyFilters = () => {
   else if (sort === 'price-desc') list.sort((a, b) => b.price - a.price);
   else if (sort === 'rating') list.sort((a, b) => b.rating - a.rating);
 
+  // Depois da ordenação escolhida, joga os esgotados pro fim
+  list = esgotadosNoFim(list);
+
   document.getElementById('count-label').textContent = list.length + ' produto' + (list.length !== 1 ? 's' : '') + ' encontrado' + (list.length !== 1 ? 's' : '');
   const grid = document.getElementById('products-grid');
   const empty = document.getElementById('empty-msg');
@@ -193,10 +196,11 @@ window.applyFilters = () => {
   // CORREÇÃO BUG 2: salva cada produto no cache e usa o ID no onclick
   list.forEach(p => { window._produtosCache[p.id] = p; });
 
-  grid.innerHTML = list.map(p => `
-    <a href="produto.html?id=${p.id}" class="product-card">
+  grid.innerHTML = list.map(p => { const esgotado = estaEsgotado(p); return `
+    <a href="produto.html?id=${p.id}" class="product-card${esgotado ? ' esgotado' : ''}">
       <div class="product-card-img" style="background:linear-gradient(135deg,#1e3a6e,#2563eb)">
         ${p.discount ? `<div class="discount-badge">-${p.discount}%</div>` : ''}
+        ${esgotado ? '<div class="esgotado-badge">Esgotado</div>' : ''}
         <button onclick="event.preventDefault(); toggleFavoritoCard(${p.id}, this)" class="fav-btn" data-fav="${_favoritosIds && _favoritosIds.has(p.id) ? '1' : '0'}" aria-label="Favoritar">${_favoritosIds && _favoritosIds.has(p.id) ? '💚' : '🤍'}</button>
         ${p.image_url ? `<img src="${p.image_thumb_url || p.image_url}" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:cover">` : `<span style="font-size:64px">${p.emoji}</span>`}
       </div>
@@ -212,9 +216,11 @@ window.applyFilters = () => {
         <div class="product-installment">ou 10x de ${formatPrice(p.price/10)}</div>
       </div>
       <div class="product-card-footer">
-        <button class="btn btn-primary btn-full btn-sm" onclick="event.preventDefault(); addToCart(${p.id}, 1, window._produtosCache[${p.id}], event)">🛒 Adicionar</button>
+        ${esgotado
+          ? '<button class="btn btn-outline btn-full btn-sm" disabled onclick="event.preventDefault()">Sem estoque</button>'
+          : `<button class="btn btn-primary btn-full btn-sm" onclick="event.preventDefault(); addToCart(${p.id}, 1, window._produtosCache[${p.id}], event)">🛒 Adicionar</button>`}
       </div>
-    </a>`).join('');
+    </a>`; }).join('');
 };
 
 // Carrega e renderiza

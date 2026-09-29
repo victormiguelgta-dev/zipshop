@@ -105,4 +105,15 @@ async function loadSinonimos() {
   return SINONIMOS;
 }
 
-export { loadProducts, getProduct, formatPrice, starsHTML, loadSinonimos, PRODUCTS, CATEGORIES };
+// Produto esgotado: só quando o estoque é controlado (stock preenchido) e chegou a 0.
+// Mesma regra usada em produto.html. stock vazio = sem controle de estoque.
+function estaEsgotado(p) {
+  return p.stock !== null && p.stock !== undefined && p.stock <= 0;
+}
+
+// Coloca os esgotados no fim da lista, mantendo a ordem dos demais
+function esgotadosNoFim(lista) {
+  return [...lista].sort((a, b) => estaEsgotado(a) - estaEsgotado(b));
+}
+
+export { loadProducts, getProduct, formatPrice, starsHTML, loadSinonimos, estaEsgotado, esgotadosNoFim, PRODUCTS, CATEGORIES };
