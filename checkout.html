@@ -702,6 +702,9 @@ async function buscarCEP() {
   const cep = (document.getElementById('campo-cep')?.value || '').replace(/\D/g,'');
   const feedback = document.getElementById('cep-feedback');
   if (cep.length !== 8) return;
+  // Faixa de CEPs de Santa Maria — RS (97000-000 a 97119-999)
+  const numCep = Number(cep);
+  const ehSantaMaria = numCep >= 97000000 && numCep <= 97119999;
   feedback.style.display = 'block';
   feedback.style.color = 'var(--text-muted)';
   feedback.textContent = 'Buscando endereço...';
@@ -709,8 +712,16 @@ async function buscarCEP() {
     const res = await fetch('https://viacep.com.br/ws/' + cep + '/json/');
     const data = await res.json();
     if (data.erro) {
-      feedback.style.color = '#ef4444';
-      feedback.textContent = '❌ CEP não encontrado.';
+      if (ehSantaMaria) {
+        // CEP geral da cidade (ex: 97010-000): o ViaCEP não traz a rua,
+        // mas a entrega é possível — a pessoa só preenche o endereço à mão
+        feedback.style.color = 'var(--text-muted)';
+        feedback.textContent = 'CEP de Santa Maria ✅ — preencha a rua e o bairro abaixo.';
+        document.getElementById('campo-rua')?.focus();
+      } else {
+        feedback.style.color = '#ef4444';
+        feedback.textContent = '❌ CEP não encontrado.';
+      }
       return;
     }
     const rua = document.getElementById('campo-rua');
@@ -723,8 +734,14 @@ async function buscarCEP() {
     feedback.textContent = '✅ Endereço encontrado — confira e edite se necessário.';
     document.getElementById('campo-numero')?.focus();
   } catch(e) {
-    feedback.style.color = '#ef4444';
-    feedback.textContent = '❌ Erro ao buscar CEP. Tente novamente.';
+    // Se o ViaCEP estiver fora do ar, não trava quem é de Santa Maria
+    if (ehSantaMaria) {
+      feedback.style.color = 'var(--text-muted)';
+      feedback.textContent = 'CEP de Santa Maria ✅ — preencha a rua e o bairro abaixo.';
+    } else {
+      feedback.style.color = '#ef4444';
+      feedback.textContent = '❌ Erro ao buscar CEP. Tente novamente.';
+    }
   }
 }
 
