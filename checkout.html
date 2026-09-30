@@ -1006,7 +1006,8 @@ async function finalizarPedido() {
     preco: item.price,
     quantidade: item.qty,
     emoji: item.emoji || '📦',
-    ...(item.cor ? { cor: item.cor } : {})
+    ...(item.cor ? { cor: item.cor } : {}),
+    ...(item.variacao_id ? { variacao_id: item.variacao_id } : {})
   }));
 
   // Instrução de ausência

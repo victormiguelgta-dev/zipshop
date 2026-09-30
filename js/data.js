@@ -7,6 +7,26 @@ import { supabase } from './supabase-config.js';
 let PRODUCTS = [];
 let CATEGORIES = [];
 
+// Variações/kits (produtos.variacoes): cada uma com preço e estoque próprios.
+// preco vazio = preço do produto; estoque vazio = sem controle.
+function variacoesDe(p) {
+  return (Array.isArray(p?.variacoes) ? p.variacoes : []).filter(v => v && v.id && v.nome);
+}
+function precoVariacao(p, v) {
+  const n = parseFloat(v?.preco);
+  return isNaN(n) || n <= 0 ? parseFloat(p.precoBase ?? p.price) : n;
+}
+function variacaoDisponivel(v) {
+  return v.estoque === null || v.estoque === undefined || v.estoque === '' || Number(v.estoque) > 0;
+}
+// Com variações, o card mostra o menor preço ("a partir de")
+function comPrecoDasVariacoes(p) {
+  const vars = variacoesDe(p);
+  if (!vars.length) return p;
+  const precos = vars.map(v => precoVariacao(p, v));
+  return { ...p, precoBase: p.price, price: Math.min(...precos), temVariacoes: true };
+}
+
 // Busca produtos do Supabase
 async function loadProducts() {
   if (PRODUCTS.length > 0) return PRODUCTS; // já carregou
@@ -27,7 +47,7 @@ async function loadProducts() {
   // cores, garantia, relacionados_ids e outros campos configurados no
   // admin nunca chegavam até a página do produto. Agora mantém tudo
   // (...p) e só sobrescreve os campos que precisam de conversão.
-  PRODUCTS = data.map(p => ({
+  PRODUCTS = data.map(p => comPrecoDasVariacoes({
     ...p,
     price: parseFloat(p.price),
     oldPrice: p.old_price ? parseFloat(p.old_price) : null,
@@ -64,7 +84,7 @@ async function getProduct(id) {
   // CORREÇÃO: mesmo problema do loadProducts — mantém todos os campos
   // (...data) em vez de uma lista fixa, senão cores/garantia/relacionados
   // ficam sempre undefined nessa página.
-  return {
+  return comPrecoDasVariacoes({
     ...data,
     price: parseFloat(data.price),
     oldPrice: data.old_price ? parseFloat(data.old_price) : null,
@@ -76,7 +96,7 @@ async function getProduct(id) {
     image_url: data.image_url || null,
     desc: data.description || '',
     specs: data.specs || {}
-  };
+  });
 }
 
 function formatPrice(v) {
@@ -107,7 +127,10 @@ async function loadSinonimos() {
 
 // Produto esgotado: só quando o estoque é controlado (stock preenchido) e chegou a 0.
 // Mesma regra usada em produto.html. stock vazio = sem controle de estoque.
+// Com variações: esgotado só quando nenhuma variação tem estoque.
 function estaEsgotado(p) {
+  const vars = variacoesDe(p);
+  if (vars.length) return !vars.some(variacaoDisponivel);
   return p.stock !== null && p.stock !== undefined && p.stock <= 0;
 }
 
@@ -116,4 +139,4 @@ function esgotadosNoFim(lista) {
   return [...lista].sort((a, b) => estaEsgotado(a) - estaEsgotado(b));
 }
 
-export { loadProducts, getProduct, formatPrice, starsHTML, loadSinonimos, estaEsgotado, esgotadosNoFim, PRODUCTS, CATEGORIES };
+export { variacoesDe, precoVariacao, variacaoDisponivel, loadProducts, getProduct, formatPrice, starsHTML, loadSinonimos, estaEsgotado, esgotadosNoFim, PRODUCTS, CATEGORIES };

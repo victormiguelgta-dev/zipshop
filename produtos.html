@@ -212,7 +212,7 @@ window.applyFilters = () => {
           ${p.reviews ? `<span class="product-sold">${p.reviews >= 1000 ? (p.reviews/1000).toFixed(1)+'mil' : p.reviews}+ vendido(s)</span>` : ''}
         </div>
         ${p.oldPrice ? `<div class="product-price-old">${formatPrice(p.oldPrice)}</div>` : ''}
-        <div class="product-price">${formatPrice(p.price)}</div>
+        <div class="product-price">${p.temVariacoes ? '<span style="font-size:11px;font-weight:600;color:var(--text-muted)">a partir de </span>' : ''}${formatPrice(p.price)}</div>
         <div class="product-installment">ou 10x de ${formatPrice(p.price/10)}</div>
       </div>
       <div class="product-card-footer">

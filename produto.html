@@ -34,13 +34,14 @@ function esc(str) {
 }
 
 import { supabase } from './js/supabase-config.js';
-import { getProduct, formatPrice, starsHTML } from './js/data.js';
+import { getProduct, formatPrice, starsHTML, variacoesDe, precoVariacao, variacaoDisponivel } from './js/data.js';
 import { getFavoritosIds, toggleFavorito } from './js/favoritos.js';
 import { registrarEvento } from './js/analytics.js';
 
 const id = new URLSearchParams(location.search).get('id');
 let qty = 1;
 let _corSelecionada = null;
+let _variacaoSelecionada = null;
 
 async function render() {
   const p = await getProduct(id);
@@ -85,8 +86,10 @@ async function render() {
         </button>`).join('')}
     </div>` : '';
 
-  const temControleEstoque = p.stock !== null && p.stock !== undefined;
-  const semEstoque = temControleEstoque && p.stock <= 0;
+  // Variações/kits com preço e estoque próprios: substituem as cores
+  const variacoes = variacoesDe(p);
+  const temControleEstoque = !variacoes.length && p.stock !== null && p.stock !== undefined;
+  const semEstoque = variacoes.length ? !variacoes.some(variacaoDisponivel) : (temControleEstoque && p.stock <= 0);
   let estoqueHTML = '';
   if (semEstoque) {
     estoqueHTML = `<p style="font-size:13px;color:#ef4444;font-weight:700;margin-bottom:16px">❌ Fora de estoque no momento</p>`;
@@ -96,7 +99,22 @@ async function render() {
     estoqueHTML = `<div style="margin-bottom:16px"></div>`;
   }
 
-  const coresHTML = cores.length ? `
+  const variacoesHTML = variacoes.length ? `
+    <div style="margin-bottom:20px">
+      <div class="detail-label" style="margin-bottom:8px">Opção</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap" id="variacoes-container">
+        ${variacoes.map((v, i) => {
+          const disp = variacaoDisponivel(v);
+          return `<button type="button" onclick="selecionarVariacao(${i})" id="var-${i}" ${disp ? '' : 'disabled'}
+            style="display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:8px 14px;border:2px solid var(--border);border-radius:12px;background:none;cursor:${disp ? 'pointer' : 'not-allowed'};font-size:13px;color:var(--text);transition:border-color .2s;${disp ? '' : 'opacity:.45;text-decoration:line-through'}">
+            <span style="font-weight:700">${esc(v.nome)}</span>
+            <span style="font-size:12px;color:var(--text-muted)">${formatPrice(precoVariacao(p, v))}${disp ? '' : ' · esgotado'}</span>
+          </button>`;
+        }).join('')}
+      </div>
+    </div>` : '';
+
+  const coresHTML = !variacoes.length && cores.length ? `
     <div style="margin-bottom:20px">
       <div class="detail-label" style="margin-bottom:8px">Cor</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap" id="cores-container">
@@ -138,8 +156,8 @@ async function render() {
           ${p.discount ? `<span class="badge badge-red">-${p.discount}%</span>` : ''}
         </div>
         ${p.oldPrice ? `<div class="detail-price-old">${formatPrice(p.oldPrice)}</div>` : ''}
-        <div class="detail-price">${formatPrice(p.price)}</div>
-        <div class="detail-installment">ou 12x de ${formatPrice(p.price/12)} sem juros</div>
+        <div class="detail-price" id="detail-price">${variacoes.length ? '<span style="font-size:14px;font-weight:600;color:var(--text-muted)">a partir de </span>' : ''}${formatPrice(p.price)}</div>
+        <div class="detail-installment" id="detail-installment">ou 12x de ${formatPrice(p.price/12)} sem juros</div>
         ${p.cashback_percentual > 0 ? `<div style="display:inline-flex;align-items:center;gap:6px;background:rgba(170,239,0,0.12);border:1px solid var(--primary);color:var(--primary);font-size:12px;font-weight:700;padding:5px 10px;border-radius:20px;margin-top:8px">💰 Receba ${formatPrice(p.price * p.cashback_percentual / 100)} de volta em saldo</div>` : ''}
         ${p.indicacao_percentual > 0 ? `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px">
           <span style="display:inline-flex;align-items:center;gap:6px;background:rgba(170,239,0,0.12);border:1px solid var(--primary);color:var(--primary);font-size:12px;font-weight:700;padding:5px 10px;border-radius:20px">🤝 Indique e ganhe ${formatPrice(p.price * p.indicacao_percentual / 100)} por venda</span>
@@ -150,6 +168,7 @@ async function render() {
           ⚡ <strong>Entrega amanhã</strong> — Peça em até 3h para garantir.
         </div>
 
+        ${variacoesHTML}
         ${coresHTML}
 
         <div class="detail-label">Quantidade</div>
@@ -158,10 +177,10 @@ async function render() {
           <span class="qty-num" id="qty-display">1</span>
           <button class="qty-btn" onclick="changeQty(1)">+</button>
         </div>
-        ${estoqueHTML}
+        <div id="estoque-info">${estoqueHTML}</div>
         <div style="display:flex;gap:12px;margin-bottom:24px;flex-wrap:wrap">
           <button class="btn btn-primary btn-lg" style="flex:1" onclick="doAddToCart(event)" ${semEstoque ? 'disabled style="opacity:.5;cursor:not-allowed"' : ''}>🛒 Adicionar ao Carrinho</button>
-          <a href="carrinho.html" class="btn btn-outline btn-lg" onclick="${semEstoque ? 'event.preventDefault()' : 'doAddToCart(event)'}" ${semEstoque ? 'style="opacity:.5;cursor:not-allowed;pointer-events:none"' : ''}>⚡ Comprar Agora</a>
+          <a href="carrinho.html" class="btn btn-outline btn-lg" onclick="${semEstoque ? 'event.preventDefault()' : 'if (!doAddToCart(event)) event.preventDefault()'}" ${semEstoque ? 'style="opacity:.5;cursor:not-allowed;pointer-events:none"' : ''}>⚡ Comprar Agora</a>
           <button id="btn-fav-detalhe" onclick="toggleFavoritoDetalhe(${p.id})" class="btn btn-outline btn-lg" style="width:52px;flex:0" aria-label="Favoritar">🤍</button>
         </div>
         <div style="display:flex;gap:16px;flex-wrap:wrap">
@@ -255,6 +274,24 @@ window.fecharImagemCheia = function() {
   document.body.style.overflow = '';
 };
 
+window.selecionarVariacao = function(i) {
+  const p = window._produto;
+  const v = variacoesDe(p)[i];
+  if (!v || !variacaoDisponivel(v)) return;
+  _variacaoSelecionada = v;
+  document.querySelectorAll('#variacoes-container button').forEach((b, j) => {
+    b.style.borderColor = j === i ? 'var(--primary)' : 'var(--border)';
+  });
+  const preco = precoVariacao(p, v);
+  document.getElementById('detail-price').textContent = formatPrice(preco);
+  document.getElementById('detail-installment').textContent = `ou 12x de ${formatPrice(preco / 12)} sem juros`;
+  const est = (v.estoque === null || v.estoque === undefined || v.estoque === '') ? null : Number(v.estoque);
+  document.getElementById('estoque-info').innerHTML = est !== null && est <= 5
+    ? `<p style="font-size:13px;color:#f59e0b;font-weight:700;margin-bottom:16px">⚠️ Últimas ${est} unidades dessa opção!</p>`
+    : '<div style="margin-bottom:16px"></div>';
+  if (est !== null && qty > est) { qty = Math.max(1, est); document.getElementById('qty-display').textContent = qty; }
+};
+
 window.selecionarCor = function(nome, btn) {
   _corSelecionada = nome;
   document.querySelectorAll('#cores-container button').forEach(b => {
@@ -266,11 +303,11 @@ window.selecionarCor = function(nome, btn) {
 };
 
 function avisarEscolherCor() {
-  const box = document.getElementById('cores-container');
+  const box = document.getElementById('variacoes-container') || document.getElementById('cores-container');
   if (!box) return;
-  showToast('Escolha a cor antes de adicionar ao carrinho', 'error');
+  showToast(box.id === 'variacoes-container' ? 'Escolha uma opção antes de adicionar ao carrinho' : 'Escolha a cor antes de adicionar ao carrinho', 'error');
   box.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  box.querySelectorAll('button').forEach(b => { b.style.borderColor = '#ef4444'; });
+  box.querySelectorAll('button:not([disabled])').forEach(b => { b.style.borderColor = '#ef4444'; });
 }
 
 // ——— AVALIAÇÕES ———
@@ -606,24 +643,33 @@ window.compartilharIndicacao = async function(btn) {
 };
 
 window.changeQty = function(dir) {
-  const max = (window._produto?.stock !== null && window._produto?.stock !== undefined) ? window._produto.stock : Infinity;
+  const v = _variacaoSelecionada;
+  const estoque = v ? v.estoque : window._produto?.stock;
+  const max = (estoque !== null && estoque !== undefined && estoque !== '') ? Number(estoque) : Infinity;
   qty = Math.max(1, Math.min(qty + dir, max || 1));
   document.getElementById('qty-display').textContent = qty;
 };
 
+// Devolve true se colocou no carrinho (o "Comprar Agora" só segue pro carrinho nesse caso)
 window.doAddToCart = function(event) {
-  if (window._produto) {
-    // Produto com cores: o cliente precisa escolher antes, senão a loja
-    // não sabe qual cor mandar
-    if (!_corSelecionada && document.getElementById('cores-container')) {
-      avisarEscolherCor();
-      return;
-    }
-    const prodComCor = _corSelecionada
-      ? { ...window._produto, name: window._produto.name + ' — ' + _corSelecionada, cor: _corSelecionada }
-      : window._produto;
-    addToCart(prodComCor.id, qty, prodComCor, event);
+  const p = window._produto;
+  if (!p) return false;
+  const temVariacoes = !!document.getElementById('variacoes-container');
+  // Produto com opções (variação/kit ou cor): o cliente precisa escolher,
+  // senão a loja não sabe o que mandar
+  if ((temVariacoes && !_variacaoSelecionada) || (!temVariacoes && !_corSelecionada && document.getElementById('cores-container'))) {
+    avisarEscolherCor();
+    return false;
   }
+  let dados = p;
+  if (_variacaoSelecionada) {
+    const v = _variacaoSelecionada;
+    dados = { ...p, price: precoVariacao(p, v), name: p.name + ' — ' + v.nome, variacao_id: v.id };
+  } else if (_corSelecionada) {
+    dados = { ...p, name: p.name + ' — ' + _corSelecionada, cor: _corSelecionada };
+  }
+  addToCart(dados.id, qty, dados, event);
+  return true;
 };
 
 window.showTab = function(tab) {

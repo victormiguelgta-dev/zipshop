@@ -92,24 +92,27 @@ function cartItemImgHTML(item, tamanho = 80) {
 // Cada linha do carrinho é produto + variação (cor). Duas cores do mesmo
 // produto ficam em linhas separadas em vez de somar numa só.
 function chaveItem(item) {
+  if (item.variacao_id) return `${item.id}|v:${item.variacao_id}`;
   return item.cor ? `${item.id}|${item.cor}` : String(item.id);
 }
 
-// O produto tem cores cadastradas? (mesmo filtro da página do produto)
-function temCores(p) {
-  return Array.isArray(p?.cores) && p.cores.some(c => String(c?.nome || '').replace(/[\s:—–-]+$/, ''));
+// O cliente precisa escolher algo na página do produto? (variação/kit ou cor)
+function precisaEscolherOpcao(p) {
+  if (Array.isArray(p?.variacoes) && p.variacoes.some(v => v && v.id && v.nome)) return !p.variacao_id;
+  const temCores = Array.isArray(p?.cores) && p.cores.some(c => String(c?.nome || '').replace(/[\s:—–-]+$/, ''));
+  return temCores && !p.cor;
 }
 
 function addToCart(productId, qty = 1, productData = null, event = null) {
   // Botão "Adicionar" dos cards não tem como escolher a cor: manda pra
   // página do produto, onde o cliente escolhe
-  if (temCores(productData) && !productData.cor) {
-    showToast('Escolha a cor do produto', 'info');
+  if (precisaEscolherOpcao(productData)) {
+    showToast('Escolha a opção do produto', 'info');
     setTimeout(() => { window.location.href = `produto.html?id=${encodeURIComponent(productId)}`; }, 600);
     return;
   }
   const cart = getCart();
-  const chave = chaveItem({ id: productId, cor: productData?.cor });
+  const chave = chaveItem({ id: productId, cor: productData?.cor, variacao_id: productData?.variacao_id });
   const existing = cart.find(i => chaveItem(i) === chave);
   if (existing) {
     existing.qty += qty;
@@ -124,6 +127,7 @@ function addToCart(productId, qty = 1, productData = null, event = null) {
   } else {
     const item = { id: productId, qty };
     if (productData?.cor) item.cor = productData.cor;
+    if (productData?.variacao_id) item.variacao_id = productData.variacao_id;
     if (productData) {
       item.price = productData.price;
       item.name  = productData.name;

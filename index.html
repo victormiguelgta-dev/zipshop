@@ -231,7 +231,7 @@ function productCardHTML(p) {
         ${p.reviews ? `<span class="product-sold">${p.reviews >= 1000 ? (p.reviews/1000).toFixed(1)+'mil' : p.reviews}+ vendido(s)</span>` : ''}
       </div>
       ${p.oldPrice ? `<div class="product-price-old">${formatPrice(p.oldPrice)}</div>` : ''}
-      <div class="product-price">${formatPrice(p.price)}</div>
+      <div class="product-price">${p.temVariacoes ? '<span style="font-size:11px;font-weight:600;color:var(--text-muted)">a partir de </span>' : ''}${formatPrice(p.price)}</div>
       <div class="product-installment">ou 10x de ${formatPrice(p.price/10)}</div>
       <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px">
         ${p.frete_gratis ? '<span style="font-size:10px;background:#1a3a1a;color:#4ade80;padding:2px 6px;border-radius:4px;font-weight:700">🚚 Frete Grátis</span>' : ''}
