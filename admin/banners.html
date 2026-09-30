@@ -162,6 +162,25 @@
     <div class="form-group">
       <label class="form-label">Link (ao clicar no banner)</label>
       <input type="text" class="form-input" id="edit-link" placeholder="Ex: produto.html?id=1 ou https://...">
+      <p style="font-size:11px;color:var(--text-muted);margin-top:4px">O banner inteiro é clicável e leva pra esse link (o botão também).</p>
+    </div>
+
+    <div class="form-group">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+        <input type="checkbox" id="edit-mostrar-botao" checked style="width:16px;height:16px;accent-color:var(--primary)" onchange="document.getElementById('grupo-texto-botao').hidden = !this.checked">
+        <span style="font-size:13px;font-weight:600">Mostrar botão no banner</span>
+      </label>
+      <div id="grupo-texto-botao" style="margin-top:8px">
+        <input type="text" class="form-input" id="edit-texto-botao" maxlength="30" placeholder="Texto do botão (padrão: Ver Produtos)">
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+        <input type="checkbox" id="edit-escurecer" style="width:16px;height:16px;accent-color:var(--primary)">
+        <span style="font-size:13px;font-weight:600">Escurecer a imagem atrás do texto</span>
+      </label>
+      <p style="font-size:11px;color:var(--text-muted);margin-top:4px">Use quando o título/subtítulo daqui ficar difícil de ler em cima da foto. Banner com o texto já na arte não precisa.</p>
     </div>
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
@@ -207,8 +226,11 @@ document.getElementById('btn-logout').addEventListener('click', async (e) => {
 
 window.previewFoto = async function(input) {
   const original = input.files[0];
+  input.value = '';
   if (!original) return;
-  fotoFile = await comprimirImagem(original);
+  const recortada = await recortarImagem(original, { ...PRESET_IMAGEM.banner, titulo: 'Ajustar banner' });
+  if (!recortada) return;
+  fotoFile = recortada;
   const reader = new FileReader();
   reader.onload = e => {
     const preview = document.getElementById('foto-preview');
@@ -278,6 +300,10 @@ window.abrirModal = function() {
   document.getElementById('edit-subtitulo').value = '';
   document.getElementById('edit-ordem').value = '1';
   document.getElementById('edit-ativo').checked = true;
+  document.getElementById('edit-mostrar-botao').checked = true;
+  document.getElementById('edit-texto-botao').value = '';
+  document.getElementById('grupo-texto-botao').hidden = false;
+  document.getElementById('edit-escurecer').checked = false;
   document.getElementById('foto-preview').innerHTML = '<span style="color:var(--text-muted);font-size:13px">📷 Clique para escolher imagem</span>';
   fotoFile = null;
   document.getElementById('modal').style.display = 'block';
@@ -298,6 +324,10 @@ window.openEdit = async function(id) {
   document.getElementById('edit-subtitulo').value = b.subtitulo || '';
   document.getElementById('edit-ordem').value = b.ordem || 1;
   document.getElementById('edit-ativo').checked = b.ativo;
+  document.getElementById('edit-mostrar-botao').checked = b.mostrar_botao !== false;
+  document.getElementById('edit-texto-botao').value = b.texto_botao && b.texto_botao !== 'Ver Produtos' ? b.texto_botao : '';
+  document.getElementById('grupo-texto-botao').hidden = b.mostrar_botao === false;
+  document.getElementById('edit-escurecer').checked = b.escurecer === true;
   const preview = document.getElementById('foto-preview');
   preview.innerHTML = b.image_url
     ? `<img src="${b.image_url}" style="width:100%;height:100%;object-fit:cover">`
@@ -322,6 +352,9 @@ window.salvarBanner = async function() {
     subtitulo: document.getElementById('edit-subtitulo').value.trim(),
     ordem: parseInt(document.getElementById('edit-ordem').value) || 1,
     ativo: document.getElementById('edit-ativo').checked,
+    mostrar_botao: document.getElementById('edit-mostrar-botao').checked,
+    texto_botao: document.getElementById('edit-texto-botao').value.trim() || 'Ver Produtos',
+    escurecer: document.getElementById('edit-escurecer').checked,
     ...(imageUrl ? { image_url: imageUrl } : {})
   };
 

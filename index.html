@@ -57,23 +57,30 @@ function linkSeguro(url, padrao) {
 }
 
 function heroHTML(banners) {
-  return banners.map((b, i) => `
+  return banners.map((b, i) => {
+    const link = linkSeguro(b.link_cat || b.link, 'produtos.html');
+    // colunas novas (_interno/sql-banners-opcoes.sql); sem elas, vale o padrão
+    const mostrarBotao = b.mostrar_botao !== false;
+    const textoBotao = (b.texto_botao || '').trim() || 'Ver Produtos';
+    return `
     <div class="hero-slide ${i === 0 ? 'active' : ''}" id="slide-${i}">
       <div class="hero-img-box">
+        <!-- O banner inteiro é clicável -->
+        <a href="${esc(link)}" class="hero-link-total" aria-label="${esc(b.titulo || textoBotao)}"></a>
         ${b.image_url
           ? `<img src="${esc(b.image_url)}" alt="" decoding="async" ${i === 0 ? 'fetchpriority="high"' : 'fetchpriority="low"'} style="width:100%;height:100%;object-fit:contain">`
           : `<span style='font-size:80px'>🛍️</span>`}
-        <div class="hero-text-wrap">
+        <div class="hero-text-wrap${b.escurecer === true ? ' escurecer' : ''}">
           ${b.badge ? `<div class="hero-badge">${esc(b.badge)}</div>` : ''}
           ${b.titulo ? `<h1 class="hero-title">${esc(b.titulo).replace(/\r?\n/g, '<br>')}</h1>` : ''}
           ${b.subtitulo ? `<p class="hero-sub">${esc(b.subtitulo)}</p>` : ''}
           ${b.preco ? `<p class="hero-price">${esc(b.preco)}</p>` : ''}
-          <div class="hero-btns">
-            <a href="${esc(linkSeguro(b.link_cat || b.link, 'produtos.html'))}" class="btn btn-primary btn-lg">Ver Produtos</a>
-          </div>
+          ${mostrarBotao ? `<div class="hero-btns">
+            <a href="${esc(link)}" class="btn btn-primary btn-lg">${esc(textoBotao)}</a>
+          </div>` : ''}
         </div>
       </div>
-    </div>`).join('') +
+    </div>`; }).join('') +
     (banners.length > 1 ? `<button class="hero-nav-btn hero-prev" onclick="changeSlide(-1)">&#8249;</button>
      <button class="hero-nav-btn hero-next" onclick="changeSlide(1)">&#8250;</button>` : '') +
     `<div class="hero-dots" id="hero-dots"></div>`;
@@ -240,7 +247,7 @@ function productCardHTML(p) {
     <div class="product-card-footer">
       ${esgotado
         ? '<button class="btn btn-outline btn-full btn-sm" disabled onclick="event.preventDefault()">Sem estoque</button>'
-        : `<button class="btn btn-primary btn-full btn-sm" onclick="event.preventDefault(); addToCart(${p.id}, 1, ${JSON.stringify(p).replace(/"/g, '&quot;')})">🛒 Adicionar</button>`}
+        : `<button class="btn btn-primary btn-full btn-sm" onclick="event.preventDefault(); addToCart(${p.id}, 1, ${JSON.stringify(p).replace(/"/g, '&quot;')}, event)">🛒 Adicionar</button>`}
     </div>
   </a>`;
 }
@@ -292,10 +299,23 @@ if (ofertas.length === 0) featGrid.innerHTML = '<p style="color:var(--text-muted
 const allGrid = document.getElementById('all-grid');
 esgotadosNoFim(PRODUCTS).slice(0, 8).forEach(p => allGrid.innerHTML += productCardHTML(p));
 
-window.handleNewsletter = (e) => {
+// Salva na tabela newsletter_inscritos (_interno/sql-newsletter.sql).
+// Antes só mostrava "Inscrito!" e o e-mail não ia pra lugar nenhum.
+window.handleNewsletter = async (e) => {
   e.preventDefault();
+  const form = e.target;
+  const email = form.querySelector('input[type="email"]').value.trim().toLowerCase();
+  const btn = form.querySelector('button');
+  btn.disabled = true;
+  // Sem .select(): o visitante pode inserir, mas não ler a tabela
+  const { error } = await _sb.from('newsletter_inscritos').insert({ email });
+  btn.disabled = false;
+  if (error && error.code !== '23505') { // 23505 = já inscrito: trata como sucesso
+    showToast('Não foi possível cadastrar. Confira o e-mail e tente de novo.', 'error');
+    return;
+  }
   showToast('Inscrito com sucesso! 🎉', 'success');
-  e.target.reset();
+  form.reset();
 };
 </script>
 
