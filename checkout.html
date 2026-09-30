@@ -144,6 +144,88 @@ function calcDescontoCupom(subtotalComDesconto) {
   return 0;
 }
 
+// ---- Pedido Pix/cartão deixado para trás no Mercado Pago ----
+// Antes: o cliente ia pro MP, desistia e voltava; o pedido Pix ficava
+// pendente segurando estoque/saldo/cupom, e o novo pedido podia falhar.
+async function _clienteSupabase() {
+  const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/+esm');
+  return createClient('https://kkliwdphrdbguclsvxcw.supabase.co', 'sb_publishable_OMXANLsZK98fPWygp8ZHfA_xzSpWgYb');
+}
+
+let _pedidoPendenteCache; // consulta o banco uma vez só, mesmo se o checkout redesenhar
+async function mostrarAvisoPedidoPendente() {
+  let id = null;
+  try { id = localStorage.getItem('zipshop_pedido_mp'); } catch {}
+  if (!id) return;
+  if (_pedidoPendenteCache === undefined) {
+    const sb = await _clienteSupabase();
+    const { data } = await sb.from('pedidos').select('id, status, pagamento, total').eq('id', id).maybeSingle();
+    _pedidoPendenteCache = data || null;
+  }
+  const p = _pedidoPendenteCache;
+  if (!p || p.status !== 'pendente' || !['pix', 'cartao'].includes(p.pagamento)) {
+    localStorage.removeItem('zipshop_pedido_mp');
+    return;
+  }
+  const main = document.getElementById('main-content');
+  if (!main || document.getElementById('aviso-pedido-pendente')) return;
+  const aviso = document.createElement('div');
+  aviso.id = 'aviso-pedido-pendente';
+  aviso.style.cssText = 'max-width:1200px;margin:16px auto 0;padding:0 16px';
+  aviso.innerHTML = `
+    <div style="background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.4);border-radius:12px;padding:16px">
+      <p style="font-weight:700;margin-bottom:4px">⏳ Você tem um pedido aguardando pagamento</p>
+      <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px">Pedido #${esc(p.id.slice(0, 8).toUpperCase())} — ${formatPrice(p.total)} (${p.pagamento === 'pix' ? 'Pix' : 'Cartão'}). Quer pagar esse pedido ou cancelar e escolher outra forma de pagamento?</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button type="button" class="btn btn-primary btn-sm" onclick="pagarPedidoPendente(this)">💳 Pagar esse pedido</button>
+        <button type="button" class="btn btn-outline btn-sm" onclick="cancelarPedidoPendente(this)">Cancelar e trocar pagamento</button>
+      </div>
+    </div>`;
+  main.prepend(aviso);
+}
+
+window.pagarPedidoPendente = async function(btn) {
+  const id = localStorage.getItem('zipshop_pedido_mp');
+  btn.disabled = true; btn.textContent = 'Abrindo pagamento...';
+  try {
+    const sb = await _clienteSupabase();
+    const { data: { session } } = await sb.auth.getSession();
+    const resp = await fetch('/.netlify/functions/criar-pagamento', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (session?.access_token || '') },
+      body: JSON.stringify({ pedidoId: id, email: session?.user?.email })
+    });
+    const dados = await resp.json();
+    if (!resp.ok || dados.erro || !dados.url) throw new Error(dados.erro || 'Não foi possível abrir o pagamento.');
+    window.location.href = dados.url;
+  } catch (err) {
+    btn.disabled = false; btn.textContent = '💳 Pagar esse pedido';
+    showToast(err.message, 'error');
+  }
+};
+
+window.cancelarPedidoPendente = async function(btn) {
+  const id = localStorage.getItem('zipshop_pedido_mp');
+  btn.disabled = true; btn.textContent = 'Cancelando...';
+  const sb = await _clienteSupabase();
+  // Só cancela se AINDA estiver pendente (se foi pago nesse meio tempo, não mexe)
+  const { error } = await sb.from('pedidos').update({ status: 'cancelado' }).eq('id', id).eq('status', 'pendente');
+  if (error) {
+    btn.disabled = false; btn.textContent = 'Cancelar e trocar pagamento';
+    showToast('Não foi possível cancelar. Tente pelo Meus Pedidos.', 'error');
+    return;
+  }
+  localStorage.removeItem('zipshop_pedido_mp');
+  _pedidoPendenteCache = null;
+  document.getElementById('aviso-pedido-pendente')?.remove();
+  showToast('Pedido anterior cancelado. Escolha a forma de pagamento e confirme.', 'success');
+};
+
+// Safari/Chrome guardam a página inteira ao sair pro Mercado Pago. Voltando
+// com o botão "voltar", o botão Confirmar vinha ainda desativado
+// ("Verificando..."), e o checkout parecia travado. Recarrega do zero.
+window.addEventListener('pageshow', (e) => { if (e.persisted) window.location.reload(); });
+
 async function renderCheckout() {
   const cart = getCart();
   const subtotal = getCartTotal();
@@ -196,6 +278,7 @@ async function renderCheckout() {
       <span style="font-weight:700">${formatPrice((item.price||0) * item.qty)}</span>
     </div>`).join('');
 
+  setTimeout(mostrarAvisoPedidoPendente, 0);
   document.getElementById('main-content').innerHTML = `
   <div class="checkout-layout">
     <div>
@@ -352,7 +435,6 @@ async function renderCheckout() {
               <div>
                 <div style="font-weight:700;font-size:14px">Entrega por Rota</div>
                 <div style="font-size:12px;color:var(--text-muted)">Prazo: 24 a 48 horas — Santa Maria</div>
-                <div style="font-size:11px;color:var(--text-muted);margin-top:2px">PIX, cartão ou dinheiro na entrega</div>
               </div>
             </div>
             <div style="text-align:right;font-weight:900;color:var(--primary)">
@@ -366,18 +448,14 @@ async function renderCheckout() {
               <div>
                 <div style="font-weight:700;font-size:14px">Entrega Exclusiva</div>
                 <div style="font-size:12px;color:var(--text-muted)" id="exclusiva-prazo-label">${infoEntregaExclusiva().tituloPrazo}</div>
-                <div style="font-size:11px;color:var(--text-muted);margin-top:2px">PIX, cartão ou dinheiro na entrega</div>
               </div>
             </div>
             <div style="text-align:right;font-weight:900">R$ 9,90</div>
           </div>
         </div>
 
-        <!-- CORREÇÃO BUG 14: aviso de que a entrega não é rastreável -->
-        <p style="font-size:11px;color:var(--text-muted);margin-top:2px">📦 Este é um serviço de entrega local sem rastreamento online — o acompanhamento é feito por telefone/WhatsApp, não existe link ou app de rastreio.</p>
-
         <!-- HORÁRIO (só para rota) -->
-        <div id="bloco-horario" style="margin-top:4px">
+        <div id="bloco-horario" style="margin-top:16px">
           <label class="form-label">Janela de horário preferida</label>
           <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:6px">
             <div onclick="selecionarHorario('08:00-12:00')" id="h1"
@@ -432,8 +510,8 @@ async function renderCheckout() {
       <div class="checkout-step" style="padding:16px">
         <div class="checkout-step-title" style="margin-bottom:12px"><span class="step-num">4</span> Cupom de Desconto</div>
         <div style="display:flex;gap:8px">
-          <input type="text" class="form-input" id="campo-cupom" placeholder="Digite o código do cupom" style="flex:1;text-transform:uppercase" value="${_cupomAplicado?.codigo || ''}">
-          <button onclick="aplicarCupom()" class="btn btn-outline" style="white-space:nowrap;padding:0 16px">Aplicar</button>
+          <input type="text" class="form-input" id="campo-cupom" placeholder="Digite o código do cupom" style="flex:1;min-width:0;text-transform:uppercase;border-color:var(--primary)" value="${_cupomAplicado?.codigo || ''}">
+          <button onclick="aplicarCupom()" class="btn btn-outline" style="white-space:nowrap;flex-shrink:0;padding:0 16px;border-color:var(--primary);color:var(--primary)">Aplicar</button>
         </div>
         <div id="cupom-feedback" style="margin-top:8px;font-size:13px;${_cupomAplicado ? '' : 'display:none'}">${_cupomAplicado ? `✅ Cupom aplicado! ${_cupomAplicado.codigo}` : ''}</div>
         <a href="cupons.html" style="display:block;margin-top:10px;font-size:12px;color:var(--primary);font-weight:700">🎟️ Ver meus cupons disponíveis</a>
@@ -991,6 +1069,8 @@ async function finalizarPedido() {
       const nomeProduto = error.message.split('ESTOQUE_INSUFICIENTE:')[1]?.split('—')[0]?.trim();
       showToast(`😕 Ih, "${nomeProduto || 'um item'}" ficou sem estoque suficiente. Ajusta a quantidade no carrinho.`, 'error');
       setTimeout(() => window.location.href = 'carrinho.html', 2500);
+    } else if (error.message && /Muitos pedidos|aguardando pagamento/.test(error.message)) {
+      showToast(error.message, 'error');
     } else {
       showToast('Erro ao salvar pedido. Tente novamente.', 'error');
     }
@@ -1066,10 +1146,6 @@ async function finalizarPedido() {
             <div class="order-info-value">${pedido.codigo_confirmacao} — informe pro entregador na hora da entrega</div>
           </div>
         </div>
-        <div class="order-info-note">
-          <span>📦</span>
-          <span>Entrega sem rastreamento online — qualquer dúvida, fale pelo WhatsApp.</span>
-        </div>
       </div>
       <p style="font-size:12px;color:var(--text-muted);margin-bottom:24px">Você receberá uma confirmação em breve.</p>
       <div style="display:flex;gap:12px">
@@ -1122,6 +1198,9 @@ async function finalizarPedido() {
     if (mpData.erro) throw new Error(mpData.erro);
     // Não limpa o carrinho aqui — só quando o pagamento for confirmado (tela "aprovado")
     // Isso evita que o cliente fique travado se desistir/voltar do Mercado Pago
+    // Guarda o pedido: se o cliente desistir e voltar, o checkout oferece
+    // pagar esse mesmo pedido ou cancelar e trocar a forma de pagamento.
+    try { localStorage.setItem('zipshop_pedido_mp', pedidoId); } catch {}
     window.location.href = mpData.url;
 
   } catch (err) {
@@ -1143,6 +1222,7 @@ if (statusMP) {
   // Só limpa o carrinho quando o pagamento foi de fato aprovado
   if (statusMP === 'aprovado') {
     clearCart();
+    try { localStorage.removeItem('zipshop_pedido_mp'); } catch {}
   }
 
   let codigoConfirmacao = null;
@@ -1253,7 +1333,7 @@ if (statusMP) {
       document.getElementById('main-content').innerHTML = `
       <div class="success-box" style="text-align:center;padding:48px 24px">
         <div style="font-size:48px;margin-bottom:16px">📋</div>
-        <h1 style="font-size:22px;margin-bottom:12px">Confira seus dados</h1>
+        <h1 style="font-size:22px;margin-bottom:12px;color:var(--primary)">Confira seus dados</h1>
         <p style="color:var(--text-muted);margin-bottom:20px">Esses dados vão junto com o seu pedido. Estão corretos?</p>
         <div style="background:var(--bg-card);border:1px solid var(--primary);border-radius:12px;padding:16px;margin-bottom:24px;text-align:left">
           <p style="font-size:14px;margin-bottom:8px">👤 <strong>Nome:</strong> ${esc(perfilCheck.nome)}</p>

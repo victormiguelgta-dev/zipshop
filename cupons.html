@@ -26,10 +26,10 @@
   <div class="card" style="margin-bottom:20px">
     <div class="card-body">
       <p style="font-weight:700;margin-bottom:10px">Tem um código? Insira aqui:</p>
-      <div style="display:flex;gap:8px">
-        <input type="text" class="form-input" id="input-codigo" placeholder="Ex: FRETE10" style="flex:1;text-transform:uppercase">
-        <button class="btn btn-primary" onclick="verificarCodigo()" style="white-space:nowrap">Verificar</button>
-      </div>
+      <form style="display:flex;gap:8px" onsubmit="event.preventDefault(); verificarCodigo()">
+        <input type="text" class="form-input" id="input-codigo" placeholder="Ex: FRETE10" autocomplete="off" style="flex:1;min-width:0;text-transform:uppercase;border-color:var(--primary)">
+        <button type="submit" class="btn btn-primary" style="white-space:nowrap;flex-shrink:0">Aplicar</button>
+      </form>
       <div id="codigo-feedback" style="display:none;margin-top:8px;font-size:13px"></div>
     </div>
   </div>
@@ -177,8 +177,16 @@ window.verificarCodigo = async function() {
   const desc = cupom.tipo === 'percentual' ? `${cupom.valor}% de desconto`
     : cupom.tipo === 'fixo' ? `R$ ${cupom.valor} de desconto`
     : 'Frete Grátis';
+  // Antes só dizia "Cupom válido" e o cliente achava que o cupom não
+  // tinha sido aplicado. Agora: com produtos no carrinho, já leva pra lá
+  // e o carrinho aplica (lá ele confere pedido mínimo, limite de uso etc.).
+  // Carrinho vazio: fica guardado e é aplicado quando ele abrir o carrinho.
+  const carrinhoTemItens = typeof getCart === 'function' && getCart().length > 0;
   fb.style.color = '#22c55e';
-  fb.innerHTML = `✅ Cupom válido! <strong>${desc}</strong>. <a href="carrinho.html" style="color:var(--primary);font-weight:700">Ir para o carrinho →</a>`;
+  fb.innerHTML = carrinhoTemItens
+    ? `✅ Cupom <strong>${esc(cupom.codigo)}</strong> (${desc}) aplicado! Levando você pro carrinho...`
+    : `✅ Cupom <strong>${esc(cupom.codigo)}</strong> (${desc}) guardado! Ele vai ser aplicado sozinho no carrinho quando você adicionar produtos.`;
+  if (carrinhoTemItens) setTimeout(() => { window.location.href = 'carrinho.html'; }, 1200);
 
   // CORREÇÃO BUG 13: antes o código verificado aqui não era guardado
   // em lugar nenhum — por isso "sumia" quando o cliente ia pro carrinho.
