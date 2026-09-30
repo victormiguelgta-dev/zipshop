@@ -67,7 +67,10 @@ function atualizarPedido(pedidoId, status, pagamentoId) {
   return new Promise((resolve, reject) => {
     const supabaseUrl = process.env.SUPABASE_URL;
     const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
-    const data = JSON.stringify({ status, pagamento_id: String(pagamentoId) });
+    // Só o status: a tabela pedidos não tem coluna pagamento_id, e mandar
+    // uma coluna inexistente fazia o banco recusar a atualização inteira
+    // (o pedido ficava 'pendente' mesmo com o pagamento aprovado).
+    const data = JSON.stringify({ status });
     const url = new URL(`${supabaseUrl}/rest/v1/pedidos?id=eq.${pedidoId}`);
     const options = {
       hostname: url.hostname, path: url.pathname + url.search, method: 'PATCH',
@@ -79,7 +82,13 @@ function atualizarPedido(pedidoId, status, pagamentoId) {
     const req = https.request(options, (res) => {
       let body = '';
       res.on('data', chunk => body += chunk);
-      res.on('end', () => resolve(body));
+      res.on('end', () => {
+        if (res.statusCode >= 300) {
+          console.error(`Falha ao atualizar pedido ${pedidoId} (pagamento ${pagamentoId}): HTTP ${res.statusCode}`);
+          return reject(new Error('falha ao atualizar pedido'));
+        }
+        resolve(body);
+      });
     });
     req.on('error', reject);
     req.write(data);
