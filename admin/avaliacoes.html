@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Avaliações Admin — Zipshop</title>
+  <link rel="stylesheet" href="../css/style.css">
+
+<style>
+.admin-mobile-bar {
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 200;
+}
+.admin-hamburger {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 20px;
+  width: 38px;
+  height: 38px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.admin-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 299;
+}
+.admin-overlay.active { display: block; }
+@media (max-width: 900px) {
+  .admin-mobile-bar { display: flex; }
+  .admin-sidebar {
+    display: flex !important;
+    position: fixed;
+    top: 0;
+    left: -260px;
+    height: 100vh;
+    width: 240px;
+    z-index: 300;
+    transition: left 0.25s ease;
+    overflow-y: auto;
+  }
+  .admin-sidebar.admin-sidebar-open { left: 0; }
+}
+</style>
+</head>
+<body>
+<div class="admin-layout">
+  <aside class="admin-sidebar">
+    <div class="admin-sidebar-logo">
+      <div class="logo"><img src="../img/logo-icon.jpeg" style="width:32px;height:32px" onerror="this.style.display='none'"><span class="logo-text"><span>ZIP</span><span>SHOP</span></span></div>
+      <div class="admin-sidebar-subtitle">Painel Administrativo</div>
+    </div>
+    <nav class="admin-nav">
+      <a href="index.html" class="admin-nav-item">📊 Dashboard</a>
+      <a href="produtos.html" class="admin-nav-item">📦 Produtos</a>
+      <a href="importar.html" class="admin-nav-item">✨ Cadastrar com IA</a>
+      <a href="pedidos.html" class="admin-nav-item">🛒 Pedidos</a>
+      <a href="clientes.html" class="admin-nav-item">👥 Clientes</a>
+      <a href="categorias.html" class="admin-nav-item">🏷️ Categorias</a>
+      <a href="banners.html" class="admin-nav-item">🖼️ Banners</a>
+      <a href="textos.html" class="admin-nav-item">📝 Textos do Site</a>
+      <a href="cupons.html" class="admin-nav-item">🎟️ Cupons</a>
+      <a href="devolucoes.html" class="admin-nav-item">↩️ Devoluções</a>
+      <a href="avaliacoes.html" class="admin-nav-item active">⭐ Avaliações</a>
+      <a href="analytics.html" class="admin-nav-item">📈 Analytics</a>
+    </nav>
+    <div style="padding:16px;border-top:1px solid var(--border)">
+      <a href="../index.html" class="admin-nav-item" style="color:var(--text-muted)">🏪 Ver Loja</a>
+      <a href="#" id="btn-logout" class="admin-nav-item" style="color:#e53e3e">🚪 Sair</a>
+    </div>
+  </aside>
+
+  <main class="admin-main">
+  <div class="admin-mobile-bar">
+    <button class="admin-hamburger" onclick="toggleAdminMenu()" id="admin-hamburger-btn">☰</button>
+    <div class="logo" style="display:flex;align-items:center;gap:8px">
+      <img src="../img/logo-icon.jpeg" alt="Zipshop" class="logo-img" style="width:28px;height:28px" onerror="this.style.display='none'">
+      <span class="logo-text"><span>ZIP</span><span>SHOP</span></span>
+    </div>
+    <span style="font-size:11px;color:var(--text-muted)">Admin</span>
+  </div>
+  <div class="admin-overlay" id="admin-overlay" onclick="toggleAdminMenu()"></div>
+
+    <h1 class="admin-page-title">Avaliações</h1>
+    <p class="admin-page-sub">Aprove ou reprove as avaliações antes de aparecerem no site. O bônus de saldo do cliente sai na aprovação.</p>
+
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-body" style="display:flex;gap:12px;flex-wrap:wrap">
+        <select class="form-input" id="filtro-status" style="width:100%;max-width:220px" onchange="carregar()">
+          <option value="pendente">Aguardando aprovação</option>
+          <option value="aprovada">Aprovadas</option>
+          <option value="reprovada">Reprovadas</option>
+          <option value="">Todas</option>
+        </select>
+      </div>
+    </div>
+
+    <div id="lista-avaliacoes">
+      <p style="text-align:center;padding:40px;color:var(--text-muted)">Carregando...</p>
+    </div>
+  </main>
+</div>
+
+<script type="module">
+import { isAdmin, supabase } from '../js/admin-guard.js';
+if (!isAdmin) throw new Error('not admin');
+
+function esc(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+}
+function formatDate(d) { return new Date(d).toLocaleDateString('pt-BR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' }); }
+
+// Mesma regra do banco (creditar_bonus_avaliacao): só pra mostrar ao admin
+const MIN_CARACTERES = 100;
+function bonusPrevisto(a) {
+  const completo = (a.texto || '').trim().length >= MIN_CARACTERES && (a.fotos || []).length >= 1 && (a.videos || []).length >= 1;
+  return completo ? 'R$ 1,00' : 'R$ 0,50';
+}
+
+const badges = { pendente: 'badge-yellow', aprovada: 'badge-green', reprovada: 'badge-red' };
+const labels = { pendente: 'Aguardando', aprovada: 'Aprovada', reprovada: 'Reprovada' };
+let avaliacoes = [];
+
+window.carregar = async function() {
+  const status = document.getElementById('filtro-status').value;
+  let q = supabase.from('avaliacoes')
+    .select('*, usuarios(nome, email), produtos(id, name, image_thumb_url, image_url)')
+    .order('created_at', { ascending: false })
+    .limit(200);
+  if (status) q = q.eq('status', status);
+  const { data, error } = await q;
+  if (error) {
+    document.getElementById('lista-avaliacoes').innerHTML = `<p style="text-align:center;padding:40px;color:#ef4444">Erro ao carregar: ${esc(error.message)}</p>`;
+    return;
+  }
+  avaliacoes = data || [];
+  render();
+};
+
+function render() {
+  const el = document.getElementById('lista-avaliacoes');
+  if (!avaliacoes.length) {
+    el.innerHTML = '<p style="text-align:center;padding:40px;color:var(--text-muted)">Nenhuma avaliação aqui.</p>';
+    return;
+  }
+  el.innerHTML = avaliacoes.map(a => {
+    const fotos = (a.fotos || []).map(u => `<a href="${esc(u)}" target="_blank" rel="noopener"><img src="${esc(u)}" loading="lazy" style="width:90px;height:90px;object-fit:cover;border-radius:8px;border:1px solid var(--border)"></a>`).join('');
+    const videos = (a.videos || []).map(u => `<video src="${esc(u)}" controls preload="metadata" playsinline style="width:220px;max-width:100%;height:160px;border-radius:8px;background:#000"></video>`).join('');
+    const foto = a.produtos?.image_thumb_url || a.produtos?.image_url;
+    return `
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-body">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:10px">
+          <a href="../produto.html?id=${a.produtos?.id || a.produto_id}" target="_blank" style="display:flex;gap:10px;align-items:center;text-decoration:none;color:var(--text);min-width:0">
+            ${foto ? `<img src="${esc(foto)}" style="width:44px;height:44px;object-fit:cover;border-radius:8px;background:#fff;flex-shrink:0">` : ''}
+            <div style="min-width:0">
+              <p style="font-weight:700;font-size:14px;overflow-wrap:anywhere">${esc(a.produtos?.name || 'Produto #' + a.produto_id)}</p>
+              <p style="font-size:12px;color:var(--text-muted)">${esc(a.usuarios?.nome || 'Cliente')} · ${esc(a.usuarios?.email || '')} · ${formatDate(a.created_at)}</p>
+            </div>
+          </a>
+          <span class="badge ${badges[a.status] || 'badge-muted'}">${labels[a.status] || esc(a.status)}</span>
+        </div>
+        <p style="color:#facc15;font-size:18px;margin-bottom:6px">${'★'.repeat(a.nota)}${'☆'.repeat(5 - a.nota)}</p>
+        ${a.texto ? `<p style="font-size:14px;line-height:1.6;margin-bottom:8px;white-space:pre-wrap">${esc(a.texto)}</p>` : '<p style="font-size:13px;color:var(--text-muted);margin-bottom:8px">(sem texto)</p>'}
+        ${fotos || videos ? `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">${fotos}${videos}</div>` : ''}
+        <p style="font-size:12px;color:var(--text-muted)">${(a.texto || '').trim().length} caracteres · ${(a.fotos || []).length} foto(s) · ${(a.videos || []).length} vídeo(s) · bônus ao aprovar: <strong style="color:var(--primary)">${bonusPrevisto(a)}</strong></p>
+        ${a.status === 'reprovada' && a.motivo_reprovacao ? `<p style="font-size:12px;color:#ef4444;margin-top:6px">Motivo: ${esc(a.motivo_reprovacao)}</p>` : ''}
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
+          ${a.status !== 'aprovada' ? `<button onclick="moderar('${a.id}', 'aprovada')" class="btn btn-primary btn-sm">✅ Aprovar</button>` : ''}
+          ${a.status !== 'reprovada' ? `<button onclick="moderar('${a.id}', 'reprovada')" class="btn btn-sm" style="background:#fee2e2;color:#b91c1c;border:none">❌ Reprovar</button>` : ''}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+window.moderar = async function(id, status) {
+  const dados = { status };
+  if (status === 'reprovada') {
+    const motivo = prompt('Motivo da reprovação (o cliente vai ver e pode reenviar). Pode deixar em branco:');
+    if (motivo === null) return;
+    dados.motivo_reprovacao = motivo.trim().slice(0, 300) || null;
+  } else {
+    dados.motivo_reprovacao = null;
+  }
+  const { error } = await supabase.from('avaliacoes').update(dados).eq('id', id);
+  if (error) { alert('Erro: ' + error.message); return; }
+  carregar();
+};
+
+document.getElementById('btn-logout').addEventListener('click', async (e) => {
+  e.preventDefault();
+  await supabase.auth.signOut();
+  window.location.href = '../login.html';
+});
+
+carregar();
+</script>
+<script>
+function toggleAdminMenu() {
+  const sidebar = document.querySelector('.admin-sidebar');
+  const overlay = document.getElementById('admin-overlay');
+  const open = sidebar.classList.toggle('admin-sidebar-open');
+  overlay.classList.toggle('active', open);
+}
+</script>
+</body>
+</html>

@@ -20,6 +20,7 @@
 <div id="footer"></div>
 
 <script src="js/cart.js"></script>
+<script src="js/imagem.js"></script>
 <script src="js/main.js"></script>
 <script type="module">
 function esc(str) {
@@ -273,6 +274,46 @@ function avisarEscolherCor() {
 }
 
 // ——— AVALIAÇÕES ———
+// Fotos/vídeos vão pro bucket 'avaliacoes' e toda avaliação passa pela
+// aprovação do admin antes de aparecer (_interno/sql-avaliacoes-midia-aprovacao.sql).
+// Bônus sai na aprovação: R$ 1,00 com 100+ caracteres, 1 foto e 1 vídeo; senão R$ 0,50.
+const AV_MIN_CARACTERES = 100;
+const AV_MAX_FOTOS = 5;
+const AV_MAX_VIDEO_MB = 50;
+let _avFotos = [];      // File[] novos
+let _avVideo = null;    // File novo
+let _avExistente = null; // avaliação do próprio cliente (pra editar)
+
+function midiaAvaliacaoHTML(a) {
+  const fotos = (a.fotos || []).map(u => `<a href="${esc(u)}" target="_blank" rel="noopener"><img src="${esc(u)}" loading="lazy" alt="Foto da avaliação" style="width:72px;height:72px;object-fit:cover;border-radius:8px;border:1px solid var(--border)"></a>`).join('');
+  const videos = (a.videos || []).map(u => `<video src="${esc(u)}" controls preload="metadata" playsinline style="width:160px;max-width:100%;height:120px;border-radius:8px;background:#000;border:1px solid var(--border)"></video>`).join('');
+  return fotos || videos ? `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">${fotos}${videos}</div>` : '';
+}
+
+function formAvaliacaoHTML(p, existente) {
+  return `
+    <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:20px">
+      <p style="font-weight:700;margin-bottom:4px">⭐ ${existente ? 'Editar sua avaliação' : 'Deixe sua avaliação'}</p>
+      <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px">Ganhe <strong style="color:var(--primary)">R$ 0,50</strong> de saldo, ou <strong style="color:var(--primary)">R$ 1,00</strong> escrevendo ${AV_MIN_CARACTERES}+ caracteres com 1 foto e 1 vídeo. O saldo cai quando a avaliação for aprovada.</p>
+      <div style="display:flex;gap:8px;margin-bottom:12px" id="estrelas-form">
+        ${[1,2,3,4,5].map(n => `<button onclick="selecionarNota(${n})" id="star-${n}"
+          style="font-size:28px;background:none;border:none;cursor:pointer;opacity:.4;transition:opacity .15s">💚</button>`).join('')}
+      </div>
+      <textarea id="av-texto" class="form-input" rows="4" maxlength="1000" placeholder="Conte sua experiência com o produto..." style="resize:vertical;margin-bottom:4px" oninput="atualizarBonusAvaliacao()">${esc(existente?.texto || '')}</textarea>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0">
+        <label class="btn btn-outline btn-sm" style="cursor:pointer">📷 Fotos (até ${AV_MAX_FOTOS})
+          <input type="file" id="av-fotos" accept="image/*" multiple hidden onchange="adicionarFotosAvaliacao(this)">
+        </label>
+        <label class="btn btn-outline btn-sm" style="cursor:pointer">🎥 Vídeo (até ${AV_MAX_VIDEO_MB} MB)
+          <input type="file" id="av-video" accept="video/*" hidden onchange="adicionarVideoAvaliacao(this)">
+        </label>
+      </div>
+      <div id="av-previews" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px"></div>
+      <div id="av-bonus" style="font-size:12px;color:var(--text-muted);margin-bottom:12px"></div>
+      <button class="btn btn-primary" id="btn-enviar-avaliacao" onclick="enviarAvaliacao('${p.id}')">${existente ? 'Reenviar Avaliação' : 'Enviar Avaliação'}</button>
+    </div>`;
+}
+
 async function carregarAvaliacoes(p) {
   const { data: avaliacoes } = await supabase
     .from('avaliacoes')
@@ -282,11 +323,12 @@ async function carregarAvaliacoes(p) {
 
   const { data: { session: _sessAval } } = await supabase.auth.getSession();
   const user = _sessAval?.user || null;
-  const jaAvaliou = avaliacoes?.some(a => a.usuario_id === user?.id);
+  const minha = avaliacoes?.find(a => a.usuario_id === user?.id) || null;
+  const aprovadas = (avaliacoes || []).filter(a => a.status === 'aprovada');
 
   // Só pode avaliar quem já recebeu este produto (o banco também exige isso)
   let recebeuProduto = false;
-  if (user && !jaAvaliou) {
+  if (user && !minha) {
     const { data: entregues } = await supabase
       .from('pedidos')
       .select('id')
@@ -297,26 +339,28 @@ async function carregarAvaliacoes(p) {
     recebeuProduto = !!(entregues && entregues.length);
   }
 
-  const totalAv = avaliacoes?.length || 0;
-  const mediaAv = totalAv ? (avaliacoes.reduce((s, a) => s + a.nota, 0) / totalAv).toFixed(1) : '-';
+  const totalAv = aprovadas.length;
+  const mediaAv = totalAv ? (aprovadas.reduce((s, a) => s + a.nota, 0) / totalAv).toFixed(1) : '-';
 
-  const formAvaliar = user && !jaAvaliou && recebeuProduto ? `
-    <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:20px">
-      <p style="font-weight:700;margin-bottom:4px">⭐ Deixe sua avaliação</p>
-      <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px">Avaliando você ganha <strong style="color:var(--primary)">R$ 0,50</strong> de saldo pra usar na próxima compra.</p>
-      <div style="display:flex;gap:8px;margin-bottom:12px" id="estrelas-form">
-        ${[1,2,3,4,5].map(n => `<button onclick="selecionarNota(${n})" id="star-${n}"
-          style="font-size:28px;background:none;border:none;cursor:pointer;opacity:.4;transition:opacity .15s">💚</button>`).join('')}
-      </div>
-      <textarea id="av-texto" class="form-input" rows="3" maxlength="1000" placeholder="Conte sua experiência com o produto..." style="resize:vertical;margin-bottom:12px"></textarea>
-      <button class="btn btn-primary" onclick="enviarAvaliacao('${p.id}')">Enviar Avaliação</button>
-    </div>` : (user && !jaAvaliou
-      ? `<div style="background:var(--bg-muted);border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:13px;color:var(--text-muted)">Você poderá avaliar este produto depois de recebê-lo. 📦</div>`
-      : user && jaAvaliou
-      ? `<div style="background:rgba(170,239,0,0.06);border:1px solid rgba(170,239,0,0.25);border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:13px">✅ Você já avaliou este produto.</div>`
-      : `<div style="background:var(--bg-muted);border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:13px;color:var(--text-muted)"><a href="login.html" style="color:var(--primary);font-weight:700">Faça login</a> para avaliar este produto.</div>`);
+  _avFotos = []; _avVideo = null;
+  _avExistente = minha && minha.status === 'reprovada' ? minha : null;
 
-  const listaHTML = totalAv ? avaliacoes.map(a => `
+  let formAvaliar;
+  if (!user) {
+    formAvaliar = `<div style="background:var(--bg-muted);border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:13px;color:var(--text-muted)"><a href="login.html" style="color:var(--primary);font-weight:700">Faça login</a> para avaliar este produto.</div>`;
+  } else if (!minha) {
+    formAvaliar = recebeuProduto
+      ? formAvaliacaoHTML(p, null)
+      : `<div style="background:var(--bg-muted);border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:13px;color:var(--text-muted)">Você poderá avaliar este produto depois de recebê-lo. 📦</div>`;
+  } else if (minha.status === 'pendente') {
+    formAvaliar = `<div style="background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.4);border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:13px">⏳ Sua avaliação foi enviada e está aguardando aprovação. O saldo cai assim que ela for aprovada.</div>`;
+  } else if (minha.status === 'reprovada') {
+    formAvaliar = `<div style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.4);border-radius:10px;padding:12px 16px;margin-bottom:12px;font-size:13px">❌ Sua avaliação não foi aprovada${minha.motivo_reprovacao ? `: ${esc(minha.motivo_reprovacao)}` : '.'} Você pode ajustar e reenviar.</div>` + formAvaliacaoHTML(p, minha);
+  } else {
+    formAvaliar = `<div style="background:rgba(170,239,0,0.06);border:1px solid rgba(170,239,0,0.25);border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:13px">✅ Você já avaliou este produto.</div>`;
+  }
+
+  const listaHTML = totalAv ? aprovadas.map(a => `
     <div style="border-bottom:1px solid var(--border);padding:16px 0">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
         <div style="display:flex;align-items:center;gap:8px">
@@ -326,6 +370,7 @@ async function carregarAvaliacoes(p) {
         <span style="font-size:11px;color:var(--text-muted)">${new Date(a.created_at).toLocaleDateString('pt-BR')}</span>
       </div>
       ${a.texto ? `<p style="font-size:13px;color:var(--text-muted);line-height:1.6">${esc(a.texto)}</p>` : ''}
+      ${midiaAvaliacaoHTML(a)}
     </div>`).join('')
     : `<p style="color:var(--text-muted);font-size:13px;padding:16px 0">Nenhuma avaliação ainda. Seja o primeiro!</p>`;
 
@@ -341,15 +386,89 @@ async function carregarAvaliacoes(p) {
       ${formAvaliar}
       ${listaHTML}
     </div>`;
+
+  if (_avExistente) selecionarNota(_avExistente.nota);
+  if (document.getElementById('av-previews')) { renderPreviewsAvaliacao(); atualizarBonusAvaliacao(); }
 }
 
 let _notaSelecionada = 0;
 window.selecionarNota = function(n) {
   _notaSelecionada = n;
   [1,2,3,4,5].forEach(i => {
-    document.getElementById('star-' + i).style.opacity = i <= n ? '1' : '.3';
+    const el = document.getElementById('star-' + i);
+    if (el) el.style.opacity = i <= n ? '1' : '.3';
   });
 };
+
+// Fotos/vídeo que valem pro bônus: os novos escolhidos agora ou, na
+// reedição, os que já estavam na avaliação
+function contagemMidiasAvaliacao() {
+  return {
+    fotos: _avFotos.length || (_avExistente?.fotos || []).length,
+    videos: _avVideo ? 1 : (_avExistente?.videos || []).length
+  };
+}
+
+window.atualizarBonusAvaliacao = function() {
+  const el = document.getElementById('av-bonus');
+  if (!el) return;
+  const chars = (document.getElementById('av-texto')?.value || '').trim().length;
+  const { fotos, videos } = contagemMidiasAvaliacao();
+  const ok = (c) => c ? '<span style="color:var(--primary)">✓</span>' : '○';
+  const completo = chars >= AV_MIN_CARACTERES && fotos >= 1 && videos >= 1;
+  el.innerHTML = `${ok(chars >= AV_MIN_CARACTERES)} ${Math.min(chars, AV_MIN_CARACTERES)}/${AV_MIN_CARACTERES} caracteres &nbsp; ${ok(fotos >= 1)} 1 foto &nbsp; ${ok(videos >= 1)} 1 vídeo
+    <br>Bônus ao aprovar: <strong style="color:var(--primary)">${completo ? 'R$ 1,00' : 'R$ 0,50'}</strong>`;
+};
+
+function renderPreviewsAvaliacao() {
+  const box = document.getElementById('av-previews');
+  if (!box) return;
+  const antigas = _avFotos.length ? [] : (_avExistente?.fotos || []).map(u => ({ url: u, tipo: 'foto' }));
+  const antigoVideo = _avVideo ? [] : (_avExistente?.videos || []).map(u => ({ url: u, tipo: 'video' }));
+  const novas = _avFotos.map((f, i) => ({ url: URL.createObjectURL(f), tipo: 'foto', i }));
+  const novoVideo = _avVideo ? [{ url: URL.createObjectURL(_avVideo), tipo: 'video', novo: true }] : [];
+  box.innerHTML = [...antigas, ...novas, ...antigoVideo, ...novoVideo].map(m => `
+    <div style="position:relative">
+      ${m.tipo === 'foto'
+        ? `<img src="${esc(m.url)}" style="width:64px;height:64px;object-fit:cover;border-radius:8px;border:1px solid var(--border)">`
+        : `<video src="${esc(m.url)}" muted playsinline preload="metadata" style="width:96px;height:64px;object-fit:cover;border-radius:8px;background:#000;border:1px solid var(--border)"></video>`}
+      ${m.i !== undefined ? `<button type="button" onclick="removerFotoAvaliacao(${m.i})" style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;border:none;background:#ef4444;color:#fff;font-size:12px;cursor:pointer;line-height:1">×</button>` : ''}
+      ${m.novo ? `<button type="button" onclick="removerVideoAvaliacao()" style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;border:none;background:#ef4444;color:#fff;font-size:12px;cursor:pointer;line-height:1">×</button>` : ''}
+    </div>`).join('');
+}
+
+window.adicionarFotosAvaliacao = function(input) {
+  const novas = [...input.files].filter(f => f.type.startsWith('image/'));
+  input.value = '';
+  if (_avFotos.length + novas.length > AV_MAX_FOTOS) showToast(`Máximo de ${AV_MAX_FOTOS} fotos`, 'error');
+  _avFotos = [..._avFotos, ...novas].slice(0, AV_MAX_FOTOS);
+  renderPreviewsAvaliacao(); atualizarBonusAvaliacao();
+};
+window.removerFotoAvaliacao = function(i) {
+  _avFotos.splice(i, 1);
+  renderPreviewsAvaliacao(); atualizarBonusAvaliacao();
+};
+window.adicionarVideoAvaliacao = function(input) {
+  const f = input.files[0];
+  input.value = '';
+  if (!f) return;
+  if (!f.type.startsWith('video/')) { showToast('Escolha um arquivo de vídeo', 'error'); return; }
+  if (f.size > AV_MAX_VIDEO_MB * 1024 * 1024) { showToast(`Vídeo muito grande (máx. ${AV_MAX_VIDEO_MB} MB). Grave um vídeo mais curto.`, 'error'); return; }
+  _avVideo = f;
+  renderPreviewsAvaliacao(); atualizarBonusAvaliacao();
+};
+window.removerVideoAvaliacao = function() {
+  _avVideo = null;
+  renderPreviewsAvaliacao(); atualizarBonusAvaliacao();
+};
+
+async function enviarArquivoAvaliacao(userId, file, extPadrao) {
+  const ext = (file.name.split('.').pop() || extPadrao).toLowerCase().replace(/[^a-z0-9]/g, '') || extPadrao;
+  const caminho = `${userId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+  const { error } = await supabase.storage.from('avaliacoes').upload(caminho, file, { contentType: file.type, upsert: false });
+  if (error) throw error;
+  return supabase.storage.from('avaliacoes').getPublicUrl(caminho).data.publicUrl;
+}
 
 window.enviarAvaliacao = async function(produtoId) {
   if (!_notaSelecionada) { showToast('Selecione uma nota de 1 a 5 ★', 'error'); return; }
@@ -358,19 +477,39 @@ window.enviarAvaliacao = async function(produtoId) {
   const user = _sessEnviar?.user || null;
   if (!user) { showToast('Faça login para avaliar', 'error'); return; }
 
-  const btn = document.querySelector('#avaliacoes-content .btn-primary');
+  const btn = document.getElementById('btn-enviar-avaliacao');
+  const textoBtn = btn.textContent;
   btn.disabled = true; btn.textContent = 'Enviando...';
 
-  const { error } = await supabase.from('avaliacoes').insert({
-    produto_id: produtoId,
-    usuario_id: user.id,
-    nota: _notaSelecionada,
-    texto
-  });
+  try {
+    let fotos = _avExistente?.fotos || [];
+    let videos = _avExistente?.videos || [];
+    if (_avFotos.length) {
+      btn.textContent = 'Enviando fotos...';
+      fotos = [];
+      for (const f of _avFotos) {
+        const otim = typeof otimizarImagem === 'function' ? await otimizarImagem(f, { lado: 1280, qualidade: 0.8 }) : f;
+        fotos.push(await enviarArquivoAvaliacao(user.id, otim, 'jpg'));
+      }
+    }
+    if (_avVideo) {
+      btn.textContent = 'Enviando vídeo...';
+      videos = [await enviarArquivoAvaliacao(user.id, _avVideo, 'mp4')];
+    }
 
-  if (error) { btn.disabled = false; btn.textContent = 'Enviar Avaliação'; showToast('Erro ao enviar avaliação.', 'error'); return; }
-  showToast('Avaliação enviada! Obrigado 🙏', 'success');
-  carregarAvaliacoes(window._produto);
+    const dados = { nota: _notaSelecionada, texto, fotos, videos };
+    const { error } = _avExistente
+      ? await supabase.from('avaliacoes').update(dados).eq('id', _avExistente.id)
+      : await supabase.from('avaliacoes').insert({ ...dados, produto_id: produtoId, usuario_id: user.id });
+    if (error) throw error;
+
+    showToast('Avaliação enviada! Ela aparece depois de aprovada 🙏', 'success');
+    carregarAvaliacoes(window._produto);
+  } catch (e) {
+    console.error(e);
+    btn.disabled = false; btn.textContent = textoBtn;
+    showToast('Erro ao enviar avaliação. Tente de novo.', 'error');
+  }
 };
 
 // ——— HELPER: card mini estilo AliExpress ———
