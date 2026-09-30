@@ -59,11 +59,14 @@ function linkSeguro(url, padrao) {
 function heroHTML(banners) {
   return banners.map((b, i) => {
     const link = linkSeguro(b.link_cat || b.link, 'produtos.html');
+    // colunas novas (_interno/sql-banners-opcoes.sql); sem elas, vale o padrão
+    const mostrarBotao = b.mostrar_botao !== false;
+    const textoBotao = (b.texto_botao || '').trim() || 'Ver Produtos';
     return `
     <div class="hero-slide ${i === 0 ? 'active' : ''}" id="slide-${i}">
       <div class="hero-img-box">
         <!-- O banner inteiro é clicável -->
-        <a href="${esc(link)}" class="hero-link-total" aria-label="${esc(b.titulo || 'Ver banner')}"></a>
+        <a href="${esc(link)}" class="hero-link-total" aria-label="${esc(b.titulo || textoBotao)}"></a>
         ${b.image_url
           ? `<img src="${esc(b.image_url)}" alt="" decoding="async" ${i === 0 ? 'fetchpriority="high"' : 'fetchpriority="low"'} style="width:100%;height:100%;object-fit:contain">`
           : `<span style='font-size:80px'>🛍️</span>`}
@@ -72,6 +75,9 @@ function heroHTML(banners) {
           ${b.titulo ? `<h1 class="hero-title">${esc(b.titulo).replace(/\r?\n/g, '<br>')}</h1>` : ''}
           ${b.subtitulo ? `<p class="hero-sub">${esc(b.subtitulo)}</p>` : ''}
           ${b.preco ? `<p class="hero-price">${esc(b.preco)}</p>` : ''}
+          ${mostrarBotao ? `<div class="hero-btns">
+            <a href="${esc(link)}" class="btn btn-primary btn-lg">${esc(textoBotao)}</a>
+          </div>` : ''}
         </div>
       </div>
     </div>`; }).join('') +

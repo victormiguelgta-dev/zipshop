@@ -163,7 +163,17 @@
     <div class="form-group">
       <label class="form-label">Link (ao clicar no banner)</label>
       <input type="text" class="form-input" id="edit-link" placeholder="Ex: produto.html?id=1 ou https://...">
-      <p style="font-size:11px;color:var(--text-muted);margin-top:4px">O banner inteiro é clicável e leva pra esse link.</p>
+      <p style="font-size:11px;color:var(--text-muted);margin-top:4px">O banner inteiro é clicável e leva pra esse link (o botão também).</p>
+    </div>
+
+    <div class="form-group">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+        <input type="checkbox" id="edit-mostrar-botao" style="width:16px;height:16px;accent-color:var(--primary)" onchange="document.getElementById('grupo-texto-botao').hidden = !this.checked">
+        <span style="font-size:13px;font-weight:600">Mostrar botão no banner (ativar/desativar)</span>
+      </label>
+      <div id="grupo-texto-botao" style="margin-top:8px" hidden>
+        <input type="text" class="form-input" id="edit-texto-botao" maxlength="30" placeholder="Texto do botão (padrão: Ver Produtos)">
+      </div>
     </div>
 
     <div class="form-group">
@@ -291,6 +301,9 @@ window.abrirModal = function() {
   document.getElementById('edit-subtitulo').value = '';
   document.getElementById('edit-ordem').value = '1';
   document.getElementById('edit-ativo').checked = true;
+  document.getElementById('edit-mostrar-botao').checked = false;
+  document.getElementById('edit-texto-botao').value = '';
+  document.getElementById('grupo-texto-botao').hidden = true;
   document.getElementById('edit-escurecer').checked = false;
   document.getElementById('foto-preview').innerHTML = '<span style="color:var(--text-muted);font-size:13px">📷 Clique para escolher imagem</span>';
   fotoFile = null;
@@ -312,6 +325,9 @@ window.openEdit = async function(id) {
   document.getElementById('edit-subtitulo').value = b.subtitulo || '';
   document.getElementById('edit-ordem').value = b.ordem || 1;
   document.getElementById('edit-ativo').checked = b.ativo;
+  document.getElementById('edit-mostrar-botao').checked = b.mostrar_botao !== false;
+  document.getElementById('edit-texto-botao').value = b.texto_botao && b.texto_botao !== 'Ver Produtos' ? b.texto_botao : '';
+  document.getElementById('grupo-texto-botao').hidden = b.mostrar_botao === false;
   document.getElementById('edit-escurecer').checked = b.escurecer === true;
   const preview = document.getElementById('foto-preview');
   preview.innerHTML = b.image_url
@@ -337,6 +353,8 @@ window.salvarBanner = async function() {
     subtitulo: document.getElementById('edit-subtitulo').value.trim(),
     ordem: parseInt(document.getElementById('edit-ordem').value) || 1,
     ativo: document.getElementById('edit-ativo').checked,
+    mostrar_botao: document.getElementById('edit-mostrar-botao').checked,
+    texto_botao: document.getElementById('edit-texto-botao').value.trim() || 'Ver Produtos',
     escurecer: document.getElementById('edit-escurecer').checked,
     ...(imageUrl ? { image_url: imageUrl } : {})
   };
