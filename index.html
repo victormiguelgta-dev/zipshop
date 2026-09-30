@@ -320,5 +320,18 @@ window.handleNewsletter = async (e) => {
 import { aplicarTextosSite } from './js/textos-loader.js';
 aplicarTextosSite();
 </script>
+<script>
+// WhatsApp some enquanto a tela rola (não cobre os botões) e volta ao parar
+(function () {
+  const wpp = document.querySelector('.whatsapp-float');
+  if (!wpp) return;
+  let t;
+  window.addEventListener('scroll', () => {
+    wpp.classList.add('rolando');
+    clearTimeout(t);
+    t = setTimeout(() => wpp.classList.remove('rolando'), 700);
+  }, { passive: true });
+})();
+</script>
 </body>
 </html>

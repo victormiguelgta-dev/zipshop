@@ -49,6 +49,14 @@ ul { list-style: none; }
 /* Com a barra do carrinho aberta, o WhatsApp sobe pra ficar acima dela */
 .whatsapp-float { transition: transform 0.2s, bottom 0.3s; }
 body.has-float-cart .whatsapp-float { bottom: calc(var(--altura-float-cart, 72px) + 16px); }
+/* Enquanto a pessoa rola a tela, o WhatsApp some pra não ficar em cima
+   dos botões dos produtos; volta quando ela para (index.html) */
+.whatsapp-float { transition: transform 0.2s, bottom 0.3s, opacity 0.25s; }
+.whatsapp-float.rolando { opacity: 0; pointer-events: none; transform: scale(0.8); }
+@media (max-width: 900px) {
+  .whatsapp-float { width: 48px; height: 48px; right: 12px; bottom: 16px; }
+  .whatsapp-float svg { width: 26px; height: 26px; }
+}
 /* ===== UTILITY ===== */
 .container { max-width: 1200px; margin: 0 auto; padding: 0 16px; }
 .flex { display: flex; }
@@ -281,7 +289,7 @@ body.has-float-cart .whatsapp-float { bottom: calc(var(--altura-float-cart, 72px
 }
 
 .nav-categories {
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--primary);
   background: #0D0D0D;
 }
 .nav-categories-inner {
@@ -600,14 +608,10 @@ body.has-float-cart .whatsapp-float { bottom: calc(var(--altura-float-cart, 72px
   grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
   gap: 12px;
 }
+/* Foto ocupa o quadrado inteiro (com a linha verde) e o nome fica fora, embaixo */
 .cat-card {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  padding: 20px 12px;
   text-align: center;
   cursor: pointer;
-  transition: border-color 0.2s;
   text-decoration: none;
   color: inherit;
   display: flex;
@@ -615,20 +619,22 @@ body.has-float-cart .whatsapp-float { bottom: calc(var(--altura-float-cart, 72px
   align-items: center;
   gap: 8px;
 }
-.cat-card:hover { border-color: var(--primary); }
 .cat-icon {
   font-size: 32px;
   width: 100%;
   aspect-ratio: 1 / 1;
-  border-radius: 12px;
+  border: 2px solid var(--primary);
+  border-radius: var(--radius-lg);
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  background: var(--bg-muted);
+  background: var(--bg-card);
+  transition: box-shadow 0.2s;
 }
+.cat-card:hover .cat-icon { box-shadow: 0 0 0 2px rgba(170,239,0,0.35); }
 .cat-icon img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.cat-name { font-size: 13px; font-weight: 700; }
+.cat-name { font-size: 13px; font-weight: 700; max-width: 100%; overflow-wrap: anywhere; }
 
 /* ===== NEWSLETTER ===== */
 .newsletter {
@@ -1107,8 +1113,9 @@ tr:hover td { background: rgba(255,255,255,0.02); }
     scrollbar-width: none;
   }
   .category-grid::-webkit-scrollbar { display: none; }
-  .cat-card { min-width: 90px; flex-shrink: 0; }
-  .cat-icon { width: 60px; height: 60px; font-size: 28px; }
+  .cat-card { width: 104px; flex-shrink: 0; }
+  .cat-icon { font-size: 28px; }
+  .cat-name { font-size: 12px; }
 
   /* Modal: tela cheia no mobile */
   #modal > div, #modal-detalhe > div {
