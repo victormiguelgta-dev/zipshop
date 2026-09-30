@@ -121,7 +121,8 @@ Extraia APENAS as informações do produto principal e devolva um JSON com exata
   "custo": número decimal do preço que aparece no texto, sem R$ e sem separador de milhar (ex: 1299.90). Se houver faixa de preço, use o MENOR valor. Se não houver preço no texto, use 0,
   "description": "descrição do produto em português, clara e vendedora, 2 a 4 frases. Reescreva com suas palavras, não copie literalmente",
   "emoji": "um único emoji que represente o produto",
-  "cores": ["lista de variações de cor mencionadas, ou lista vazia"]
+  "cores": ["lista de variações de cor mencionadas, ou lista vazia"],
+  "especificacoes": [{ "nome": "nome curto da característica (ex: Bateria)", "valor": "valor (ex: 5000 mAh)" }]
 }
 
 Regras:
@@ -129,6 +130,7 @@ Regras:
 - Se um campo não for identificável, use string vazia, 0 ou lista vazia conforme o tipo
 - A categoria DEVE ser uma das opções listadas. Escolha a mais próxima
 - Não invente especificações que não estejam no texto
+- Em "especificacoes", liste até 12 características técnicas que aparecem no texto (dimensões, peso, bateria, conexão, material, voltagem, capacidade...). Se não houver, use lista vazia
 - Não mencione nomes de lojas ou marketplaces (Shopee, Mercado Livre, Amazon etc.) no nome nem na descrição
 
 TEXTO SOBRE O PRODUTO:
@@ -179,7 +181,11 @@ ${textoLimitado}`;
         custo: parseFloat(dados.custo) || 0,
         description: String(dados.description || ''),
         emoji: String(dados.emoji || '📦').slice(0, 4),
-        cores: Array.isArray(dados.cores) ? dados.cores.slice(0, 12) : []
+        cores: Array.isArray(dados.cores) ? dados.cores.slice(0, 12) : [],
+        especificacoes: (Array.isArray(dados.especificacoes) ? dados.especificacoes : [])
+          .filter(e => e && e.nome)
+          .slice(0, 15)
+          .map(e => ({ nome: String(e.nome).slice(0, 60), valor: String(e.valor || '').slice(0, 200) }))
       })
     };
 

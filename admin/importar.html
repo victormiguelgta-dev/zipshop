@@ -215,6 +215,12 @@
           <textarea class="form-input" id="in-desc" rows="3" style="resize:vertical"></textarea>
         </div>
 
+        <div class="form-group">
+          <label class="form-label" for="in-specs">Especificações</label>
+          <textarea class="form-input" id="in-specs" rows="5" style="resize:vertical" placeholder="Uma por linha, no formato Nome: Valor&#10;Ex:&#10;Bateria: 5000 mAh&#10;Conexão: Bluetooth 5.3&#10;Peso: 250 g"></textarea>
+          <div class="passo-dica">A IA preenche com o que achar no texto. Uma por linha: <strong>Nome: Valor</strong>.</div>
+        </div>
+
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
           <div class="form-group">
             <label class="form-label">Custo (quanto você pagou) *</label>
@@ -290,9 +296,14 @@ function comprimirImagem(file) {
 }
 
 window.adicionarImagens = async function(files) {
-  for (const f of files) {
-    if (!f.type.startsWith('image/')) continue;
-    const comprimida = await comprimirImagem(f);
+  const lista = [...files].filter(f => f.type.startsWith('image/'));
+  document.getElementById('in-imagens').value = '';
+  for (const [i, f] of lista.entries()) {
+    const comprimida = await recortarImagem(f, {
+      ...PRESET_IMAGEM.produto,
+      titulo: lista.length > 1 ? `Ajustar foto ${i + 1} de ${lista.length}` : 'Ajustar foto'
+    });
+    if (!comprimida) continue;
     const url = URL.createObjectURL(comprimida);
     imagens.push({ file: comprimida, url });
   }
@@ -369,6 +380,7 @@ window.analisar = async function() {
     document.getElementById('in-nome').value = dados.name || '';
     document.getElementById('in-marca').value = dados.brand || '';
     document.getElementById('in-desc').value = dados.description || '';
+    document.getElementById('in-specs').value = specsParaTexto(dados.especificacoes || []);
     document.getElementById('in-emoji').value = dados.emoji || '📦';
     if (dados.custo) document.getElementById('in-custo').value = dados.custo;
     if (dados.category) document.getElementById('in-categoria').value = dados.category;
@@ -435,6 +447,7 @@ window.salvarProduto = async function() {
     brand: document.getElementById('in-marca').value.trim(),
     category: document.getElementById('in-categoria').value,
     description: document.getElementById('in-desc').value.trim(),
+    specs: textoParaSpecs(document.getElementById('in-specs').value),
     emoji: document.getElementById('in-emoji').value || '📦',
     price: Math.round(precoVenda * 100) / 100,
     stock: parseInt(document.getElementById('in-estoque').value) || 0,
@@ -477,8 +490,24 @@ window.salvarProduto = async function() {
   setTimeout(limparFormulario, 1200);
 };
 
+// Especificações: textarea "Nome: Valor" (uma por linha) ⇄ lista [{nome, valor}].
+// Guardado como LISTA (e não objeto) pra manter a ordem que o admin digitou.
+function specsParaTexto(specs) {
+  const lista = Array.isArray(specs) ? specs
+    : Object.entries(specs || {}).map(([nome, valor]) => ({ nome, valor }));
+  return lista.map(s => `${s.nome}: ${s.valor}`).join('\n');
+}
+function textoParaSpecs(texto) {
+  return String(texto || '').split('\n').map(l => l.trim()).filter(Boolean).map(l => {
+    const i = l.indexOf(':');
+    return i > 0
+      ? { nome: l.slice(0, i).trim().slice(0, 60), valor: l.slice(i + 1).trim().slice(0, 200) }
+      : { nome: l.slice(0, 60), valor: '' };
+  }).filter(s => s.nome).slice(0, 30);
+}
+
 function limparFormulario() {
-  ['in-texto','in-nome','in-marca','in-desc','in-custo','in-emoji'].forEach(id => {
+  ['in-texto','in-nome','in-marca','in-desc','in-specs','in-custo','in-emoji'].forEach(id => {
     document.getElementById(id).value = '';
   });
   imagens = [];

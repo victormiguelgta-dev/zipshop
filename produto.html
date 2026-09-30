@@ -50,23 +50,37 @@ async function render() {
     return;
   }
   document.title = p.name + ' — Zipshop';
-  const specs = Object.entries(p.specs || {}).map(([k, v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join('');
+  // specs pode vir como lista [{nome, valor}] (novo, mantém a ordem) ou objeto (antigo)
+  const listaSpecs = Array.isArray(p.specs) ? p.specs
+    : Object.entries(p.specs || {}).map(([nome, valor]) => ({ nome, valor }));
+  const specs = listaSpecs.filter(s => s && s.nome)
+    .map(s => `<tr><td>${esc(s.nome)}</td><td>${esc(s.valor)}</td></tr>`).join('');
 
   // Cores (se o produto tiver variações)
-  const cores = p.cores || [];
+  const cores = (p.cores || []).map(c => ({ ...c, nome: String(c.nome || '').replace(/[\s:—–-]+$/, '') })).filter(c => c.nome);
 
   // Galeria: imagem de capa (image_url) + fotos extras (imagens).
   // Sempre mostra pelo menos a capa como primeira miniatura.
-  const galeria = [
-    ...(p.image_url ? [{ url: p.image_url, thumb: p.image_thumb_url || p.image_url }] : []),
+  // Produtos antigos guardavam as fotos extras como texto (só a URL), e
+  // não como {url, thumb} — por isso apareciam miniaturas quebradas "?".
+  // Aqui aceita os dois formatos, ignora itens vazios e fotos repetidas.
+  const galeria = [];
+  const urlsVistas = new Set();
+  [
+    p.image_url ? { url: p.image_url, thumb: p.image_thumb_url } : null,
     ...(Array.isArray(p.imagens) ? p.imagens : [])
-  ];
+  ].forEach(item => {
+    const url = typeof item === 'string' ? item : item?.url;
+    if (!url || typeof url !== 'string' || urlsVistas.has(url)) return;
+    urlsVistas.add(url);
+    galeria.push({ url, thumb: (typeof item === 'object' && item.thumb) || url });
+  });
   const galeriaHTML = galeria.length > 1 ? `
     <div style="display:flex;gap:8px;margin-top:10px;overflow-x:auto;padding-bottom:4px">
       ${galeria.map((img, i) => `
         <button onclick="trocarFotoGaleria('${(img.url||'').replace(/'/g,"\\'")}', this)"
           style="flex-shrink:0;width:64px;height:64px;border-radius:10px;overflow:hidden;padding:0;cursor:pointer;background:var(--bg-muted);border:2px solid ${i===0 ? 'var(--primary)' : 'var(--border)'}">
-          <img src="${img.thumb || img.url}" loading="lazy" style="width:100%;height:100%;object-fit:cover">
+          <img src="${img.thumb || img.url}" loading="lazy" alt="" style="width:100%;height:100%;object-fit:cover" onerror="this.closest('button').remove()">
         </button>`).join('')}
     </div>` : '';
 
@@ -109,13 +123,10 @@ async function render() {
 
     <div class="detail-layout">
       <div>
-        <div class="detail-img" id="detail-img-wrap" style="background:linear-gradient(135deg,#1e3a6e,#2563eb);${p.image_url ? 'cursor:zoom-in' : ''}" ${p.image_url ? `onclick="abrirImagemCheia(document.getElementById('detail-main-img').src)"` : ''}>
-          ${p.image_url ? `<img id="detail-main-img" src="${p.image_url}" style="width:100%;height:100%;object-fit:cover;border-radius:12px">` : `<span style="font-size:140px">${p.emoji}</span>`}
+        <div class="detail-img" id="detail-img-wrap" style="background:${p.image_url ? '#fff' : 'linear-gradient(135deg,#1e3a6e,#2563eb)'};${p.image_url ? 'cursor:zoom-in' : ''}" ${p.image_url ? `onclick="abrirImagemCheia(document.getElementById('detail-main-img').src)"` : ''}>
+          ${p.image_url ? `<img id="detail-main-img" src="${p.image_url}" alt="${esc(p.name)}" style="width:100%;height:100%;object-fit:contain;border-radius:12px">` : `<span style="font-size:140px">${p.emoji}</span>`}
         </div>
         ${galeriaHTML}
-        <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
-          <div style="background:var(--bg-card);border:2px solid var(--primary);border-radius:10px;padding:8px;width:70px;height:70px;display:flex;align-items:center;justify-content:center;font-size:32px;overflow:hidden">${p.image_url ? `<img src="${p.image_url}" style="width:100%;height:100%;object-fit:cover;border-radius:6px">` : p.emoji}</div>
-        </div>
       </div>
       <div>
         <div style="font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">${p.brand}</div>
@@ -129,6 +140,10 @@ async function render() {
         <div class="detail-price">${formatPrice(p.price)}</div>
         <div class="detail-installment">ou 12x de ${formatPrice(p.price/12)} sem juros</div>
         ${p.cashback_percentual > 0 ? `<div style="display:inline-flex;align-items:center;gap:6px;background:rgba(170,239,0,0.12);border:1px solid var(--primary);color:var(--primary);font-size:12px;font-weight:700;padding:5px 10px;border-radius:20px;margin-top:8px">💰 Receba ${formatPrice(p.price * p.cashback_percentual / 100)} de volta em saldo</div>` : ''}
+        ${p.indicacao_percentual > 0 ? `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px">
+          <span style="display:inline-flex;align-items:center;gap:6px;background:rgba(170,239,0,0.12);border:1px solid var(--primary);color:var(--primary);font-size:12px;font-weight:700;padding:5px 10px;border-radius:20px">🤝 Indique e ganhe ${formatPrice(p.price * p.indicacao_percentual / 100)} por venda</span>
+          <button type="button" onclick="compartilharIndicacao(this)" style="background:none;border:none;color:var(--text-muted);font-size:12px;font-weight:700;text-decoration:underline;cursor:pointer;padding:4px 0">Copiar meu link</button>
+        </div>` : ''}
         <hr class="detail-divider">
         <div style="background:rgba(170,239,0,.07);border:1px solid rgba(170,239,0,.2);border-radius:12px;padding:12px 16px;margin-bottom:20px;font-size:13px;display:flex;align-items:center;gap:8px">
           ⚡ <strong>Entrega amanhã</strong> — Peça em até 3h para garantir.
@@ -164,13 +179,13 @@ async function render() {
         <button onclick="showTab('avaliacoes')" id="tab-avaliacoes" style="padding:12px 20px;background:none;border:none;border-bottom:2px solid transparent;color:var(--text-muted);cursor:pointer;font-size:14px">Avaliações</button>
       </div>
       <div id="pane-desc">
-        <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:24px">
+        <div style="background:var(--bg-card);border:1px solid var(--primary);border-radius:var(--radius-lg);padding:24px">
           <p style="color:var(--text-muted);line-height:1.8">${p.desc}</p>
         </div>
       </div>
       <div id="pane-specs" style="display:none">
-        <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:24px">
-          <table class="spec-table">${specs}</table>
+        <div style="background:var(--bg-card);border:1px solid var(--primary);border-radius:var(--radius-lg);padding:24px">
+          ${specs ? `<table class="spec-table">${specs}</table>` : '<p style="color:var(--text-muted);font-size:13px">Este produto ainda não tem especificações cadastradas.</p>'}
         </div>
       </div>
       <div id="pane-avaliacoes" style="display:none">
@@ -279,7 +294,8 @@ async function carregarAvaliacoes(p) {
 
   const formAvaliar = user && !jaAvaliou && recebeuProduto ? `
     <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:20px">
-      <p style="font-weight:700;margin-bottom:12px">⭐ Deixe sua avaliação</p>
+      <p style="font-weight:700;margin-bottom:4px">⭐ Deixe sua avaliação</p>
+      <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px">Avaliando você ganha <strong style="color:var(--primary)">R$ 0,50</strong> de saldo pra usar na próxima compra.</p>
       <div style="display:flex;gap:8px;margin-bottom:12px" id="estrelas-form">
         ${[1,2,3,4,5].map(n => `<button onclick="selecionarNota(${n})" id="star-${n}"
           style="font-size:28px;background:none;border:none;cursor:pointer;opacity:.4;transition:opacity .15s">💚</button>`).join('')}
@@ -306,12 +322,12 @@ async function carregarAvaliacoes(p) {
     : `<p style="color:var(--text-muted);font-size:13px;padding:16px 0">Nenhuma avaliação ainda. Seja o primeiro!</p>`;
 
   document.getElementById('avaliacoes-content').innerHTML = `
-    <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:24px">
+    <div style="background:var(--bg-card);border:1px solid var(--primary);border-radius:var(--radius-lg);padding:24px">
       <div style="display:flex;align-items:center;gap:16px;margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid var(--border)">
         <div style="text-align:center">
-          <p style="font-size:48px;font-weight:900;line-height:1;color:var(--primary)">${mediaAv}</p>
+          ${totalAv ? `<p style="font-size:48px;font-weight:900;line-height:1;color:var(--primary)">${mediaAv}</p>` : ''}
           <p style="color:#facc15;font-size:20px">${mediaAv !== '-' ? '★'.repeat(Math.round(Number(mediaAv))) + '☆'.repeat(5 - Math.round(Number(mediaAv))) : '☆☆☆☆☆'}</p>
-          <p style="font-size:12px;color:var(--text-muted)">${totalAv} avaliação${totalAv !== 1 ? 'ões' : ''}</p>
+          <p style="font-size:12px;color:var(--text-muted)">${totalAv} ${totalAv === 1 ? 'avaliação' : 'avaliações'}</p>
         </div>
       </div>
       ${formAvaliar}
@@ -407,6 +423,40 @@ async function carregarTbmPodeGostar(p) {
   document.getElementById('tbm-section').style.display = 'block';
   document.getElementById('tbm-grid').innerHTML = similares.map(r => miniCard(r)).join('');
 }
+
+// Link de indicação DESTE produto: produto.html?id=X&ref=CODIGO.
+// O js/main.js guarda o ?ref de qualquer página, e o banco credita a
+// comissão quando o pedido é entregue (só se o código existir).
+window.compartilharIndicacao = async function(btn) {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.user) {
+    showToast('Entre na sua conta pra pegar seu link de indicação.', 'info');
+    setTimeout(() => { window.location.href = 'login.html?redirect=' + encodeURIComponent(location.pathname.slice(1) + location.search); }, 1200);
+    return;
+  }
+  const { data: u } = await supabase.from('usuarios').select('codigo_indicacao').eq('id', session.user.id).single();
+  if (!u?.codigo_indicacao) { showToast('Seu código ainda está sendo gerado. Tente de novo em instantes.', 'error'); return; }
+
+  const url = new URL(location.href);
+  url.search = '';
+  url.searchParams.set('id', window._produto?.id);
+  url.searchParams.set('ref', u.codigo_indicacao);
+  const link = url.toString();
+
+  // No celular abre o compartilhar (WhatsApp etc.); no computador, copia
+  if (navigator.share) {
+    try { await navigator.share({ title: window._produto?.name || 'Zipshop', url: link }); return; }
+    catch (e) { if (e.name === 'AbortError') return; }
+  }
+  try {
+    await navigator.clipboard.writeText(link);
+    const original = btn.textContent;
+    btn.textContent = '✅ Link copiado!';
+    setTimeout(() => { btn.textContent = original; }, 2000);
+  } catch {
+    prompt('Copie seu link:', link);
+  }
+};
 
 window.changeQty = function(dir) {
   const max = (window._produto?.stock !== null && window._produto?.stock !== undefined) ? window._produto.stock : Infinity;

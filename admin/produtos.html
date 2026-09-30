@@ -158,9 +158,14 @@
       <label class="form-label">Descrição</label>
       <textarea class="form-input" id="edit-desc" rows="3" placeholder="Descreva o produto..."></textarea>
 
+      <label class="form-label" for="edit-specs" style="display:block;margin-top:12px">Especificações</label>
+      <textarea class="form-input" id="edit-specs" rows="5" placeholder="Uma por linha, no formato Nome: Valor&#10;Ex:&#10;Bateria: 5000 mAh&#10;Conexão: Bluetooth 5.3&#10;Peso: 250 g"></textarea>
+      <p style="font-size:12px;color:var(--text-muted);margin-top:4px">Aparecem na aba "Especificações" da página do produto. Uma por linha: <strong>Nome: Valor</strong>.</p>
+
     <div style="display:flex;flex-direction:column;gap:10px;margin-top:12px;padding:14px;background:var(--bg-muted);border-radius:10px;border:1px solid var(--border);margin-bottom:12px">
       <p style="font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em">🔗 Produtos Relacionados</p>
       <p style="font-size:11px;color:var(--text-muted)">Cole os IDs dos produtos separados por vírgula (ex: 3,7,12). Aparecem na seção "Relacionados" da página do produto.</p>
+      <p style="font-size:11px;color:var(--text-muted);margin-top:4px">💡 <strong>Como achar o ID:</strong> na lista de produtos desta página, ele aparece em verde embaixo do nome de cada produto (ex: <strong>ID 7</strong>). Também dá pra ver no site: abra o produto e olhe o fim do link — em <strong>produto.html?id=7</strong>, o ID é 7.</p>
       <input type="text" class="form-input" id="edit-relacionados" placeholder="Ex: 3, 7, 12" style="font-size:13px">
     </div>
     <div style="display:flex;flex-direction:column;gap:10px;margin-top:0;padding:14px;background:var(--bg-muted);border-radius:10px;border:1px solid var(--border);margin-bottom:12px">
@@ -256,8 +261,14 @@ function renderGaleriaGrid() {
 }
 
 window.adicionarFotosGaleria = async function(input) {
-  for (const file of input.files) {
-    const comprimido = await comprimirImagem(file);
+  const arquivos = [...input.files];
+  input.value = '';
+  for (const [i, file] of arquivos.entries()) {
+    const comprimido = await recortarImagem(file, {
+      ...PRESET_IMAGEM.produto,
+      titulo: arquivos.length > 1 ? `Ajustar foto ${i + 1} de ${arquivos.length}` : 'Ajustar foto'
+    });
+    if (!comprimido) continue; // cancelou essa: pula pra próxima
     const preview = await new Promise(resolve => {
       const reader = new FileReader();
       reader.onload = e => resolve(e.target.result);
@@ -265,7 +276,6 @@ window.adicionarFotosGaleria = async function(input) {
     });
     galeriaNovas.push({ file: comprimido, preview });
   }
-  input.value = '';
   renderGaleriaGrid();
 };
 
@@ -278,13 +288,24 @@ window.removerFotoGaleriaExistente = function(i) {
   renderGaleriaGrid();
 };
 
+// O Supabase Storage recusa nome de arquivo com acento ou símbolo
+// ("portátil", "ç", "/", "?"...). Antes o nome do produto ia direto no
+// nome do arquivo: o upload falhava calado e o produto era salvo SEM foto.
+function nomeArquivoSeguro(texto) {
+  return String(texto || 'produto')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+    .toLowerCase().slice(0, 40) || 'produto';
+}
+
 async function uploadGaleria(nomeProduto) {
   const enviadas = [...galeriaExistente];
+  galeriaFalhou = 0;
   for (const item of galeriaNovas) {
     const ext = extensaoImagem(item.file);
-    const base = `${Date.now()}-${Math.random().toString(36).slice(2,7)}-${nomeProduto.replace(/\s/g,'-')}`;
+    const base = `${Date.now()}-${Math.random().toString(36).slice(2,7)}-${nomeArquivoSeguro(nomeProduto)}`;
     const { error } = await supabase.storage.from('Produtos').upload(`${base}.${ext}`, item.file, { cacheControl: '31536000', upsert: false });
-    if (error) continue;
+    if (error) { console.error('Erro upload galeria:', error); galeriaFalhou++; continue; }
     const url = supabase.storage.from('Produtos').getPublicUrl(`${base}.${ext}`).data.publicUrl;
 
     let thumbUrl = url;
@@ -306,8 +327,12 @@ function formatPrice(v) {
 // Preview da foto antes de enviar
 window.previewFoto = async function(input) {
   const original = input.files[0];
+  input.value = ''; // deixa escolher a mesma foto de novo depois de cancelar
   if (!original) return;
-  fotoFile = await comprimirImagem(original);
+  // Pessoa ajusta o enquadramento (arrastar + zoom) — js/imagem.js
+  const recortada = await recortarImagem(original, { ...PRESET_IMAGEM.produto, titulo: 'Ajustar foto do produto' });
+  if (!recortada) return;
+  fotoFile = recortada;
   const reader = new FileReader();
   reader.onload = e => {
     document.getElementById('foto-img').src = e.target.result;
@@ -323,7 +348,7 @@ async function uploadFoto(file, nomeProduto) {
   document.getElementById('progress-bar').style.width = '30%';
 
   const ext = extensaoImagem(file);
-  const baseName = `${Date.now()}-${nomeProduto.replace(/\s/g,'-')}`;
+  const baseName = `${Date.now()}-${nomeArquivoSeguro(nomeProduto)}`;
   const fileName = `${baseName}.${ext}`;
 
   const { error } = await supabase.storage
@@ -389,7 +414,7 @@ function renderTabela(lista) {
           }
           <div>
             <p style="font-weight:700;font-size:13px">${p.name}</p>
-            <p style="font-size:12px;color:var(--text-muted)">${p.brand||''}</p>
+            <p style="font-size:12px;color:var(--text-muted)">${p.brand||''} · <span style="color:var(--primary);font-weight:700">ID ${p.id}</span></p>
           </div>
         </div>
       </td>
@@ -464,6 +489,7 @@ window.editarProduto = function(id) {
   document.getElementById('edit-stock').value = p.stock||0;
   document.getElementById('edit-emoji').value = p.emoji||'';
   document.getElementById('edit-desc').value = p.description||'';
+  document.getElementById('edit-specs').value = specsParaTexto(p.specs);
   document.getElementById('edit-oferta').checked = p.oferta||false;
   document.getElementById('edit-garantia').value = p.garantia||'';
   document.getElementById('edit-frete-gratis').checked = p.frete_gratis||false;
@@ -477,14 +503,31 @@ window.editarProduto = function(id) {
   document.getElementById('edit-relacionados').value = (p.relacionados_ids || []).join(', ');
   // Cores: array de {nome, hex} → uma por linha "Nome #hex"
   document.getElementById('edit-cores').value = (p.cores || []).map(c => c.hex ? `${c.nome} ${c.hex}` : c.nome).join('\n');
-  if (p.image_url) {
-    document.getElementById('foto-img').src = p.image_url;
-    document.getElementById('foto-img').style.display = 'block';
-    document.getElementById('foto-placeholder').style.display = 'none';
-  }
+  // Sem foto: limpa a prévia (senão ficava a foto do último produto aberto)
+  document.getElementById('foto-img').src = p.image_url || '';
+  document.getElementById('foto-img').style.display = p.image_url ? 'block' : 'none';
+  document.getElementById('foto-placeholder').style.display = p.image_url ? 'none' : '';
   fotoFile = null;
   document.getElementById('modal').style.display = 'flex';
 };
+
+let galeriaFalhou = 0;
+
+// Especificações: textarea "Nome: Valor" (uma por linha) ⇄ lista [{nome, valor}].
+// Guardado como LISTA (e não objeto) pra manter a ordem que o admin digitou.
+function specsParaTexto(specs) {
+  const lista = Array.isArray(specs) ? specs
+    : Object.entries(specs || {}).map(([nome, valor]) => ({ nome, valor }));
+  return lista.map(s => `${s.nome}: ${s.valor}`).join('\n');
+}
+function textoParaSpecs(texto) {
+  return String(texto || '').split('\n').map(l => l.trim()).filter(Boolean).map(l => {
+    const i = l.indexOf(':');
+    return i > 0
+      ? { nome: l.slice(0, i).trim().slice(0, 60), valor: l.slice(i + 1).trim().slice(0, 200) }
+      : { nome: l.slice(0, 60), valor: '' };
+  }).filter(s => s.nome).slice(0, 30);
+}
 
 window.salvarProduto = async function() {
   const nome = document.getElementById('edit-name').value.trim();
@@ -501,8 +544,14 @@ window.salvarProduto = async function() {
     const resultado = await uploadFoto(fotoFile, nome);
     imageUrl = resultado.imageUrl;
     thumbUrl = resultado.thumbUrl;
+    if (!imageUrl) {
+      btn.disabled = false; btn.textContent = 'Salvar Produto';
+      alert('Não foi possível enviar a foto principal. O produto NÃO foi salvo — tente de novo ou use outra foto.');
+      return;
+    }
   }
   const imagensGaleria = await uploadGaleria(nome);
+  if (galeriaFalhou) alert(`${galeriaFalhou} foto(s) da galeria não foram enviadas. O produto vai ser salvo sem elas.`);
 
   const dados = {
     name: nome,
@@ -514,6 +563,7 @@ window.salvarProduto = async function() {
     emoji: document.getElementById('edit-emoji').value || '📦',
     imagens: imagensGaleria,
     description: document.getElementById('edit-desc').value,
+    specs: textoParaSpecs(document.getElementById('edit-specs').value),
     oferta: document.getElementById('edit-oferta').checked,
     frete_gratis: document.getElementById('edit-frete-gratis').checked,
     entrega_24h: document.getElementById('edit-entrega-24h').checked,
@@ -526,7 +576,8 @@ window.salvarProduto = async function() {
       .split('\n').map(l => l.trim()).filter(Boolean)
       .map(l => {
         const match = l.match(/^(.+?)\s*(#[0-9a-fA-F]{3,6})?$/);
-        return match ? { nome: match[1].trim(), hex: match[2] || null } : { nome: l, hex: null };
+        // tira ":" que sobra no fim de cores importadas ("Branco:")
+        return match ? { nome: match[1].trim().replace(/[\s:—–-]+$/, ''), hex: match[2] || null } : { nome: l.replace(/[\s:—–-]+$/, ''), hex: null };
       }),
     ativo: true,
     ...(imageUrl ? { image_url: imageUrl } : {}),
@@ -535,9 +586,6 @@ window.salvarProduto = async function() {
 
   const id = document.getElementById('edit-id').value;
   let error;
-
-  console.log('Dados a salvar:', dados);
-  console.log('image_url:', dados.image_url);
 
   if (id) {
     ({ error } = await supabase.from('produtos').update(dados).eq('id', id));
