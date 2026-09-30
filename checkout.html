@@ -159,7 +159,7 @@ async function mostrarAvisoPedidoPendente() {
   if (!id) return;
   if (_pedidoPendenteCache === undefined) {
     const sb = await _clienteSupabase();
-    const { data } = await sb.from('pedidos').select('id, status, pagamento, total').eq('id', id).maybeSingle();
+    const { data } = await sb.from('pedidos').select('id, status, pagamento, total, created_at').eq('id', id).maybeSingle();
     _pedidoPendenteCache = data || null;
   }
   const p = _pedidoPendenteCache;
@@ -176,6 +176,7 @@ async function mostrarAvisoPedidoPendente() {
     <div style="background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.4);border-radius:12px;padding:16px">
       <p style="font-weight:700;margin-bottom:4px">⏳ Você tem um pedido aguardando pagamento</p>
       <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px">Pedido #${esc(p.id.slice(0, 8).toUpperCase())} — ${formatPrice(p.total)} (${p.pagamento === 'pix' ? 'Pix' : 'Cartão'}). Quer pagar esse pedido ou cancelar e escolher outra forma de pagamento?</p>
+      ${p.created_at ? `<p style="font-size:13px;font-weight:700;margin-bottom:12px">Tempo pra pagar: <span data-expira="${new Date(new Date(p.created_at).getTime() + 24 * 60 * 60 * 1000).toISOString()}" style="font-variant-numeric:tabular-nums;color:#f59e0b">--:--:--</span></p>` : ''}
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button type="button" class="btn btn-primary btn-sm" onclick="pagarPedidoPendente(this)">💳 Pagar esse pedido</button>
         <button type="button" class="btn btn-outline btn-sm" onclick="cancelarPedidoPendente(this)">Cancelar e trocar pagamento</button>

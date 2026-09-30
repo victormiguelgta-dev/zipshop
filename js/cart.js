@@ -351,6 +351,24 @@ function showToast(msg, type = 'info') {
   t._timeout = setTimeout(() => t.classList.remove('show'), 2500);
 }
 
+// Contador regressivo do prazo de pagamento (Pix/cartão).
+// Qualquer elemento com data-expira="<data ISO>" vira "12:34:56" e se
+// atualiza sozinho a cada segundo. Usado em Meus Pedidos e no checkout.
+function atualizarContadores() {
+  document.querySelectorAll('[data-expira]').forEach(el => {
+    const falta = new Date(el.dataset.expira) - Date.now();
+    if (isNaN(falta)) return;
+    if (falta <= 0) { el.textContent = 'prazo encerrado'; el.style.color = '#ef4444'; return; }
+    const s = Math.floor(falta / 1000);
+    const hh = String(Math.floor(s / 3600)).padStart(2, '0');
+    const mm = String(Math.floor(s / 60) % 60).padStart(2, '0');
+    const ss = String(s % 60).padStart(2, '0');
+    el.textContent = `${hh}:${mm}:${ss}`;
+    if (falta < 60 * 60 * 1000) el.style.color = '#ef4444'; // última hora em vermelho
+  });
+}
+setInterval(atualizarContadores, 1000);
+
 // Inicializa o carrinho flutuante quando a página carrega
 document.addEventListener('DOMContentLoaded', () => {
   updateCartBadge();
