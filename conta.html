@@ -124,11 +124,13 @@ document.getElementById('avatar-input').addEventListener('change', async (e) => 
   if (!original) return;
   if (!original.type.startsWith('image/')) { showToast('Escolha um arquivo de imagem.', 'error'); return; }
 
+  // Pessoa ajusta o enquadramento na máscara redonda (js/imagem.js)
+  const foto = await recortarImagem(original, { ...PRESET_IMAGEM.avatar, titulo: 'Ajustar foto de perfil' });
+  if (!foto) return;
+
   const btn = document.getElementById('avatar-btn');
   btn.classList.add('carregando');
   try {
-    // Quadrado 256×256 leve (js/imagem.js)
-    const foto = await otimizarImagem(original, PRESET_IMAGEM.avatar);
     if (foto.size > 2 * 1024 * 1024) { showToast('Imagem muito grande. Tente outra foto.', 'error'); return; }
 
     const path = `${user.id}/avatar-${Date.now()}.${extensaoImagem(foto)}`;

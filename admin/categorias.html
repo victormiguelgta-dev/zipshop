@@ -159,9 +159,13 @@ if (!isAdmin) throw new Error('acesso negado');
 let fotoFile = null;
 
 window.previewFoto = async function(input) {
-  if (!input.files[0]) return;
-  // Ícone de categoria: quadrado 400×400 leve (js/imagem.js)
-  fotoFile = await otimizarImagem(input.files[0], PRESET_IMAGEM.categoria);
+  const original = input.files[0];
+  input.value = '';
+  if (!original) return;
+  // Ícone de categoria: quadrado 400×400, com ajuste de enquadramento (js/imagem.js)
+  const recortada = await recortarImagem(original, { ...PRESET_IMAGEM.categoria, titulo: 'Ajustar imagem da categoria' });
+  if (!recortada) return;
+  fotoFile = recortada;
   const reader = new FileReader();
   reader.onload = e => {
     document.getElementById('foto-img').src = e.target.result;
