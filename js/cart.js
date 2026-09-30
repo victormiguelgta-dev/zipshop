@@ -89,9 +89,16 @@ function cartItemImgHTML(item, tamanho = 80) {
   return `<div class="cart-item-img" style="${base}background:linear-gradient(135deg,#1e3a6e,#2563eb);display:flex;align-items:center;justify-content:center;font-size:${Math.round(tamanho / 2)}px">${emoji}</div>`;
 }
 
+// Cada linha do carrinho é produto + variação (cor). Duas cores do mesmo
+// produto ficam em linhas separadas em vez de somar numa só.
+function chaveItem(item) {
+  return item.cor ? `${item.id}|${item.cor}` : String(item.id);
+}
+
 function addToCart(productId, qty = 1, productData = null, event = null) {
   const cart = getCart();
-  const existing = cart.find(i => i.id === productId);
+  const chave = chaveItem({ id: productId, cor: productData?.cor });
+  const existing = cart.find(i => chaveItem(i) === chave);
   if (existing) {
     existing.qty += qty;
     // CORREÇÃO BUG 1: atualiza o preço sempre que o produto já está no carrinho
@@ -104,6 +111,7 @@ function addToCart(productId, qty = 1, productData = null, event = null) {
     }
   } else {
     const item = { id: productId, qty };
+    if (productData?.cor) item.cor = productData.cor;
     if (productData) {
       item.price = productData.price;
       item.name  = productData.name;
@@ -124,14 +132,15 @@ function addToCart(productId, qty = 1, productData = null, event = null) {
   anunciarLeitorTela('Produto adicionado ao carrinho');
 }
 
-function removeFromCart(productId) {
-  const cart = getCart().filter(i => i.id !== productId);
+// "chave" = chaveItem(item): identifica a linha (produto + cor)
+function removeFromCart(chave) {
+  const cart = getCart().filter(i => chaveItem(i) !== String(chave));
   saveCart(cart);
 }
 
-function updateQty(productId, qty) {
+function updateQty(chave, qty) {
   const cart = getCart();
-  const item = cart.find(i => i.id === productId);
+  const item = cart.find(i => chaveItem(i) === String(chave));
   if (item) { item.qty = Math.max(1, qty); saveCart(cart); }
 }
 

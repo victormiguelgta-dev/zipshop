@@ -467,7 +467,7 @@ window.changeQty = function(dir) {
 window.doAddToCart = function(event) {
   if (window._produto) {
     const prodComCor = _corSelecionada
-      ? { ...window._produto, name: window._produto.name + ' — ' + _corSelecionada }
+      ? { ...window._produto, name: window._produto.name + ' — ' + _corSelecionada, cor: _corSelecionada }
       : window._produto;
     addToCart(prodComCor.id, qty, prodComCor, event);
   }
