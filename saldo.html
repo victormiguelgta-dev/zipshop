@@ -43,6 +43,14 @@
     </div>
   </div>
 
+  <!-- Bônus por avaliação (crédito feito pelo banco: _interno/sql-bonus-avaliacao.sql) -->
+  <div class="card" style="margin-bottom:20px">
+    <div class="card-body">
+      <p style="font-weight:700;margin-bottom:4px">⭐ Avalie e ganhe</p>
+      <p style="font-size:13px;color:var(--text-muted)">Ganhe <strong style="color:var(--primary)">R$ 0,50</strong> de saldo a cada produto que você avaliar depois de receber. É só abrir o produto, ir na aba <strong>Avaliações</strong> e contar como foi.</p>
+    </div>
+  </div>
+
   <!-- Extrato -->
   <p style="font-weight:900;font-size:15px;margin-bottom:10px">Extrato</p>
   <div id="extrato-lista">
@@ -93,7 +101,7 @@ async function carregarSaldo() {
     return;
   }
 
-  const rotulos = { cashback: '💰 Cashback', indicacao: '🤝 Indicação', resgate: '🛒 Usado em uma compra' };
+  const rotulos = { cashback: '💰 Cashback', indicacao: '🤝 Indicação', resgate: '🛒 Usado em uma compra', reembolso: '↩️ Reembolso', avaliacao: '⭐ Avaliação' };
   lista.innerHTML = extrato.map(e => `
     <div class="card" style="margin-bottom:8px">
       <div class="card-body" style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px">

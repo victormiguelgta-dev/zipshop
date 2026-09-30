@@ -60,7 +60,11 @@
 
   function getDestino(userObj) {
     const params = new URLSearchParams(window.location.search);
-    if (params.get('redirect') === 'checkout') return 'checkout.html';
+    const redirect = params.get('redirect') || '';
+    if (redirect === 'checkout') return 'checkout.html';
+    // Volta pra página de onde veio (ex: produto.html?id=7, saldo.html).
+    // Só aceita página interna do site — nada de "https://outro-site".
+    if (/^[a-z0-9_-]+\.html(\?[a-z0-9_=&%.-]*)?$/i.test(redirect)) return redirect;
     if (ADMIN_EMAILS.includes(userObj?.email)) return 'admin/index.html';
     return 'conta.html';
   }

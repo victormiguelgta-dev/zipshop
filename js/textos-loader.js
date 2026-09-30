@@ -122,6 +122,16 @@ function aplicarEm(el, mapa) {
   } else {
     el.textContent = valor;
   }
+
+  // data-texto-mailto: o link (<a> em volta) acompanha o e-mail editado no
+  // painel. Só aceita algo com cara de e-mail, pra não virar link estranho.
+  if (el.hasAttribute('data-texto-mailto')) {
+    const email = String(valor).trim();
+    const link = el.closest('a');
+    if (link && /^[^\s@<>"']+@[^\s@<>"']+\.[a-z]{2,}$/i.test(email)) {
+      link.href = 'mailto:' + email;
+    }
+  }
 }
 
 /**

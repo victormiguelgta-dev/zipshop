@@ -136,9 +136,9 @@ function footerHTML() {
               <span style="background:#25D366;border-radius:4px;padding:2px 6px;font-size:11px;color:white;font-weight:700">WhatsApp</span>
               <span data-texto="footer_link_whatsapp">Fale pelo WhatsApp</span>
             </a>
-            <a href="mailto:suporte@zipshop.com" style="display:flex;align-items:center;gap:6px">
+            <a href="mailto:zipshopsm@gmail.com" style="display:flex;align-items:center;gap:6px">
               <span style="background:#ea4335;border-radius:4px;padding:2px 6px;font-size:11px;color:white;font-weight:700">E-mail</span>
-              <span data-texto="footer_link_email">suporte@zipshop.com</span>
+              <span data-texto="footer_link_email" data-texto-mailto>zipshopsm@gmail.com</span>
             </a>
             <a href="${BASE}/termos.html" style="color:var(--text-muted);font-size:12px" data-texto="footer_link_termos">Termos de Uso</a>
           </div>
