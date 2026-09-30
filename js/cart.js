@@ -119,14 +119,9 @@ function addToCart(productId, qty = 1, productData = null, event = null) {
   // arquivo é script clássico, não módulo)
   import('/js/analytics.js').then(m => m.registrarEvento('adicionar_carrinho', { produtoId: productId })).catch(() => {});
 
-  // Animação ao adicionar
-  if (event) {
-    animarVooCarrinho(event, productData?.emoji || '📦');
-  } else {
-    animarBounce();
-  }
-
-  showToast('✅ Adicionado ao carrinho!', 'success');
+  // Feedback: a foto do produto voa até o carrinho (sem pop-up)
+  animarVooCarrinho(event, productData);
+  anunciarLeitorTela('Produto adicionado ao carrinho');
 }
 
 function removeFromCart(productId) {
@@ -204,6 +199,17 @@ function updateFloatCart() {
     document.body.appendChild(cart);
     document.body.classList.add('has-float-cart');
     requestAnimationFrame(() => cart.classList.add('visible'));
+    // Altura real da barra (muda entre celular e computador): o botão do
+    // WhatsApp usa isso pra ficar logo ACIMA dela, sem cobrir o "Ver Carrinho"
+    const medir = () => document.documentElement.style.setProperty('--altura-float-cart', cart.offsetHeight + 'px');
+    requestAnimationFrame(medir);
+    if (!window._medirFloatCart) {
+      window._medirFloatCart = true;
+      window.addEventListener('resize', () => {
+        const c = document.getElementById('cart-float');
+        if (c) document.documentElement.style.setProperty('--altura-float-cart', c.offsetHeight + 'px');
+      });
+    }
   } else {
     const badge = document.getElementById('cart-float-badge');
     const totalEl = document.getElementById('cart-float-total');
@@ -215,42 +221,85 @@ function updateFloatCart() {
 }
 
 // Animação: produto voa até o carrinho
-function animarVooCarrinho(event, emoji) {
-  const btn = event?.target || event?.currentTarget;
-  if (!btn) { animarBounce(); return; }
+// Pega o carrinho que está visível na tela: o da navbar (fica fixa no
+// topo) ou, se não der, a barra flutuante de baixo.
+function alvoDoCarrinho() {
+  for (const el of [document.querySelector('.cart-btn'), document.getElementById('cart-float')]) {
+    if (!el) continue;
+    const r = el.getBoundingClientRect();
+    if (r.width && r.bottom > 0 && r.top < window.innerHeight) return el;
+  }
+  return null;
+}
 
-  const rect = btn.getBoundingClientRect();
-  const cartIcon = document.querySelector('.cart-btn') || document.getElementById('cart-float');
-  const cartRect = cartIcon ? cartIcon.getBoundingClientRect() : { left: window.innerWidth - 60, top: 20 };
+// Foto do produto voa em arco do botão/card até o carrinho, diminuindo.
+// Quando chega, o ícone do carrinho dá um "pulinho".
+function animarVooCarrinho(event, productData) {
+  const botao = event?.target instanceof Element ? (event.target.closest('button, a') || event.target) : null;
+  const alvo = alvoDoCarrinho();
+  const menosMovimento = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  if (!botao || !alvo || menosMovimento || !Element.prototype.animate) { animarBounce(); return; }
 
-  const fly = document.createElement('div');
-  fly.className = 'fly-item';
-  fly.textContent = emoji;
-  fly.style.left = `${rect.left + rect.width / 2}px`;
-  fly.style.top = `${rect.top + rect.height / 2}px`;
-  fly.style.setProperty('--fly-x', `${(cartRect.left - rect.left) * 0.5}px`);
-  fly.style.setProperty('--fly-y', `${(cartRect.top - rect.top) * 0.5}px`);
-  fly.style.setProperty('--fly-x2', `${cartRect.left - rect.left}px`);
-  fly.style.setProperty('--fly-y2', `${cartRect.top - rect.top}px`);
-  document.body.appendChild(fly);
-  setTimeout(() => fly.remove(), 800);
+  // Origem: a foto do card, ou a foto grande na página do produto
+  const card = botao.closest('.product-card');
+  const foto = card ? card.querySelector('.product-card-img img') : document.getElementById('detail-main-img');
+  const origem = (foto || botao).getBoundingClientRect();
+  const destino = alvo.getBoundingClientRect();
 
-  // Partículas
-  for (let i = 0; i < 6; i++) {
-    const p = document.createElement('div');
-    p.className = 'particle';
-    p.style.left = `${rect.left + rect.width / 2}px`;
-    p.style.top = `${rect.top + rect.height / 2}px`;
-    const angle = (i / 6) * 360;
-    const dist = 40 + Math.random() * 30;
-    p.style.setProperty('--px', `${Math.cos(angle) * dist}px`);
-    p.style.setProperty('--py', `${Math.sin(angle) * dist}px`);
-    p.style.background = i % 2 === 0 ? '#AAEF00' : '#fff';
-    document.body.appendChild(p);
-    setTimeout(() => p.remove(), 700);
+  const TAM = 56;
+  const voo = document.createElement('div');
+  voo.className = 'voo-carrinho';
+  voo.setAttribute('aria-hidden', 'true');
+  const src = foto?.currentSrc || foto?.src || productData?.image_thumb_url || productData?.image_url;
+  if (src) {
+    const img = document.createElement('img');
+    img.src = src; img.alt = '';
+    voo.appendChild(img);
+  } else {
+    voo.textContent = productData?.emoji || '📦';
   }
 
-  setTimeout(() => animarBounce(), 600);
+  const x0 = origem.left + origem.width / 2 - TAM / 2;
+  const y0 = origem.top + origem.height / 2 - TAM / 2;
+  const dx = destino.left + destino.width / 2 - TAM / 2 - x0;
+  const dy = destino.top + destino.height / 2 - TAM / 2 - y0;
+  voo.style.left = `${x0}px`;
+  voo.style.top = `${y0}px`;
+  document.body.appendChild(voo);
+
+  // Curva (Bézier quadrática) com o ponto de controle acima do caminho,
+  // pra fazer o arco. Vários quadros deixam a curva suave.
+  const cx = dx * 0.5, cy = Math.min(0, dy) - 120;
+  const quadros = [];
+  for (let i = 0; i <= 16; i++) {
+    const t = i / 16, u = 1 - t;
+    const x = 2 * u * t * cx + t * t * dx;
+    const y = 2 * u * t * cy + t * t * dy;
+    quadros.push({ transform: `translate(${x}px, ${y}px) scale(${1 - 0.7 * t})`, opacity: t < 0.85 ? 1 : 0.6 });
+  }
+  const anim = voo.animate(quadros, { duration: 750, easing: 'ease-in' });
+  anim.onfinish = anim.oncancel = () => {
+    voo.remove();
+    alvo.animate(
+      [{ transform: 'scale(1)' }, { transform: 'scale(1.25)' }, { transform: 'scale(1)' }],
+      { duration: 350, easing: 'ease-out' }
+    );
+    animarBounce();
+  };
+}
+
+// Sem pop-up na tela, avisa quem usa leitor de tela
+function anunciarLeitorTela(msg) {
+  let el = document.getElementById('aviso-leitor-tela');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'aviso-leitor-tela';
+    el.setAttribute('aria-live', 'polite');
+    el.style.cssText = 'position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap';
+    document.body.appendChild(el);
+  }
+  el.textContent = '';
+  setTimeout(() => { el.textContent = msg; }, 50);
 }
 
 // Bounce no badge do carrinho

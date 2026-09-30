@@ -65,7 +65,7 @@ if (!lista.length) {
       <div class="product-card-footer">
         ${esgotado
           ? '<button class="btn btn-outline btn-full btn-sm" disabled onclick="event.preventDefault()">Sem estoque</button>'
-          : `<button class="btn btn-primary btn-full btn-sm" onclick="event.preventDefault(); addToCart(${p.id}, 1, ${JSON.stringify(p).replace(/"/g,'&quot;')})">🛒 Adicionar</button>`}
+          : `<button class="btn btn-primary btn-full btn-sm" onclick="event.preventDefault(); addToCart(${p.id}, 1, ${JSON.stringify(p).replace(/"/g,'&quot;')}, event)">🛒 Adicionar</button>`}
       </div>
     </a>`; }).join('');
 }
