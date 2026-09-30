@@ -1,5 +1,14 @@
 const https = require('https');
 
+// Tempo que o cliente tem para pagar um pedido online (Pix/cartão).
+// Tem que ser igual ao da função expirar-pedidos-pendentes.
+const PRAZO_PAGAMENTO_HORAS = 24;
+
+// Formato de data que o Mercado Pago aceita: 2026-09-30T14:00:00.000-03:00
+function dataMP(d) {
+  return new Date(d.getTime() - 3 * 60 * 60 * 1000).toISOString().replace('Z', '-03:00');
+}
+
 // Busca produto real no Supabase pelo ID (preço confiável, não vem do navegador)
 function buscarProduto(produtoId) {
   return new Promise((resolve, reject) => {
@@ -111,6 +120,15 @@ exports.handler = async (event) => {
       return { statusCode: 409, body: JSON.stringify({ erro: 'Este pedido não está mais aguardando pagamento.' }) };
     }
 
+    // 1b2. Prazo para pagar: depois disso o pedido é cancelado sozinho
+    // (função expirar-pedidos-pendentes) e o saldo/cupom/estoque voltam.
+    // created_at é gravado em UTC sem fuso, por isso o 'Z'.
+    const criadoEm = new Date(String(pedido.created_at).replace(' ', 'T') + 'Z');
+    const expiraEm = new Date(criadoEm.getTime() + PRAZO_PAGAMENTO_HORAS * 60 * 60 * 1000);
+    if (!isNaN(expiraEm) && expiraEm <= new Date()) {
+      return { statusCode: 409, body: JSON.stringify({ erro: 'O prazo para pagar este pedido acabou. Faça um novo pedido.' }) };
+    }
+
     // 1c. Se o pedido tem dono, confirma pelo token que quem paga é o dono
     const donoId = pedido.usuario_id;
     if (donoId && donoId !== 'anonimo') {
@@ -196,7 +214,14 @@ exports.handler = async (event) => {
             excluded_payment_types: [{ id: 'ticket' }],
             installments: 12
           },
-      statement_descriptor: 'ZIPSHOP'
+      statement_descriptor: 'ZIPSHOP',
+      // O Mercado Pago para de aceitar pagamento quando o prazo acaba,
+      // assim ninguém paga um pedido que já foi cancelado.
+      ...(isNaN(expiraEm) ? {} : {
+        expires: true,
+        expiration_date_to: dataMP(expiraEm),
+        date_of_expiration: dataMP(expiraEm)
+      })
     };
 
     const result = await new Promise((resolve, reject) => {

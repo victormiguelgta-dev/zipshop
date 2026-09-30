@@ -6,6 +6,11 @@
 [functions."lembrete-carrinho-abandonado"]
   schedule = "@hourly"
 
+# Roda de hora em hora: cancela pedidos Pix/cartão não pagos no prazo
+# (o banco devolve saldo, cupom e estoque ao cancelar)
+[functions."expirar-pedidos-pendentes"]
+  schedule = "@hourly"
+
 [[headers]]
   for = "/*"
   [headers.values]
