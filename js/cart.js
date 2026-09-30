@@ -95,7 +95,19 @@ function chaveItem(item) {
   return item.cor ? `${item.id}|${item.cor}` : String(item.id);
 }
 
+// O produto tem cores cadastradas? (mesmo filtro da página do produto)
+function temCores(p) {
+  return Array.isArray(p?.cores) && p.cores.some(c => String(c?.nome || '').replace(/[\s:—–-]+$/, ''));
+}
+
 function addToCart(productId, qty = 1, productData = null, event = null) {
+  // Botão "Adicionar" dos cards não tem como escolher a cor: manda pra
+  // página do produto, onde o cliente escolhe
+  if (temCores(productData) && !productData.cor) {
+    showToast('Escolha a cor do produto', 'info');
+    setTimeout(() => { window.location.href = `produto.html?id=${encodeURIComponent(productId)}`; }, 600);
+    return;
+  }
   const cart = getCart();
   const chave = chaveItem({ id: productId, cor: productData?.cor });
   const existing = cart.find(i => chaveItem(i) === chave);

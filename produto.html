@@ -166,7 +166,7 @@ async function render() {
         <div style="display:flex;gap:16px;flex-wrap:wrap">
           <span style="font-size:13px;color:var(--text-muted)">🔒 Compra 100% segura</span>
           <span style="font-size:13px;color:var(--text-muted)">🔄 30 dias para troca</span>
-          <span style="font-size:13px;color:var(--text-muted)">🛡️ Garantia ${p.garantia || '12 meses'}</span>
+          ${p.garantia ? `<span style="font-size:13px;color:var(--text-muted)">🛡️ Garantia ${esc(p.garantia)}</span>` : ''}
         </div>
       </div>
     </div>
@@ -263,6 +263,14 @@ window.selecionarCor = function(nome, btn) {
   btn.style.borderColor = 'var(--primary)';
   btn.style.color = 'var(--primary)';
 };
+
+function avisarEscolherCor() {
+  const box = document.getElementById('cores-container');
+  if (!box) return;
+  showToast('Escolha a cor antes de adicionar ao carrinho', 'error');
+  box.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  box.querySelectorAll('button').forEach(b => { b.style.borderColor = '#ef4444'; });
+}
 
 // ——— AVALIAÇÕES ———
 async function carregarAvaliacoes(p) {
@@ -466,6 +474,12 @@ window.changeQty = function(dir) {
 
 window.doAddToCart = function(event) {
   if (window._produto) {
+    // Produto com cores: o cliente precisa escolher antes, senão a loja
+    // não sabe qual cor mandar
+    if (!_corSelecionada && document.getElementById('cores-container')) {
+      avisarEscolherCor();
+      return;
+    }
     const prodComCor = _corSelecionada
       ? { ...window._produto, name: window._produto.name + ' — ' + _corSelecionada, cor: _corSelecionada }
       : window._produto;
