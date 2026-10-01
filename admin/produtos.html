@@ -5,6 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Produtos Admin — Zipshop</title>
   <link rel="stylesheet" href="../css/style.css">
+<style>
+/* Edição rápida na lista de produtos */
+.inline-edit { background: var(--bg-muted); border: 1px solid var(--border); color: var(--text); border-radius: 8px; padding: 6px 8px; font-size: 13px; max-width: 150px; outline: none; transition: border-color .2s; }
+.inline-edit:focus { border-color: var(--primary); }
+.inline-num { width: 90px; font-weight: 700; }
+</style>
 </head>
 <body>
 <div class="admin-layout">
@@ -400,7 +406,11 @@ async function uploadFoto(file, nomeProduto) {
 
 // Carregar produtos
 async function carregar() {
-  const { data } = await supabase.from('produtos').select('*').order('id');
+  const [{ data }, { data: catsPainel }] = await Promise.all([
+    supabase.from('produtos').select('*').order('id'),
+    supabase.from('categorias').select('name').order('name')
+  ]);
+  categoriasPainel = (catsPainel || []).map(c => c.name).filter(Boolean);
   produtos = data || [];
 
   // Preenche filtro de categorias
@@ -412,6 +422,54 @@ async function carregar() {
   sel.value = valorAtual;
 
   renderTabela(produtos);
+}
+
+// ——— Edição rápida direto na lista (categoria, preço, estoque) ———
+let categoriasPainel = [];
+function escAttr(t) { return String(t ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;'); }
+function selectCategoriaHTML(p) {
+  const atual = p.category || '';
+  const existe = categoriasPainel.includes(atual);
+  return `<select class="inline-edit" aria-label="Categoria" onchange="salvarCampo(${p.id}, 'category', this)"${existe ? '' : ' style="border-color:#f59e0b"'}>
+    ${existe ? '' : `<option value="${escAttr(atual)}" selected>${escAttr(atual || '—')} (antiga)</option>`}
+    ${categoriasPainel.map(c => `<option value="${escAttr(c)}"${c === atual ? ' selected' : ''}>${escAttr(c)}</option>`).join('')}
+  </select>`;
+}
+window.salvarCampo = async function(id, campo, el) {
+  const p = produtos.find(x => x.id === id);
+  if (!p) return;
+  let valor = el.value;
+  if (campo === 'price') {
+    valor = Math.round(parseFloat(valor) * 100) / 100;
+    if (!(valor > 0)) { el.value = p.price; mostrarToast('Preço inválido', 'error'); return; }
+  } else if (campo === 'stock') {
+    valor = parseInt(valor);
+    if (isNaN(valor) || valor < 0) { el.value = p.stock ?? 0; mostrarToast('Estoque inválido', 'error'); return; }
+  } else if (campo === 'category' && !valor) return;
+  if (p[campo] === valor) return;
+  el.disabled = true;
+  const { error } = await supabase.from('produtos').update({ [campo]: valor }).eq('id', id);
+  el.disabled = false;
+  if (error) {
+    el.value = p[campo] ?? '';
+    mostrarToast('Erro ao salvar: ' + error.message, 'error');
+    return;
+  }
+  p[campo] = valor;
+  if (campo === 'category') {
+    // trocou de uma categoria antiga: tira a opção "(antiga)" e o aviso laranja
+    [...el.options].filter(o => o.textContent.endsWith('(antiga)')).forEach(o => o.remove());
+  }
+  el.style.borderColor = 'var(--primary)';
+  setTimeout(() => { el.style.borderColor = ''; }, 1200);
+  mostrarToast('Salvo ✓', 'success');
+};
+function mostrarToast(msg, tipo) {
+  const t = document.createElement('div');
+  t.className = `toast ${tipo} show`;
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 1800);
 }
 
 function renderTabela(lista) {
@@ -434,9 +492,13 @@ function renderTabela(lista) {
           </div>
         </div>
       </td>
-      <td><span class="badge badge-muted">${p.category}</span></td>
-      <td style="font-weight:700">${formatPrice(p.price)}</td>
-      <td>${p.stock||0}</td>
+      <td>${selectCategoriaHTML(p)}</td>
+      <td>${(p.variacoes || []).length
+        ? `<span style="font-weight:700">${formatPrice(Math.min(...p.variacoes.map(v => Number(v.preco) || Number(p.price))))}</span><br><a href="#" onclick="event.preventDefault(); editarProduto(${p.id})" style="font-size:11px;color:var(--text-muted)">🧩 ${p.variacoes.length} opções</a>`
+        : `<input type="number" class="inline-edit inline-num" step="0.01" min="0" value="${p.price}" aria-label="Preço" onchange="salvarCampo(${p.id}, 'price', this)">`}</td>
+      <td>${(p.variacoes || []).length
+        ? `<span title="Estoque das opções">${p.stock ?? '—'}</span>`
+        : `<input type="number" class="inline-edit inline-num" step="1" min="0" value="${p.stock ?? 0}" aria-label="Estoque" onchange="salvarCampo(${p.id}, 'stock', this)">`}</td>
       <td>
         <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
           <input type="checkbox" ${p.ativo?'checked':''} onchange="toggleAtivo(${p.id}, this.checked)">
