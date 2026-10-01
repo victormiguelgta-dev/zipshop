@@ -196,14 +196,7 @@
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
           <div class="form-group">
             <label class="form-label">Categoria</label>
-            <select class="form-input" id="in-categoria">
-              <option>Smartphones</option>
-              <option>Notebooks</option>
-              <option>Headphones</option>
-              <option>Smart TVs</option>
-              <option>Games</option>
-              <option>Acessorios</option>
-            </select>
+            <select class="form-input" id="in-categoria"><option value="">Carregando...</option></select>
           </div>
           <div class="form-group">
             <label class="form-label">Marca</label>
@@ -272,6 +265,14 @@
 <script src="../js/imagem.js"></script>
 <script type="module">
 import { isAdmin, supabase } from '../js/admin-guard.js';
+import { preencherCategorias, carregarMarcas, sugerirMarcas, normalizarMarca } from '../js/admin-catalogo.js';
+let marcas = [];
+let categoriasPainel = [];
+(async () => {
+  categoriasPainel = await preencherCategorias(supabase, document.getElementById('in-categoria'), '');
+  marcas = await carregarMarcas(supabase);
+  sugerirMarcas(document.getElementById('in-marca'), marcas);
+})();
 if (!isAdmin) throw new Error('not admin');
 
 document.getElementById('btn-logout').addEventListener('click', async (e) => {
@@ -369,7 +370,7 @@ window.analisar = async function() {
     const resp = await fetch('/.netlify/functions/analisar-produto', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (_sess?.access_token || '') },
-      body: JSON.stringify({ texto })
+      body: JSON.stringify({ texto, categorias: categoriasPainel })
     });
     const dados = await resp.json();
 
@@ -379,12 +380,14 @@ window.analisar = async function() {
     }
 
     document.getElementById('in-nome').value = dados.name || '';
-    document.getElementById('in-marca').value = dados.brand || '';
+    document.getElementById('in-marca').value = normalizarMarca(dados.brand || '', marcas);
     document.getElementById('in-desc').value = dados.description || '';
     document.getElementById('in-specs').value = specsParaTexto(dados.especificacoes || []);
     document.getElementById('in-emoji').value = dados.emoji || '📦';
     if (dados.custo) document.getElementById('in-custo').value = dados.custo;
-    if (dados.category) document.getElementById('in-categoria').value = dados.category;
+    // A IA sugere a categoria; só aplica se existir no painel (sem diferença de maiúsculas)
+    const catIA = categoriasPainel.find(c => c.toLowerCase() === String(dados.category || '').trim().toLowerCase());
+    if (catIA) document.getElementById('in-categoria').value = catIA;
     calcularPreco();
 
     status.textContent = '✅ Pronto! Confira os campos ao lado antes de salvar.';
@@ -439,13 +442,14 @@ window.salvarProduto = async function() {
     if (r) enviadas.push(r);
   }
 
+  if (!document.getElementById('in-categoria').value) { alert('Escolha a categoria'); return; }
   status.textContent = 'Cadastrando produto...';
 
   const precoVenda = calcularPreco();
 
   const dados = {
     name: nome,
-    brand: document.getElementById('in-marca').value.trim(),
+    brand: normalizarMarca(document.getElementById('in-marca').value, marcas),
     category: document.getElementById('in-categoria').value,
     description: document.getElementById('in-desc').value.trim(),
     specs: textoParaSpecs(document.getElementById('in-specs').value),

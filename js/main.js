@@ -38,6 +38,45 @@ window.atualizarAvatarNavbar = function(url) {
   if (el) el.outerHTML = navAvatarHTML(url);
 };
 
+// Categorias vêm do painel (tabela categorias). Guardamos uma cópia pra
+// barra aparecer na hora; o initPage busca a versão atual e atualiza.
+const CATS_CACHE_KEY = 'zipshop_categorias_v1';
+function categoriasSalvas() {
+  try { const c = JSON.parse(localStorage.getItem(CATS_CACHE_KEY) || '[]'); return Array.isArray(c) ? c : []; }
+  catch (e) { return []; }
+}
+function escTexto(t) {
+  return String(t ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[ch]));
+}
+function navCategoriasHTML() {
+  const atual = new URLSearchParams(location.search).get('cat');
+  return categoriasSalvas().map(nome =>
+    `<a href="${BASE}/produtos.html?cat=${encodeURIComponent(nome)}" class="nav-cat-link${nome === atual ? ' ativa' : ''}">${escTexto(nome)}</a>`
+  ).join('');
+}
+function footerCategoriasHTML() {
+  return categoriasSalvas().slice(0, 4).map(nome =>
+    `<a href="${BASE}/produtos.html?cat=${encodeURIComponent(nome)}">${escTexto(nome)}</a>`
+  ).join('');
+}
+async function atualizarCategoriasNav(sb) {
+  try {
+    const { data } = await sb.from('categorias').select('name').eq('ativo', true).order('name');
+    if (!data) return;
+    const nomes = data.map(c => c.name).filter(Boolean);
+    if (JSON.stringify(nomes) === JSON.stringify(categoriasSalvas())) return;
+    localStorage.setItem(CATS_CACHE_KEY, JSON.stringify(nomes));
+    const ofertas = document.querySelector('.nav-categories-inner .highlight');
+    document.querySelectorAll('.nav-categories-inner .nav-cat-link:not(.highlight)').forEach(a => a.remove());
+    ofertas?.insertAdjacentHTML('beforebegin', navCategoriasHTML());
+    const col = document.querySelector('#footer .footer-links');
+    if (col) {
+      col.querySelectorAll('a[href*="?cat="]').forEach(a => a.remove());
+      col.insertAdjacentHTML('beforeend', footerCategoriasHTML());
+    }
+  } catch (e) { /* sem rede: fica a cópia salva */ }
+}
+
 function navbarHTML(user, isAdmin = false) {
   const primeiroNome = (user?.user_metadata?.full_name || user?.email || '').split(' ')[0].split('@')[0]
     .replace(/[<>&"']/g, '');
@@ -76,12 +115,7 @@ function navbarHTML(user, isAdmin = false) {
     </form>
     <div class="nav-categories">
       <div class="nav-categories-inner">
-        <a href="${BASE}/produtos.html?cat=Smartphones" class="nav-cat-link" data-texto="navbar_cat_1">Smartphones</a>
-        <a href="${BASE}/produtos.html?cat=Notebooks" class="nav-cat-link" data-texto="navbar_cat_2">Notebooks</a>
-        <a href="${BASE}/produtos.html?cat=Headphones" class="nav-cat-link" data-texto="navbar_cat_3">Headphones</a>
-        <a href="${BASE}/produtos.html?cat=Smart+TVs" class="nav-cat-link" data-texto="navbar_cat_4">Smart TVs</a>
-        <a href="${BASE}/produtos.html?cat=Games" class="nav-cat-link" data-texto="navbar_cat_5">Games</a>
-        <a href="${BASE}/produtos.html?cat=Acessorios" class="nav-cat-link" data-texto="navbar_cat_6">Acessórios</a>
+        ${navCategoriasHTML()}
         <a href="${BASE}/produtos.html?deal=1" class="nav-cat-link highlight" data-texto="navbar_cat_ofertas">🔥 Ofertas do Dia</a>
       </div>
     </div>
@@ -117,8 +151,7 @@ function footerHTML() {
           <div class="footer-links">
             <a href="${BASE}/produtos.html" data-texto="footer_link_todos">Todos os Produtos</a>
             <a href="${BASE}/produtos.html?deal=1" data-texto="footer_link_ofertas">Ofertas do Dia</a>
-            <a href="${BASE}/produtos.html?cat=Smartphones" data-texto="footer_link_smartphones">Smartphones</a>
-            <a href="${BASE}/produtos.html?cat=Notebooks" data-texto="footer_link_notebooks">Notebooks</a>
+            ${footerCategoriasHTML()}
           </div>
         </div>
         <div>
@@ -268,6 +301,7 @@ async function initPage() {
     aplicarTextosEm(footEl);
   }
   updateCartBadge();
+  if (sb) atualizarCategoriasNav(sb);
 
   // Se a sessão mudar depois (login, logout, token renovado) em
   // qualquer aba, atualiza o cabeçalho sem precisar recarregar a página.

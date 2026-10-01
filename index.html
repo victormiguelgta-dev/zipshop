@@ -241,7 +241,7 @@ function productCardHTML(p) {
       <div class="product-installment">ou 10x de ${formatPrice(p.price/10)}</div>
       <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px">
         ${p.frete_gratis ? '<span style="font-size:10px;background:#1a3a1a;color:#4ade80;padding:2px 6px;border-radius:4px;font-weight:700">🚚 Frete Grátis</span>' : ''}
-        ${p.entrega_24h ? '<span style="font-size:10px;background:#1a2a3a;color:#60a5fa;padding:2px 6px;border-radius:4px;font-weight:700">⚡ 24h</span>' : ''}
+        ${p.tipo_estoque === 'dropshipping' ? '<span style="font-size:10px;background:#1a2a3a;color:#93c5fd;padding:2px 6px;border-radius:4px;font-weight:700">🚚 5 a 15 dias</span>' : (p.entrega_24h ? '<span style="font-size:10px;background:#1a2a3a;color:#60a5fa;padding:2px 6px;border-radius:4px;font-weight:700">⚡ 24h</span>' : '')}
       </div>
     </div>
     <div class="product-card-footer">

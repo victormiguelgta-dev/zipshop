@@ -33,9 +33,14 @@ function getUser(token) {
   });
 }
 
-const CATEGORIAS_VALIDAS = [
-  'Smartphones', 'Notebooks', 'Headphones', 'Smart TVs', 'Games', 'Acessorios'
-];
+// As categorias vêm do painel (o navegador manda a lista da tabela
+// categorias). Limpa tudo antes de colocar no prompt.
+function categoriasDoPedido(lista) {
+  return (Array.isArray(lista) ? lista : [])
+    .map(c => String(c || '').replace(/[\r\n"|`]/g, ' ').trim().slice(0, 40))
+    .filter(Boolean)
+    .slice(0, 40);
+}
 
 function chamarGemini(prompt, apiKey) {
   return new Promise((resolve, reject) => {
@@ -96,7 +101,8 @@ exports.handler = async (event) => {
   }
 
   try {
-    const { texto } = JSON.parse(event.body || '{}');
+    const { texto, categorias } = JSON.parse(event.body || '{}');
+    const CATEGORIAS_VALIDAS = categoriasDoPedido(categorias);
 
     if (!texto || texto.trim().length < 20) {
       return {
@@ -117,7 +123,7 @@ Extraia APENAS as informações do produto principal e devolva um JSON com exata
 {
   "name": "nome do produto, limpo e sem emojis de propaganda, no máximo 80 caracteres",
   "brand": "marca do produto, ou string vazia se não identificar",
-  "category": "uma destas opções exatas: ${CATEGORIAS_VALIDAS.join(' | ')}",
+  "category": "${CATEGORIAS_VALIDAS.length ? 'uma destas opções exatas: ' + CATEGORIAS_VALIDAS.join(' | ') : 'string vazia'}",
   "custo": número decimal do preço que aparece no texto, sem R$ e sem separador de milhar (ex: 1299.90). Se houver faixa de preço, use o MENOR valor. Se não houver preço no texto, use 0,
   "description": "descrição do produto em português, clara e vendedora, 2 a 4 frases. Reescreva com suas palavras, não copie literalmente",
   "emoji": "um único emoji que represente o produto",
@@ -168,7 +174,7 @@ ${textoLimitado}`;
 
     // Garante que a categoria é uma das válidas
     if (!CATEGORIAS_VALIDAS.includes(dados.category)) {
-      dados.category = 'Acessorios';
+      dados.category = '';
     }
 
     return {

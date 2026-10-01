@@ -108,7 +108,7 @@ async function render() {
           return `<button type="button" onclick="selecionarVariacao(${i})" id="var-${i}" ${disp ? '' : 'disabled'}
             style="display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:8px 14px;border:2px solid var(--border);border-radius:12px;background:none;cursor:${disp ? 'pointer' : 'not-allowed'};font-size:13px;color:var(--text);transition:border-color .2s;${disp ? '' : 'opacity:.45;text-decoration:line-through'}">
             <span style="font-weight:700">${esc(v.nome)}</span>
-            <span style="font-size:12px;color:var(--text-muted)">${formatPrice(precoVariacao(p, v))}${disp ? '' : ' · esgotado'}</span>
+            <span style="font-size:12px;color:var(--text-muted)">${Number(v.preco_antigo) > precoVariacao(p, v) ? `<s style="opacity:.7">${formatPrice(Number(v.preco_antigo))}</s> ` : ''}${formatPrice(precoVariacao(p, v))}${disp ? '' : ' · esgotado'}</span>
           </button>`;
         }).join('')}
       </div>
@@ -155,18 +155,24 @@ async function render() {
           <span class="stars-count">(${p.reviews} avaliações)</span>
           ${p.discount ? `<span class="badge badge-red">-${p.discount}%</span>` : ''}
         </div>
-        ${p.oldPrice ? `<div class="detail-price-old">${formatPrice(p.oldPrice)}</div>` : ''}
+        <div class="detail-price-old" id="detail-price-old" ${p.oldPrice && !variacoes.length ? '' : 'hidden'}>${p.oldPrice ? formatPrice(p.oldPrice) : ''}</div>
         <div class="detail-price" id="detail-price">${variacoes.length ? '<span style="font-size:14px;font-weight:600;color:var(--text-muted)">a partir de </span>' : ''}${formatPrice(p.price)}</div>
         <div class="detail-installment" id="detail-installment">ou 12x de ${formatPrice(p.price/12)} sem juros</div>
-        ${p.cashback_percentual > 0 ? `<div style="display:inline-flex;align-items:center;gap:6px;background:rgba(170,239,0,0.12);border:1px solid var(--primary);color:var(--primary);font-size:12px;font-weight:700;padding:5px 10px;border-radius:20px;margin-top:8px">💰 Receba ${formatPrice(p.price * p.cashback_percentual / 100)} de volta em saldo</div>` : ''}
+        ${p.cashback_percentual > 0 ? `<div style="display:inline-flex;align-items:center;gap:6px;background:rgba(170,239,0,0.12);border:1px solid var(--primary);color:var(--primary);font-size:12px;font-weight:700;padding:5px 10px;border-radius:20px;margin-top:8px">💰 Receba <span id="valor-cashback">${formatPrice(p.price * p.cashback_percentual / 100)}</span> de volta em saldo</div>` : ''}
         ${p.indicacao_percentual > 0 ? `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px">
-          <span style="display:inline-flex;align-items:center;gap:6px;background:rgba(170,239,0,0.12);border:1px solid var(--primary);color:var(--primary);font-size:12px;font-weight:700;padding:5px 10px;border-radius:20px">🤝 Indique e ganhe ${formatPrice(p.price * p.indicacao_percentual / 100)} por venda</span>
+          <span style="display:inline-flex;align-items:center;gap:6px;background:rgba(170,239,0,0.12);border:1px solid var(--primary);color:var(--primary);font-size:12px;font-weight:700;padding:5px 10px;border-radius:20px">🤝 Indique e ganhe <span id="valor-indicacao">${formatPrice(p.price * p.indicacao_percentual / 100)}</span> por venda</span>
           <button type="button" onclick="compartilharIndicacao(this)" style="background:none;border:none;color:var(--text-muted);font-size:12px;font-weight:700;text-decoration:underline;cursor:pointer;padding:4px 0">Copiar meu link</button>
         </div>` : ''}
         <hr class="detail-divider">
+        ${p.tipo_estoque === 'dropshipping' ? `
+        <div style="background:rgba(96,165,250,.08);border:2px solid rgba(96,165,250,.45);border-radius:14px;padding:16px 18px;margin-bottom:20px;display:flex;align-items:center;gap:14px">
+          <span style="font-size:32px;line-height:1">🚚</span>
+          <span><strong style="display:block;font-size:17px;color:#93c5fd">Entrega em 5 a 15 dias</strong>
+          <span style="font-size:13px;color:var(--text-muted)">Enviado direto do fornecedor. Você acompanha tudo em Meus Pedidos.</span></span>
+        </div>` : `
         <div style="background:rgba(170,239,0,.07);border:1px solid rgba(170,239,0,.2);border-radius:12px;padding:12px 16px;margin-bottom:20px;font-size:13px;display:flex;align-items:center;gap:8px">
-          ⚡ <strong>Entrega amanhã</strong> — Peça em até 3h para garantir.
-        </div>
+          <span>⚡</span><span><strong>Entrega amanhã</strong> — Peça em até 3h para garantir.</span>
+        </div>`}
 
         ${variacoesHTML}
         ${coresHTML}
@@ -285,12 +291,30 @@ window.selecionarVariacao = function(i) {
   const preco = precoVariacao(p, v);
   document.getElementById('detail-price').textContent = formatPrice(preco);
   document.getElementById('detail-installment').textContent = `ou 12x de ${formatPrice(preco / 12)} sem juros`;
+  // Preço antigo riscado: o da opção (como na Shopee); sem ele, some
+  const antigoEl = document.getElementById('detail-price-old');
+  const antigo = Number(v.preco_antigo);
+  antigoEl.hidden = !(antigo > preco);
+  if (antigo > preco) antigoEl.textContent = formatPrice(antigo);
   const est = (v.estoque === null || v.estoque === undefined || v.estoque === '') ? null : Number(v.estoque);
   document.getElementById('estoque-info').innerHTML = est !== null && est <= 5
     ? `<p style="font-size:13px;color:#f59e0b;font-weight:700;margin-bottom:16px">⚠️ Últimas ${est} unidades dessa opção!</p>`
     : '<div style="margin-bottom:16px"></div>';
   if (est !== null && qty > est) { qty = Math.max(1, est); document.getElementById('qty-display').textContent = qty; }
+  atualizarGanhos();
 };
+
+// Cashback e indicação acompanham a opção escolhida e a quantidade
+function atualizarGanhos() {
+  const p = window._produto;
+  if (!p) return;
+  const preco = _variacaoSelecionada ? precoVariacao(p, _variacaoSelecionada) : p.price;
+  const total = preco * qty;
+  const cb = document.getElementById('valor-cashback');
+  const ind = document.getElementById('valor-indicacao');
+  if (cb) cb.textContent = formatPrice(total * (p.cashback_percentual || 0) / 100);
+  if (ind) ind.textContent = formatPrice(total * (p.indicacao_percentual || 0) / 100);
+}
 
 window.selecionarCor = function(nome, btn) {
   _corSelecionada = nome;
@@ -648,6 +672,7 @@ window.changeQty = function(dir) {
   const max = (estoque !== null && estoque !== undefined && estoque !== '') ? Number(estoque) : Infinity;
   qty = Math.max(1, Math.min(qty + dir, max || 1));
   document.getElementById('qty-display').textContent = qty;
+  atualizarGanhos();
 };
 
 // Devolve true se colocou no carrinho (o "Comprar Agora" só segue pro carrinho nesse caso)

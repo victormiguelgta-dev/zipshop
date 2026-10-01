@@ -109,18 +109,11 @@
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
       <div class="form-group">
         <label class="form-label">Categoria *</label>
-        <select class="form-input" id="edit-cat">
-          <option>Smartphones</option>
-          <option>Notebooks</option>
-          <option>Headphones</option>
-          <option>Smart TVs</option>
-          <option>Games</option>
-          <option>Acessorios</option>
-        </select>
+        <select class="form-input" id="edit-cat"><option value="">Carregando...</option></select>
       </div>
       <div class="form-group">
         <label class="form-label">Marca</label>
-        <input type="text" class="form-input" id="edit-brand" placeholder="Ex: Apple">
+        <input type="text" class="form-input" id="edit-brand" placeholder="Comece a digitar e escolha da lista">
       </div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
@@ -172,7 +165,7 @@
     </div>
     <div style="display:flex;flex-direction:column;gap:10px;margin-top:0;padding:14px;background:var(--bg-muted);border-radius:10px;border:1px solid var(--primary);margin-bottom:12px">
       <p style="font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em">🧩 Variações e Kits (preço e estoque próprios)</p>
-      <p style="font-size:11px;color:var(--text-muted)">Ex: <strong>Azul</strong>, <strong>Tamanho G</strong>, <strong>Kit 2 unidades</strong>, <strong>Azul - G</strong>. Preço vazio = preço do produto. Estoque vazio = sem controle. Com variações, o cliente é obrigado a escolher uma, o estoque do produto lá em cima é ignorado e a lista de cores abaixo não aparece.</p>
+      <p style="font-size:11px;color:var(--text-muted)">Ex: <strong>Azul</strong>, <strong>Tamanho G</strong>, <strong>Kit 2 unidades</strong>, <strong>Azul - G</strong>. Preço vazio = preço do produto. Preço antigo (opcional) aparece riscado, como na Shopee. Estoque vazio = sem controle. Com variações, o cliente é obrigado a escolher uma, o estoque do produto lá em cima é ignorado e a lista de cores abaixo não aparece.</p>
       <div id="variacoes-lista" style="display:flex;flex-direction:column;gap:8px"></div>
       <button type="button" class="btn btn-outline btn-sm" onclick="adicionarLinhaVariacao()" style="align-self:flex-start">+ Adicionar opção</button>
     </div>
@@ -212,6 +205,11 @@
         <span style="font-size:13px;font-weight:600">⚡ Entrega em 24h</span>
         <span style="font-size:11px;color:var(--text-muted)">(exibe selo de entrega rápida)</span>
       </label>
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
+        <input type="checkbox" id="edit-drop" style="width:16px;height:16px;accent-color:var(--primary)">
+        <span style="font-size:13px;font-weight:600">📦 Produto drop</span>
+        <span style="font-size:11px;color:var(--text-muted)">(enviado pelo fornecedor: mostra "Entrega em 5 a 15 dias" no lugar de "Entrega amanhã")</span>
+      </label>
     </div>
     </div>
 
@@ -230,7 +228,14 @@
 <script src="../js/imagem.js"></script>
 <script type="module">
 import { isAdmin, supabase } from '../js/admin-guard.js';
+import { preencherCategorias, carregarMarcas, sugerirMarcas, normalizarMarca } from '../js/admin-catalogo.js';
 if (!isAdmin) throw new Error('not admin');
+let marcas = [];
+async function prepararCatalogo(categoriaAtual) {
+  await preencherCategorias(supabase, document.getElementById('edit-cat'), categoriaAtual);
+  marcas = await carregarMarcas(supabase);
+  sugerirMarcas(document.getElementById('edit-brand'), marcas);
+}
 
 
 let produtos = [];
@@ -399,9 +404,12 @@ async function carregar() {
   produtos = data || [];
 
   // Preenche filtro de categorias
-  const cats = [...new Set(produtos.map(p => p.category))];
+  const cats = [...new Set(produtos.map(p => p.category).filter(Boolean))].sort();
   const sel = document.getElementById('filtro-cat');
-  cats.forEach(c => sel.innerHTML += `<option value="${c}">${c}</option>`);
+  const valorAtual = sel.value;
+  sel.innerHTML = '<option value="">Todas as categorias</option>' +
+    cats.map(c => `<option value="${String(c).replace(/"/g, '&quot;')}">${String(c).replace(/</g, '&lt;')}</option>`).join('');
+  sel.value = valorAtual;
 
   renderTabela(produtos);
 }
@@ -458,9 +466,10 @@ window.filtrar = function() {
 function linhaVariacaoHTML(v = {}) {
   const id = v.id || ('v' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6));
   const val = (x) => (x === null || x === undefined) ? '' : String(x).replace(/"/g, '&quot;');
-  return `<div class="linha-variacao" data-id="${val(id)}" style="display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr) minmax(0,1fr) 32px;gap:6px;align-items:center">
+  return `<div class="linha-variacao" data-id="${val(id)}" style="display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) 28px;gap:6px;align-items:center">
     <input type="text" class="form-input var-nome" maxlength="60" placeholder="Nome (ex: Kit 2 un)" value="${val(v.nome)}" style="font-size:13px">
     <input type="number" class="form-input var-preco" step="0.01" min="0" placeholder="Preço" value="${val(v.preco)}" style="font-size:13px">
+    <input type="number" class="form-input var-preco-antigo" step="0.01" min="0" placeholder="Preço antigo" value="${val(v.preco_antigo)}" style="font-size:13px">
     <input type="number" class="form-input var-estoque" step="1" min="0" placeholder="Estoque" value="${val(v.estoque)}" style="font-size:13px">
     <button type="button" onclick="this.closest('.linha-variacao').remove()" title="Remover" style="background:none;border:none;color:#ef4444;font-size:18px;cursor:pointer">×</button>
   </div>`;
@@ -475,11 +484,13 @@ function lerVariacoes() {
   return [...document.querySelectorAll('#variacoes-lista .linha-variacao')].map(l => {
     const nome = l.querySelector('.var-nome').value.trim().replace(/[<>"]/g, '').slice(0, 60);
     const preco = parseFloat(l.querySelector('.var-preco').value);
+    const antigo = parseFloat(l.querySelector('.var-preco-antigo').value);
     const est = l.querySelector('.var-estoque').value.trim();
     return {
       id: l.dataset.id,
       nome,
       preco: isNaN(preco) || preco <= 0 ? null : Math.round(preco * 100) / 100,
+      preco_antigo: isNaN(antigo) || antigo <= 0 ? null : Math.round(antigo * 100) / 100,
       estoque: est === '' ? null : Math.max(0, parseInt(est) || 0)
     };
   }).filter(v => v.nome);
@@ -500,6 +511,11 @@ window.abrirModal = function() {
   document.getElementById('edit-garantia').value = '';
   document.getElementById('edit-frete-gratis').checked = false;
   document.getElementById('edit-entrega-24h').checked = false;
+  document.getElementById('edit-drop').checked = false;
+  document.getElementById('edit-relacionados').value = '';
+  document.getElementById('edit-cores').value = '';
+  document.getElementById('edit-specs').value = '';
+  prepararCatalogo('');
   document.getElementById('edit-cashback').value = '';
   document.getElementById('edit-indicacao').value = '';
   document.getElementById('foto-img').style.display = 'none';
@@ -523,7 +539,7 @@ window.editarProduto = function(id) {
   document.getElementById('edit-id').value = p.id;
   document.getElementById('edit-name').value = p.name;
   document.getElementById('edit-brand').value = p.brand||'';
-  document.getElementById('edit-cat').value = p.category||'Smartphones';
+  prepararCatalogo(p.category || '');
   document.getElementById('edit-price').value = p.price;
   document.getElementById('edit-old-price').value = p.old_price||'';
   document.getElementById('edit-stock').value = p.stock||0;
@@ -534,6 +550,7 @@ window.editarProduto = function(id) {
   document.getElementById('edit-garantia').value = p.garantia||'';
   document.getElementById('edit-frete-gratis').checked = p.frete_gratis||false;
   document.getElementById('edit-entrega-24h').checked = p.entrega_24h||false;
+  document.getElementById('edit-drop').checked = p.tipo_estoque === 'dropshipping';
   document.getElementById('edit-cashback').value = p.cashback_percentual || '';
   document.getElementById('edit-indicacao').value = p.indicacao_percentual || '';
   galeriaNovas = [];
@@ -575,6 +592,7 @@ window.salvarProduto = async function() {
   if (!nome) { alert('Digite o nome do produto'); return; }
   const preco = parseFloat(document.getElementById('edit-price').value);
   if (!preco) { alert('Digite o preço'); return; }
+  if (!document.getElementById('edit-cat').value) { alert('Escolha a categoria'); return; }
   const variacoes = lerVariacoes();
   const nomesVar = variacoes.map(v => v.nome.toLowerCase());
   if (new Set(nomesVar).size !== nomesVar.length) { alert('Tem duas variações com o mesmo nome.'); return; }
@@ -599,7 +617,7 @@ window.salvarProduto = async function() {
 
   const dados = {
     name: nome,
-    brand: document.getElementById('edit-brand').value,
+    brand: normalizarMarca(document.getElementById('edit-brand').value, marcas),
     category: document.getElementById('edit-cat').value,
     price: preco,
     old_price: parseFloat(document.getElementById('edit-old-price').value) || null,
@@ -616,6 +634,8 @@ window.salvarProduto = async function() {
     oferta: document.getElementById('edit-oferta').checked,
     frete_gratis: document.getElementById('edit-frete-gratis').checked,
     entrega_24h: document.getElementById('edit-entrega-24h').checked,
+    tipo_estoque: document.getElementById('edit-drop').checked ? 'dropshipping' : 'proprio',
+    ...(document.getElementById('edit-drop').checked ? { prazo_entrega_dias: 15 } : {}),
     garantia: document.getElementById('edit-garantia').value || null,
     cashback_percentual: parseFloat(document.getElementById('edit-cashback').value) || 0,
     indicacao_percentual: parseFloat(document.getElementById('edit-indicacao').value) || 0,

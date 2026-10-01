@@ -313,6 +313,7 @@ body.has-float-cart .whatsapp-float { bottom: calc(var(--altura-float-cart, 72px
   border-bottom: 2px solid transparent;
 }
 .nav-cat-link:hover { color: var(--text); }
+.nav-cat-link.ativa { color: var(--primary); font-weight: 700; }
 .nav-cat-link.highlight { color: var(--primary); font-weight: 700; margin-left: auto; }
 
 /* ===== BUTTONS ===== */
