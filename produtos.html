@@ -12,66 +12,81 @@
 <body>
 <div id="navbar"></div>
 
-<div class="page-hero">
-  <div class="container">
-    <div class="breadcrumb"><a href="index.html">Home</a><span>/</span><span>Produtos</span></div>
-    <h1>Produtos</h1>
-  </div>
-</div>
+<main class="lista-produtos">
+  <div class="lp-topo">
+    <div class="lp-titulo">
+      <h1 id="lp-titulo">Todos os produtos</h1>
+      <span id="count-label" class="lp-contagem"></span>
+    </div>
 
-<div class="products-layout">
-  <!-- FILTROS -->
-  <aside>
-    <div class="filter-panel">
-      <button type="button" id="filter-toggle" onclick="toggleFiltros()" style="display:flex;align-items:center;justify-content:space-between;width:100%;background:none;border:none;color:var(--text);cursor:pointer;padding:0">
-        <span style="display:flex;align-items:center;gap:8px;font-size:14px;font-weight:900">🎛️ Filtros</span>
-        <span id="filter-chevron" style="transition:transform .2s">▾</span>
+    <label class="lp-busca">
+      <span aria-hidden="true">🔍</span>
+      <input type="search" id="search-prod" placeholder="Buscar nesta lista..." oninput="applyFilters()" autocomplete="off">
+    </label>
+
+    <div class="lp-cats" id="cat-pills" aria-label="Categorias"></div>
+
+    <div class="lp-barra">
+      <div class="lp-ordem" role="tablist" aria-label="Ordenar">
+        <button type="button" data-ordem="relevance" class="ativo" onclick="ordenar('relevance')">Relevância</button>
+        <button type="button" data-ordem="vendidos" onclick="ordenar('vendidos')">Mais vendidos</button>
+        <button type="button" data-ordem="price" id="ordem-preco" onclick="ordenar('price')">Preço <span id="seta-preco">⇅</span></button>
+      </div>
+      <button type="button" class="lp-btn-filtro" onclick="abrirFiltros()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 5h18l-7 8v6l-4 2v-8z"/></svg>
+        Filtrar <span class="lp-badge" id="badge-filtros" hidden>0</span>
       </button>
-      <div id="filter-body" style="display:none;margin-top:14px">
-        <div class="filter-section">
-          <p class="filter-section-title">Categorias</p>
-          <div id="cat-filters" class="filter-options-grid"></div>
-        </div>
-        <div class="filter-section">
-          <p class="filter-section-title">Marcas</p>
-          <div id="brand-filters" class="filter-options-grid"></div>
-        </div>
-        <div class="filter-section">
-          <p class="filter-section-title">Faixa de Preço</p>
-          <input type="range" id="price-range" min="0" max="15000" value="15000" style="width:100%;accent-color:var(--primary)" oninput="applyFilters()">
-          <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-muted);margin-top:4px">
-            <span>R$ 0</span><span id="max-price-label">R$ 15.000</span>
-          </div>
-        </div>
-        <button class="btn btn-outline btn-full btn-sm" onclick="clearFilters()">Limpar Filtros</button>
-      </div>
     </div>
-  </aside>
 
-  <!-- PRODUCTS -->
-  <div>
-    <div class="products-header">
-      <div>
-        <input type="text" id="search-prod" class="form-input" style="width:100%;max-width:280px;padding:8px 14px" placeholder="Buscar nos resultados..." oninput="applyFilters()">
-      </div>
-      <div style="display:flex;align-items:center;gap:12px">
-        <span class="products-count" id="count-label">10 produtos encontrados</span>
-        <select class="products-sort" id="sort-select" onchange="applyFilters()">
-          <option value="relevance">Mais relevantes</option>
-          <option value="price-asc">Menor preço</option>
-          <option value="price-desc">Maior preço</option>
-          <option value="rating">Melhor avaliados</option>
-        </select>
-      </div>
-    </div>
-    <div class="product-grid" id="products-grid"></div>
-    <div id="empty-msg" style="display:none;text-align:center;padding:60px 16px;color:var(--text-muted)">
-      <p style="font-size:48px">🔍</p>
-      <p style="font-size:18px;font-weight:700;margin-top:12px">Nenhum produto encontrado</p>
-      <p style="margin-top:4px">Tente outros filtros ou termos de busca.</p>
-    </div>
+    <div class="lp-chips" id="active-chips"></div>
   </div>
-</div>
+
+  <div class="product-grid" id="products-grid"></div>
+
+  <div id="empty-msg" class="lp-vazio" hidden>
+    <div class="lp-vazio-icone">🛍️</div>
+    <p class="lp-vazio-titulo">Nenhum produto encontrado</p>
+    <p class="lp-vazio-sub">Tente tirar algum filtro ou buscar outro termo.</p>
+    <button type="button" class="btn btn-primary" onclick="clearFilters(true)">Ver todos os produtos</button>
+  </div>
+</main>
+
+<!-- GAVETA DE FILTROS (sobe de baixo no celular, abre na lateral no computador) -->
+<div class="lp-gaveta-fundo" id="gaveta-fundo" onclick="fecharFiltros()" hidden></div>
+<aside class="lp-gaveta" id="gaveta" aria-label="Filtros" aria-hidden="true">
+  <div class="lp-gaveta-topo">
+    <strong>Filtrar</strong>
+    <button type="button" class="lp-fechar" onclick="fecharFiltros()" aria-label="Fechar">✕</button>
+  </div>
+  <div class="lp-gaveta-corpo">
+    <section id="secao-marcas">
+      <p class="lp-secao-titulo">Marca</p>
+      <div class="lp-opcoes" id="brand-filters"></div>
+    </section>
+    <section>
+      <p class="lp-secao-titulo">Faixa de preço (R$)</p>
+      <div class="lp-preco">
+        <input type="number" id="preco-min" inputmode="numeric" min="0" placeholder="Mínimo">
+        <span>–</span>
+        <input type="number" id="preco-max" inputmode="numeric" min="0" placeholder="Máximo">
+      </div>
+      <div class="lp-opcoes" id="faixas-preco"></div>
+    </section>
+    <section>
+      <p class="lp-secao-titulo">Serviços e promoções</p>
+      <div class="lp-opcoes">
+        <button type="button" class="lp-opcao" data-flag="oferta" onclick="alternarFlag(this)">⚡ Em oferta</button>
+        <button type="button" class="lp-opcao" data-flag="frete" onclick="alternarFlag(this)">🚚 Frete grátis</button>
+        <button type="button" class="lp-opcao" data-flag="rapida" onclick="alternarFlag(this)">⚡ Entrega rápida</button>
+        <button type="button" class="lp-opcao" data-flag="estoque" onclick="alternarFlag(this)">✅ Só com estoque</button>
+      </div>
+    </section>
+  </div>
+  <div class="lp-gaveta-rodape">
+    <button type="button" class="btn btn-outline" onclick="clearFilters()">Limpar</button>
+    <button type="button" class="btn btn-primary" id="btn-ver-resultados" onclick="aplicarGaveta()">Ver produtos</button>
+  </div>
+</aside>
 
 <div id="footer"></div>
 
@@ -88,26 +103,29 @@ function esc(str) {
     .replace(/'/g, '&#039;');
 }
 
-import { loadProducts, formatPrice, starsHTML, loadSinonimos, estaEsgotado, esgotadosNoFim } from './js/data.js';
+import { supabase } from './js/supabase-config.js';
+import { loadProducts, formatPrice, loadSinonimos, estaEsgotado, esgotadosNoFim } from './js/data.js';
 import { getFavoritosIds, toggleFavorito } from './js/favoritos.js';
 
-// Filtros retráteis: em telas maiores já vem aberto (comportamento antigo);
-// no celular começa fechado, economizando espaço — só um ícone pra expandir.
-window.toggleFiltros = function() {
-  const body = document.getElementById('filter-body');
-  const chevron = document.getElementById('filter-chevron');
-  const aberto = body.style.display !== 'none';
-  body.style.display = aberto ? 'none' : 'block';
-  chevron.style.transform = aberto ? 'rotate(0deg)' : 'rotate(180deg)';
-};
-if (window.innerWidth > 900) toggleFiltros();
-
+// Estado da lista (categoria única, igual Shopee; marcas e opções na gaveta)
 const params = new URLSearchParams(location.search);
-let selectedCats = params.get('cat') ? [params.get('cat')] : [];
-let selectedBrands = [];
+const estado = {
+  cat: params.get('cat') || '',
+  marcas: new Set(),
+  min: null,
+  max: null,
+  flags: new Set(params.get('deal') ? ['oferta'] : []),
+  ordem: 'relevance',
+  precoAsc: true
+};
+// Rascunho da gaveta: só vale ao tocar em "Ver produtos"
+let rascunho = null;
+
 let PRODUCTS = [];
+let CATEGORIAS = [];
 let _favoritosIds = new Set();
 let SINONIMOS = [];
+window._produtosCache = {};
 
 window.toggleFavoritoCard = async function(produtoId, btn) {
   const r = await toggleFavorito(produtoId);
@@ -115,98 +133,186 @@ window.toggleFavoritoCard = async function(produtoId, btn) {
   btn.textContent = r.favoritado ? '💚' : '🤍';
   btn.dataset.fav = r.favoritado ? '1' : '0';
 };
-const searchQuery = params.get('q') || '';
 
-// CORREÇÃO BUG 2: cache dos objetos de produto para evitar JSON.stringify no HTML
-window._produtosCache = {};
-
-const catFilters = document.getElementById('cat-filters');
-const brandFilters = document.getElementById('brand-filters');
-
-function buildFilters() {
-  const cats = [...new Set(PRODUCTS.map(p => p.category))];
-  cats.forEach(c => {
-    const checked = selectedCats.includes(c) ? 'checked' : '';
-    catFilters.innerHTML += `<label class="filter-option" title="${c}"><input type="checkbox" value="${c}" ${checked} onchange="toggleCat(this)"><span>${c}</span></label>`;
-  });
-  const brands = [...new Set(PRODUCTS.map(p => p.brand))];
-  brands.forEach(b => {
-    brandFilters.innerHTML += `<label class="filter-option" title="${b}"><input type="checkbox" value="${b}" onchange="toggleBrand(this)"><span>${b}</span></label>`;
-  });
+// ——— Categorias em pílulas (com a foto do painel) ———
+function renderCategorias() {
+  const box = document.getElementById('cat-pills');
+  const pilula = (nome, rotulo, img) => `
+    <button type="button" class="lp-cat${estado.cat === nome ? ' ativo' : ''}" data-cat="${esc(nome)}" onclick="escolherCategoria(this.dataset.cat)">
+      ${img}<span>${esc(rotulo)}</span>
+    </button>`;
+  box.innerHTML = pilula('', 'Todos', '<span class="lp-cat-img">🛍️</span>') +
+    CATEGORIAS.map(c => pilula(c.name, c.name,
+      c.image_url ? `<img class="lp-cat-img" src="${esc(c.image_url)}" alt="" loading="lazy">` : `<span class="lp-cat-img">${esc(c.emoji || '📦')}</span>`
+    )).join('');
+  box.querySelector('.ativo')?.scrollIntoView({ inline: 'center', block: 'nearest' });
 }
-
-window.toggleCat = (el) => {
-  if (el.checked) selectedCats.push(el.value);
-  else selectedCats = selectedCats.filter(c => c !== el.value);
+window.escolherCategoria = function(nome) {
+  estado.cat = nome;
+  const url = new URL(location.href);
+  if (nome) url.searchParams.set('cat', nome); else url.searchParams.delete('cat');
+  history.replaceState(null, '', url);
+  renderCategorias();
   applyFilters();
 };
 
-window.toggleBrand = (el) => {
-  if (el.checked) selectedBrands.push(el.value);
-  else selectedBrands = selectedBrands.filter(b => b !== el.value);
+// ——— Ordenação (abas) ———
+window.ordenar = function(ordem) {
+  if (ordem === 'price') estado.precoAsc = estado.ordem === 'price' ? !estado.precoAsc : true;
+  estado.ordem = ordem;
+  document.querySelectorAll('.lp-ordem button').forEach(b => b.classList.toggle('ativo', b.dataset.ordem === ordem));
+  document.getElementById('seta-preco').textContent = ordem === 'price' ? (estado.precoAsc ? '↑' : '↓') : '⇅';
   applyFilters();
 };
 
-window.clearFilters = () => {
-  selectedCats = []; selectedBrands = [];
-  document.querySelectorAll('#cat-filters input, #brand-filters input').forEach(i => i.checked = false);
-  document.getElementById('price-range').value = 15000;
-  document.getElementById('search-prod').value = '';
+// ——— Gaveta de filtros ———
+function faixasPreco() {
+  const maior = Math.max(0, ...PRODUCTS.map(p => p.price));
+  const base = [[0, 50], [50, 100], [100, 300], [300, null]];
+  return base.filter(([a]) => a < maior || a === 0);
+}
+function rotuloFaixa([a, b]) {
+  if (a === 0) return `Até R$ ${b}`;
+  if (b === null) return `Acima de R$ ${a}`;
+  return `R$ ${a} a ${b}`;
+}
+function renderGaveta() {
+  const r = rascunho;
+  const marcas = [...new Set(PRODUCTS.map(p => (p.brand || '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  document.getElementById('secao-marcas').hidden = marcas.length < 2;
+  document.getElementById('brand-filters').innerHTML = marcas.map(m =>
+    `<button type="button" class="lp-opcao${r.marcas.has(m) ? ' ativo' : ''}" data-marca="${esc(m)}" onclick="alternarMarca(this)">${esc(m)}</button>`).join('');
+  document.getElementById('faixas-preco').innerHTML = faixasPreco().map((f, i) => {
+    const ativo = r.min === f[0] && r.max === f[1];
+    return `<button type="button" class="lp-opcao${ativo ? ' ativo' : ''}" onclick="escolherFaixa(${i})">${rotuloFaixa(f)}</button>`;
+  }).join('');
+  document.getElementById('preco-min').value = r.min ?? '';
+  document.getElementById('preco-max').value = r.max ?? '';
+  document.querySelectorAll('.lp-opcao[data-flag]').forEach(b => b.classList.toggle('ativo', r.flags.has(b.dataset.flag)));
+  atualizarBotaoResultados();
+}
+function lerPrecosDigitados() {
+  const min = parseFloat(document.getElementById('preco-min').value);
+  const max = parseFloat(document.getElementById('preco-max').value);
+  rascunho.min = isNaN(min) ? null : min;
+  rascunho.max = isNaN(max) ? null : max;
+}
+function atualizarBotaoResultados() {
+  const n = filtrar(rascunho).length;
+  document.getElementById('btn-ver-resultados').textContent = `Ver ${n} produto${n !== 1 ? 's' : ''}`;
+}
+window.abrirFiltros = function() {
+  rascunho = { ...estado, marcas: new Set(estado.marcas), flags: new Set(estado.flags) };
+  renderGaveta();
+  document.getElementById('gaveta-fundo').hidden = false;
+  const g = document.getElementById('gaveta');
+  g.classList.add('aberta'); g.setAttribute('aria-hidden', 'false');
+  document.body.style.overflow = 'hidden';
+};
+window.fecharFiltros = function() {
+  document.getElementById('gaveta-fundo').hidden = true;
+  const g = document.getElementById('gaveta');
+  g.classList.remove('aberta'); g.setAttribute('aria-hidden', 'true');
+  document.body.style.overflow = '';
+};
+window.alternarMarca = function(btn) {
+  const m = btn.dataset.marca;
+  rascunho.marcas.has(m) ? rascunho.marcas.delete(m) : rascunho.marcas.add(m);
+  btn.classList.toggle('ativo');
+  atualizarBotaoResultados();
+};
+window.alternarFlag = function(btn) {
+  const f = btn.dataset.flag;
+  rascunho.flags.has(f) ? rascunho.flags.delete(f) : rascunho.flags.add(f);
+  btn.classList.toggle('ativo');
+  atualizarBotaoResultados();
+};
+window.escolherFaixa = function(i) {
+  const [a, b] = faixasPreco()[i];
+  const mesma = rascunho.min === a && rascunho.max === b;
+  rascunho.min = mesma ? null : a;
+  rascunho.max = mesma ? null : b;
+  renderGaveta();
+};
+['preco-min', 'preco-max'].forEach(id => document.getElementById(id).addEventListener('input', () => {
+  lerPrecosDigitados();
+  document.querySelectorAll('#faixas-preco .lp-opcao').forEach(b => b.classList.remove('ativo'));
+  atualizarBotaoResultados();
+}));
+window.aplicarGaveta = function() {
+  lerPrecosDigitados();
+  estado.marcas = rascunho.marcas; estado.flags = rascunho.flags;
+  estado.min = rascunho.min; estado.max = rascunho.max;
+  fecharFiltros();
   applyFilters();
 };
+window.clearFilters = function(tudo = false) {
+  const limpo = { marcas: new Set(), flags: new Set(), min: null, max: null };
+  if (rascunho && !tudo) { Object.assign(rascunho, limpo); renderGaveta(); return; }
+  Object.assign(estado, limpo);
+  if (tudo) {
+    document.getElementById('search-prod').value = '';
+    escolherCategoria('');
+  } else applyFilters();
+};
 
-window.applyFilters = () => {
-  const q = document.getElementById('search-prod').value.toLowerCase();
-  const maxPrice = parseInt(document.getElementById('price-range').value);
-  const sort = document.getElementById('sort-select').value;
-  document.getElementById('max-price-label').textContent = 'R$ ' + maxPrice.toLocaleString('pt-BR');
+// ——— Chips dos filtros ativos (cada um com ✕) ———
+function renderChips() {
+  const chips = [];
+  estado.marcas.forEach(m => chips.push({ t: m, rm: () => estado.marcas.delete(m) }));
+  if (estado.min !== null || estado.max !== null) {
+    const t = estado.min !== null && estado.max !== null ? `${formatPrice(estado.min)} a ${formatPrice(estado.max)}`
+      : estado.min !== null ? `Acima de ${formatPrice(estado.min)}` : `Até ${formatPrice(estado.max)}`;
+    chips.push({ t, rm: () => { estado.min = null; estado.max = null; } });
+  }
+  const nomesFlag = { oferta: 'Em oferta', frete: 'Frete grátis', rapida: 'Entrega rápida', estoque: 'Só com estoque' };
+  estado.flags.forEach(f => chips.push({ t: nomesFlag[f], rm: () => estado.flags.delete(f) }));
+  window._chipsRemover = chips.map(c => c.rm);
+  const box = document.getElementById('active-chips');
+  box.innerHTML = chips.map((c, i) => `<button type="button" class="lp-chip" onclick="removerChip(${i})">${esc(c.t)} <span aria-hidden="true">✕</span></button>`).join('') +
+    (chips.length > 1 ? `<button type="button" class="lp-chip-limpar" onclick="clearFilters()">Limpar tudo</button>` : '');
+  const badge = document.getElementById('badge-filtros');
+  badge.hidden = !chips.length; badge.textContent = chips.length;
+}
+window.removerChip = function(i) { window._chipsRemover[i]?.(); applyFilters(); };
 
-  // Sinônimos: se "q" bater com um termo cadastrado (ex: "celular"),
-  // pega a(s) categoria(s) equivalente(s) (ex: "Smartphones") pra
-  // incluir na busca também, além do texto literal de sempre.
+// ——— Filtro + ordenação ———
+function filtrar(f) {
+  const q = document.getElementById('search-prod').value.trim().toLowerCase();
   const categoriasSinonimo = q
     ? SINONIMOS.filter(s => s.termo.toLowerCase() === q).map(s => s.categoria.toLowerCase())
     : [];
-
-  let list = PRODUCTS.filter(p => {
-    if (selectedCats.length && !selectedCats.includes(p.category)) return false;
-    if (selectedBrands.length && !selectedBrands.includes(p.brand)) return false;
-    if (p.price > maxPrice) return false;
+  return PRODUCTS.filter(p => {
+    if (estado.cat && p.category !== estado.cat) return false;
+    if (f.marcas.size && !f.marcas.has((p.brand || '').trim())) return false;
+    if (f.min !== null && p.price < f.min) return false;
+    if (f.max !== null && p.price > f.max) return false;
+    if (f.flags.has('oferta') && !(p.oferta || p.discount > 0)) return false;
+    if (f.flags.has('frete') && !p.frete_gratis) return false;
+    if (f.flags.has('rapida') && (p.tipo_estoque === 'dropshipping' || !p.entrega_24h)) return false;
+    if (f.flags.has('estoque') && estaEsgotado(p)) return false;
     if (q) {
-      const bateTextoLiteral = p.name.toLowerCase().includes(q) || p.brand.toLowerCase().includes(q) || p.category.toLowerCase().includes(q) || (p.desc||'').toLowerCase().includes(q);
-      const bateSinonimo = categoriasSinonimo.includes(p.category.toLowerCase());
-      if (!bateTextoLiteral && !bateSinonimo) return false;
+      const texto = `${p.name} ${p.brand || ''} ${p.category || ''} ${p.desc || ''}`.toLowerCase();
+      if (!texto.includes(q) && !categoriasSinonimo.includes((p.category || '').toLowerCase())) return false;
     }
     return true;
   });
+}
 
-  if (sort === 'price-asc') list.sort((a, b) => a.price - b.price);
-  else if (sort === 'price-desc') list.sort((a, b) => b.price - a.price);
-  else if (sort === 'rating') list.sort((a, b) => b.rating - a.rating);
-
-  // Depois da ordenação escolhida, joga os esgotados pro fim
-  list = esgotadosNoFim(list);
-
-  document.getElementById('count-label').textContent = list.length + ' produto' + (list.length !== 1 ? 's' : '') + ' encontrado' + (list.length !== 1 ? 's' : '');
-  const grid = document.getElementById('products-grid');
-  const empty = document.getElementById('empty-msg');
-  if (list.length === 0) { grid.innerHTML = ''; empty.style.display = 'block'; return; }
-  empty.style.display = 'none';
-
-  // CORREÇÃO BUG 2: salva cada produto no cache e usa o ID no onclick
-  list.forEach(p => { window._produtosCache[p.id] = p; });
-
-  grid.innerHTML = list.map(p => { const esgotado = estaEsgotado(p); return `
+function cardHTML(p) {
+  const esgotado = estaEsgotado(p);
+  const fav = _favoritosIds && _favoritosIds.has(p.id);
+  return `
     <a href="produto.html?id=${p.id}" class="product-card${esgotado ? ' esgotado' : ''}">
       <div class="product-card-img" style="background:linear-gradient(135deg,#1e3a6e,#2563eb)">
         ${p.discount ? `<div class="discount-badge">-${p.discount}%</div>` : ''}
         ${esgotado ? '<div class="esgotado-badge">Esgotado</div>' : ''}
-        <button onclick="event.preventDefault(); toggleFavoritoCard(${p.id}, this)" class="fav-btn" data-fav="${_favoritosIds && _favoritosIds.has(p.id) ? '1' : '0'}" aria-label="Favoritar">${_favoritosIds && _favoritosIds.has(p.id) ? '💚' : '🤍'}</button>
-        ${p.image_url ? `<img src="${p.image_thumb_url || p.image_url}" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:cover">` : `<span style="font-size:64px">${p.emoji}</span>`}
+        <button onclick="event.preventDefault(); toggleFavoritoCard(${p.id}, this)" class="fav-btn" data-fav="${fav ? '1' : '0'}" aria-label="Favoritar">${fav ? '💚' : '🤍'}</button>
+        ${p.image_url ? `<img src="${esc(p.image_thumb_url || p.image_url)}" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:cover">` : `<span style="font-size:64px">${esc(p.emoji)}</span>`}
       </div>
       <div class="product-card-body">
-        <div class="product-brand">${p.brand}</div>
-        <div class="product-name">${p.name}</div>
+        <div class="product-brand">${esc(p.brand)}</div>
+        <div class="product-name">${esc(p.name)}</div>
         <div class="product-rating-row">
           <span class="rating-pill">★ ${p.rating ? p.rating.toFixed(1) : '5.0'}</span>
           ${p.reviews ? `<span class="product-sold">${p.reviews >= 1000 ? (p.reviews/1000).toFixed(1)+'mil' : p.reviews}+ vendido(s)</span>` : ''}
@@ -214,25 +320,50 @@ window.applyFilters = () => {
         ${p.oldPrice ? `<div class="product-price-old">${formatPrice(p.oldPrice)}</div>` : ''}
         <div class="product-price">${p.temVariacoes ? '<span style="font-size:11px;font-weight:600;color:var(--text-muted)">a partir de </span>' : ''}${formatPrice(p.price)}</div>
         <div class="product-installment">ou 10x de ${formatPrice(p.price/10)}</div>
+        <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px">
+          ${p.frete_gratis ? '<span style="font-size:10px;background:#1a3a1a;color:#4ade80;padding:2px 6px;border-radius:4px;font-weight:700">🚚 Frete Grátis</span>' : ''}
+          ${p.tipo_estoque === 'dropshipping' ? '<span style="font-size:10px;background:#1a2a3a;color:#93c5fd;padding:2px 6px;border-radius:4px;font-weight:700">🚚 5 a 15 dias</span>' : (p.entrega_24h ? '<span style="font-size:10px;background:#1a2a3a;color:#60a5fa;padding:2px 6px;border-radius:4px;font-weight:700">⚡ 24h</span>' : '')}
+        </div>
       </div>
       <div class="product-card-footer">
         ${esgotado
           ? '<button class="btn btn-outline btn-full btn-sm" disabled onclick="event.preventDefault()">Sem estoque</button>'
           : `<button class="btn btn-primary btn-full btn-sm" onclick="event.preventDefault(); addToCart(${p.id}, 1, window._produtosCache[${p.id}], event)">🛒 Adicionar</button>`}
       </div>
-    </a>`; }).join('');
+    </a>`;
+}
+
+window.applyFilters = () => {
+  let list = filtrar(estado);
+  if (estado.ordem === 'price') list.sort((a, b) => estado.precoAsc ? a.price - b.price : b.price - a.price);
+  else if (estado.ordem === 'vendidos') list.sort((a, b) => (b.reviews || 0) - (a.reviews || 0));
+  list = esgotadosNoFim(list);
+
+  const q = document.getElementById('search-prod').value.trim();
+  document.getElementById('lp-titulo').textContent = estado.cat || (q ? `Resultados para "${q}"` : (estado.flags.has('oferta') && estado.flags.size === 1 ? 'Ofertas do dia' : 'Todos os produtos'));
+  document.getElementById('count-label').textContent = `${list.length} produto${list.length !== 1 ? 's' : ''}`;
+  renderChips();
+
+  const grid = document.getElementById('products-grid');
+  const empty = document.getElementById('empty-msg');
+  empty.hidden = list.length > 0;
+  list.forEach(p => { window._produtosCache[p.id] = p; });
+  grid.innerHTML = list.map(cardHTML).join('');
 };
 
+window.addEventListener('keydown', e => { if (e.key === 'Escape') fecharFiltros(); });
+
 // Carrega e renderiza
-PRODUCTS = await loadProducts();
-_favoritosIds = await getFavoritosIds();
-SINONIMOS = await loadSinonimos();
-buildFilters();
-if (searchQuery) {
-  const searchInput = document.getElementById('search-prod');
-  if (searchInput) searchInput.value = searchQuery;
-  document.querySelector('.page-hero h1').textContent = `Resultados para "${searchQuery}"`;
-}
+const [prods, favs, sins, cats] = await Promise.all([
+  loadProducts(),
+  getFavoritosIds(),
+  loadSinonimos(),
+  supabase.from('categorias').select('name, image_url, emoji').eq('ativo', true).order('name').then(r => r.data || []).catch(() => [])
+]);
+PRODUCTS = prods; _favoritosIds = favs; SINONIMOS = sins; CATEGORIAS = cats;
+const busca = params.get('q') || '';
+if (busca) document.getElementById('search-prod').value = busca;
+renderCategorias();
 applyFilters();
 </script>
 </body>
