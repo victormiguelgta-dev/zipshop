@@ -408,8 +408,8 @@ window.pagarPedido = async function(id, btn) {
 
 window.cancelarPedido = async function(id) {
   if (!confirm('Tem certeza que deseja cancelar este pedido?')) return;
-  const { error } = await supabase.from('pedidos').update({ status: 'cancelado' }).eq('id', id);
-  if (error) { showToast('Erro ao cancelar pedido.', 'error'); return; }
+  const { error } = await supabase.rpc('cancelar_meu_pedido', { p_pedido_id: id });
+  if (error) { showToast(error.message || 'Erro ao cancelar pedido.', 'error'); return; }
   showToast('Pedido cancelado.', 'success');
   loadOrders();
 };
@@ -552,13 +552,16 @@ window.salvarEdicaoPedido = async function(id) {
     referencia: sanitizar(document.getElementById('edit-pedido-referencia').value, 200)
   };
 
-  const { error } = await supabase.from('pedidos').update({
-    endereco: novoEndereco,
-    usuario_nome: novoEndereco.nome,
-    usuario_telefone: novoEndereco.telefone
-  }).eq('id', id);
+  const { error } = await supabase.rpc('editar_dados_meu_pedido', {
+    p_pedido_id: id,
+    p_nome: novoEndereco.nome,
+    p_telefone: novoEndereco.telefone,
+    p_bairro: novoEndereco.bairro,
+    p_endereco: novoEndereco.endereco,
+    p_referencia: novoEndereco.referencia
+  });
 
-  if (error) { showToast('Erro ao salvar alterações.', 'error'); return; }
+  if (error) { showToast(error.message || 'Erro ao salvar alterações.', 'error'); return; }
   document.getElementById('modal-editar-pedido')?.remove();
   showToast('Dados do pedido atualizados!', 'success');
   loadOrders();
