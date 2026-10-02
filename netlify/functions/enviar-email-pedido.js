@@ -75,7 +75,7 @@ function gerarHTMLPedido(pedido) {
     <div style="background:#1a1a1a;border-radius:10px;padding:16px;margin-bottom:20px">
       <p style="font-weight:700;margin-bottom:8px;font-size:13px">📍 Entrega</p>
       <p style="margin:4px 0;font-size:13px;color:#ccc">${esc(end.endereco || '')}, ${esc(end.bairro || '')}</p>
-      <p style="margin:4px 0;font-size:13px;color:#ccc">${pedido.tipo_entrega === 'exclusiva' ? '⚡ Entrega Exclusiva — até 3h' : '🛵 Entrega por Rota — 24-48h'}</p>
+      <p style="margin:4px 0;font-size:13px;color:#ccc">${pedido.tipo_entrega === 'exclusiva' ? '⚡ Entrega Exclusiva — até 3h' : pedido.tipo_entrega === 'fornecedor' ? '🚚 Envio pelo fornecedor — 5 a 15 dias' : '🛵 Entrega por Rota — 24-48h'}</p>
       ${end.horario_preferido ? `<p style="margin:4px 0;font-size:13px;color:#ccc">🕐 Janela: ${esc(end.horario_preferido)}</p>` : ''}
     </div>
     <p style="text-align:center;color:#666;font-size:12px;margin-top:24px">Dúvidas? Fale conosco pelo WhatsApp.</p>

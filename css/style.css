@@ -469,6 +469,12 @@ body.has-float-cart .whatsapp-float { bottom: calc(var(--altura-float-cart, 72px
   font-size: 80px;
   background: #0A0A0A;
 }
+.hero-img { width: 100%; height: 100%; object-fit: contain; display: block; }
+/* Banner com imagem: a caixa segue a proporção da imagem (sem faixa preta) */
+.hero-img-box.com-imagem { display: block; min-height: 0; max-height: none; }
+.hero-img-box.com-imagem .hero-img { height: auto; max-height: 480px; }
+/* Banner que já traz o texto na imagem: o botão fica embaixo, sem cobrir nada */
+.hero-text-wrap.so-botao { position: static; padding: 16px 32px 0; justify-content: flex-start; align-items: center; }
 .hero-dots { display: flex; justify-content: center; gap: 8px; padding: 20px; }
 .hero-dot { width: 8px; height: 8px; border-radius: 999px; background: rgba(255,255,255,0.2); border: none; cursor: pointer; transition: all 0.3s; }
 .hero-dot.active { width: 24px; background: var(--primary); }
@@ -775,11 +781,33 @@ footer {
 .input-wrapper { position: relative; }
 
 /* ===== ACCOUNT PAGE ===== */
-.account-layout { display: grid; grid-template-columns: 240px 1fr; gap: 24px; max-width: 1100px; margin: 0 auto; padding: 32px 16px; }
-.account-nav { background: var(--bg-card); border: 1px solid var(--primary); border-radius: var(--radius-lg); padding: 8px; height: fit-content; position: sticky; top: 80px; }
-.account-nav-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: var(--radius); font-size: 14px; cursor: pointer; color: var(--text-muted); transition: all 0.2s; text-decoration: none; }
-.account-nav-item:hover { background: var(--bg-muted); color: var(--text); }
-.account-nav-item.active { background: rgba(170,239,0,0.1); color: var(--primary); font-weight: 700; }
+.account-layout { display: grid; grid-template-columns: 300px 1fr; gap: 24px; max-width: 1100px; margin: 0 auto; padding: 24px 16px 32px; }
+.account-layout > div { min-width: 0; }
+.account-layout aside { display: flex; flex-direction: column; gap: 12px; height: fit-content; position: sticky; top: 80px; }
+
+/* Perfil compacto: foto ao lado do nome + números rápidos */
+.conta-perfil { padding: 18px; border: 1px solid var(--primary); border-radius: var(--radius-lg); background: radial-gradient(120% 140% at 0% 0%, rgba(170,239,0,0.16) 0%, rgba(170,239,0,0.04) 45%, var(--bg-card) 75%); }
+.conta-perfil-topo { display: flex; align-items: center; gap: 14px; }
+.conta-perfil .avatar-btn { width: 64px; height: 64px; margin: 0; flex-shrink: 0; box-shadow: 0 0 0 3px var(--bg-card), 0 0 0 5px var(--primary); }
+.conta-perfil-info { min-width: 0; }
+.conta-ola { font-size: 18px; font-weight: 900; line-height: 1.2; overflow-wrap: anywhere; }
+.conta-email { font-size: 12px; color: var(--text-muted); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.conta-perfil .avatar-remover { margin: 4px 0 0; padding: 0; font-size: 11px; }
+.conta-resumo { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 16px; }
+.conta-resumo-item { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 10px 4px; border-radius: var(--radius); background: rgba(0,0,0,0.35); border: 1px solid var(--border); text-decoration: none; color: var(--text); text-align: center; transition: border-color 0.2s, transform 0.2s; }
+.conta-resumo-item:hover { border-color: var(--primary); transform: translateY(-1px); }
+.conta-resumo-item strong { font-size: 15px; font-weight: 900; color: var(--primary); white-space: nowrap; }
+.conta-resumo-item span { font-size: 11px; color: var(--text-muted); }
+
+/* Menu em grade de ícones (estilo app) */
+.account-nav { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.account-nav-item { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 14px 4px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--bg-card); font-size: 12px; font-weight: 600; text-align: center; cursor: pointer; color: var(--text-muted); transition: all 0.2s; text-decoration: none; }
+.account-nav-icone { font-size: 24px; line-height: 1; }
+.account-nav-item:hover { border-color: var(--primary); color: var(--text); }
+.account-nav-item.active { background: rgba(170,239,0,0.1); border-color: var(--primary); color: var(--primary); font-weight: 800; }
+.conta-sair { align-self: center; padding: 6px 12px; font-size: 13px; color: #e53e3e; text-decoration: none; opacity: 0.85; }
+.conta-sair:hover { opacity: 1; text-decoration: underline; }
+.conta-secao-titulo { font-size: 22px; font-weight: 900; margin-bottom: 14px; }
 
 /* ===== ADMIN ===== */
 .admin-layout { display: flex; min-height: 100vh; }
@@ -1005,6 +1033,11 @@ tr:hover td { background: rgba(255,255,255,0.02); }
   .hero-text-wrap.escurecer { background: linear-gradient(180deg, rgba(10,10,10,0.5) 0%, rgba(10,10,10,0.85) 60%, rgba(10,10,10,0.95) 100%); }
   .hero-img-box { min-height: 320px; max-height: 360px; }
   .hero-title { font-size: 32px; }
+  /* Banner com imagem: a caixa segue a proporção da imagem (sem faixa preta
+     em cima e embaixo) e, se o banner só tem botão, ele vai logo abaixo */
+  .hero-text-wrap.so-botao { padding: 12px 16px 0; }
+  .hero-text-wrap.so-botao .hero-btns, .hero-text-wrap.so-botao .btn { width: 100%; justify-content: center; }
+  .hero-dots { padding: 14px; }
 
   /* Produtos: painel de filtros fica em cima (não sticky) */
   .products-layout { grid-template-columns: 1fr; }
@@ -1030,7 +1063,8 @@ tr:hover td { background: rgba(255,255,255,0.02); }
   .kpi-grid { grid-template-columns: repeat(2, 1fr); }
 
   /* Conta: menu lateral vai para cima */
-  .account-layout { grid-template-columns: 1fr; }
+  .account-layout { grid-template-columns: 1fr; padding-top: 16px; }
+  .account-layout aside { position: static; }
 
   /* Admin: esconde sidebar, conteúdo ocupa tudo */
   .admin-sidebar { display: none; }

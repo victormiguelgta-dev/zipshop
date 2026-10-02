@@ -62,15 +62,18 @@ function heroHTML(banners) {
     // colunas novas (_interno/sql-banners-opcoes.sql); sem elas, vale o padrão
     const mostrarBotao = b.mostrar_botao !== false;
     const textoBotao = (b.texto_botao || '').trim() || 'Ver Produtos';
+    // Banner que já traz o texto na própria imagem: no celular o botão vai
+    // embaixo da imagem em vez de ficar por cima dela
+    const soBotao = !b.badge && !b.titulo && !b.subtitulo && !b.preco;
     return `
     <div class="hero-slide ${i === 0 ? 'active' : ''}" id="slide-${i}">
-      <div class="hero-img-box">
+      <div class="hero-img-box${b.image_url ? ' com-imagem' : ''}">
         <!-- O banner inteiro é clicável -->
         <a href="${esc(link)}" class="hero-link-total" aria-label="${esc(b.titulo || textoBotao)}"></a>
         ${b.image_url
-          ? `<img src="${esc(b.image_url)}" alt="" decoding="async" ${i === 0 ? 'fetchpriority="high"' : 'fetchpriority="low"'} style="width:100%;height:100%;object-fit:contain">`
+          ? `<img src="${esc(b.image_url)}" alt="" decoding="async" ${i === 0 ? 'fetchpriority="high"' : 'fetchpriority="low"'} class="hero-img">`
           : `<span style='font-size:80px'>🛍️</span>`}
-        <div class="hero-text-wrap${b.escurecer === true ? ' escurecer' : ''}">
+        <div class="hero-text-wrap${b.escurecer === true ? ' escurecer' : ''}${soBotao ? ' so-botao' : ''}">
           ${b.badge ? `<div class="hero-badge">${esc(b.badge)}</div>` : ''}
           ${b.titulo ? `<h1 class="hero-title">${esc(b.titulo).replace(/\r?\n/g, '<br>')}</h1>` : ''}
           ${b.subtitulo ? `<p class="hero-sub">${esc(b.subtitulo)}</p>` : ''}

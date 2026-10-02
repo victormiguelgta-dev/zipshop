@@ -12,38 +12,48 @@
 <body>
 <div id="navbar"></div>
 
-<div class="page-hero">
-  <div class="container">
-    <div class="breadcrumb"><a href="index.html">Home</a><span>/</span><span>Minha Conta</span></div>
-    <h1 id="page-title">Minha Conta</h1>
-  </div>
-</div>
-
 <div class="account-layout">
   <aside>
-    <div class="card" style="margin-bottom:16px;padding:20px;text-align:center">
-      <!-- Foto de perfil: toque para trocar -->
-      <button type="button" id="avatar-btn" class="avatar-btn" onclick="document.getElementById('avatar-input').click()" aria-label="Trocar foto de perfil">
-        <span id="avatar-conteudo" class="avatar-conteudo">👤</span>
-        <span class="avatar-editar" aria-hidden="true">📷</span>
-      </button>
-      <input type="file" id="avatar-input" accept="image/*" style="display:none">
-      <button type="button" id="avatar-remover" class="avatar-remover" hidden>Remover foto</button>
-      <p id="user-name" style="font-weight:700">Carregando...</p>
-      <p id="user-email" style="font-size:13px;color:var(--text-muted)"></p>
+    <div class="conta-perfil">
+      <div class="conta-perfil-topo">
+        <!-- Foto de perfil: toque para trocar -->
+        <button type="button" id="avatar-btn" class="avatar-btn" onclick="document.getElementById('avatar-input').click()" aria-label="Trocar foto de perfil">
+          <span id="avatar-conteudo" class="avatar-conteudo">👤</span>
+          <span class="avatar-editar" aria-hidden="true">📷</span>
+        </button>
+        <input type="file" id="avatar-input" accept="image/*" style="display:none">
+        <div class="conta-perfil-info">
+          <p class="conta-ola">Olá, <span id="user-name">...</span> 👋</p>
+          <p id="user-email" class="conta-email"></p>
+          <button type="button" id="avatar-remover" class="avatar-remover" hidden>Remover foto</button>
+        </div>
+      </div>
+      <div class="conta-resumo">
+        <a href="saldo.html" class="conta-resumo-item">
+          <strong id="resumo-saldo">—</strong><span>💰 Saldo</span>
+        </a>
+        <a href="cupons.html" class="conta-resumo-item">
+          <strong id="resumo-cupons">—</strong><span>🎟️ Cupons</span>
+        </a>
+        <a href="#" class="conta-resumo-item" onclick="event.preventDefault();document.getElementById('nav-pedidos').click()">
+          <strong id="resumo-pedidos">—</strong><span>📦 Ativos</span>
+        </a>
+      </div>
     </div>
     <nav class="account-nav">
-      <a class="account-nav-item active" href="#" onclick="showSection('orders', this)">📦 Meus Pedidos</a>
-      <a class="account-nav-item" href="#" onclick="showSection('profile', this)">👤 Dados Pessoais</a>
-      <a class="account-nav-item" href="#" onclick="showSection('addresses', this)">📍 Endereços</a>
-      <a class="account-nav-item" href="cupons.html">🎟️ Meus Cupons</a>
-      <a class="account-nav-item" href="saldo.html">💰 Meu Saldo</a>
-      <a class="account-nav-item" href="favoritos.html">💚 Meus Favoritos</a>
-      <a class="account-nav-item" href="#" onclick="showSection('security', this)">🔒 Segurança</a>
-      <a class="account-nav-item" href="#" id="btn-logout" style="color:#e53e3e;margin-top:auto">🚪 Sair</a>
+      <a class="account-nav-item active" id="nav-pedidos" href="#" onclick="showSection('orders', this)"><span class="account-nav-icone">📦</span>Pedidos</a>
+      <a class="account-nav-item" href="#" onclick="showSection('profile', this)"><span class="account-nav-icone">👤</span>Meus dados</a>
+      <a class="account-nav-item" href="#" onclick="showSection('addresses', this)"><span class="account-nav-icone">📍</span>Endereços</a>
+      <a class="account-nav-item" href="cupons.html"><span class="account-nav-icone">🎟️</span>Cupons</a>
+      <a class="account-nav-item" href="favoritos.html"><span class="account-nav-icone">💚</span>Favoritos</a>
+      <a class="account-nav-item" href="#" onclick="showSection('security', this)"><span class="account-nav-icone">🔒</span>Segurança</a>
     </nav>
+    <a href="#" id="btn-logout" class="conta-sair">🚪 Sair da conta</a>
   </aside>
-  <div id="account-content"><div style="padding:40px;text-align:center">Carregando...</div></div>
+  <div>
+    <h1 id="page-title" class="conta-secao-titulo">Meus Pedidos</h1>
+    <div id="account-content"><div style="padding:40px;text-align:center">Carregando...</div></div>
+  </div>
 </div>
 
 <div id="footer"></div>
@@ -79,8 +89,51 @@ const user = session.user;
 
 // Mostra nome e email
 const nome = user.user_metadata?.full_name || user.email.split('@')[0];
-document.getElementById('user-name').textContent = nome;
+const primeiroNome = (n) => String(n || '').trim().split(/\s+/)[0] || 'cliente';
+document.getElementById('user-name').textContent = primeiroNome(nome);
 document.getElementById('user-email').textContent = user.email;
+
+// ===== RESUMO RÁPIDO (saldo, cupons disponíveis, pedidos em andamento) =====
+async function carregarResumo() {
+  const [saldo, pedidosAtivos, cupons] = await Promise.all([
+    supabase.from('saldo_extrato').select('valor').eq('usuario_id', user.id),
+    supabase.from('pedidos').select('id', { count: 'exact', head: true })
+      .eq('usuario_id', user.id).in('status', ['pendente', 'pago', 'enviado']),
+    contarCuponsDisponiveis()
+  ]);
+
+  const totalSaldo = (saldo.data || []).reduce((t, e) => t + Number(e.valor || 0), 0);
+  document.getElementById('resumo-saldo').textContent = saldo.error ? '—'
+    : totalSaldo.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  document.getElementById('resumo-pedidos').textContent = pedidosAtivos.error ? '—' : (pedidosAtivos.count || 0);
+  document.getElementById('resumo-cupons').textContent = cupons ?? '—';
+}
+
+// Mesma regra da página de cupons: ativo, público ou do usuário (ou código
+// verificado), dentro da validade, com estoque e não usado por ele.
+async function contarCuponsDisponiveis() {
+  let codigos = [];
+  try { codigos = JSON.parse(localStorage.getItem('cupons_verificados') || '[]'); } catch {}
+
+  const [publicos, privados, usos] = await Promise.all([
+    supabase.from('cupons').select('*').eq('ativo', true).or('publico.eq.true,usuario_id.eq.' + user.id),
+    codigos.length ? supabase.from('cupons').select('*').eq('ativo', true).in('codigo', codigos) : { data: [] },
+    supabase.from('cupons_usos').select('cupom_id').eq('usuario_id', user.id)
+  ]);
+  if (publicos.error) return null;
+
+  const usados = new Set((usos.data || []).map(u => u.cupom_id));
+  const vistos = new Set();
+  return [...(publicos.data || []), ...(privados.data || [])].filter(c => {
+    if (vistos.has(c.id)) return false;
+    vistos.add(c.id);
+    const expirado = c.valido_ate && new Date(c.valido_ate) < new Date();
+    const esgotado = c.uso_maximo && c.uso_atual >= c.uso_maximo;
+    const jaUsou = usados.has(c.id) && c.uso_unico_por_usuario;
+    return !expirado && !esgotado && !jaUsou;
+  }).length;
+}
+carregarResumo();
 
 // ===== FOTO DE PERFIL =====
 // A foto vai pro bucket "avatares", sempre dentro da pasta com o id do
@@ -408,10 +461,11 @@ window.pagarPedido = async function(id, btn) {
 
 window.cancelarPedido = async function(id) {
   if (!confirm('Tem certeza que deseja cancelar este pedido?')) return;
-  const { error } = await supabase.from('pedidos').update({ status: 'cancelado' }).eq('id', id);
-  if (error) { showToast('Erro ao cancelar pedido.', 'error'); return; }
+  const { error } = await supabase.rpc('cancelar_meu_pedido', { p_pedido_id: id });
+  if (error) { showToast(error.message || 'Erro ao cancelar pedido.', 'error'); return; }
   showToast('Pedido cancelado.', 'success');
   loadOrders();
+  carregarResumo();
 };
 
 // ===== RASTREIO DO PEDIDO (linha do tempo tipo iFood, ao vivo) =====
@@ -552,13 +606,16 @@ window.salvarEdicaoPedido = async function(id) {
     referencia: sanitizar(document.getElementById('edit-pedido-referencia').value, 200)
   };
 
-  const { error } = await supabase.from('pedidos').update({
-    endereco: novoEndereco,
-    usuario_nome: novoEndereco.nome,
-    usuario_telefone: novoEndereco.telefone
-  }).eq('id', id);
+  const { error } = await supabase.rpc('editar_dados_meu_pedido', {
+    p_pedido_id: id,
+    p_nome: novoEndereco.nome,
+    p_telefone: novoEndereco.telefone,
+    p_bairro: novoEndereco.bairro,
+    p_endereco: novoEndereco.endereco,
+    p_referencia: novoEndereco.referencia
+  });
 
-  if (error) { showToast('Erro ao salvar alterações.', 'error'); return; }
+  if (error) { showToast(error.message || 'Erro ao salvar alterações.', 'error'); return; }
   document.getElementById('modal-editar-pedido')?.remove();
   showToast('Dados do pedido atualizados!', 'success');
   loadOrders();
@@ -626,7 +683,7 @@ async function loadProfile() {
       .eq('id', user.id);
     if (error) { showToast('Erro ao salvar.', 'error'); return; }
     showToast('Nome atualizado!', 'success');
-    document.getElementById('user-name').textContent = document.getElementById('edit-name').value;
+    document.getElementById('user-name').textContent = primeiroNome(document.getElementById('edit-name').value);
   });
 
   // CPF — salva direto (sem confirmação por e-mail por enquanto; a
