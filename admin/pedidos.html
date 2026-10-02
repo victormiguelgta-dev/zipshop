@@ -276,7 +276,7 @@ window.abrirDetalhesPedido = function(id) {
       ${end.horario_preferido ? `<p style="font-size:13px;color:var(--text-muted);margin-bottom:14px">Janela/Previsão: ${esc(end.horario_preferido)}</p>` : ''}
 
       <p style="font-size:11px;color:var(--text-muted);text-transform:uppercase;font-weight:700;margin-bottom:4px">Pagamento / Entrega</p>
-      <p style="font-size:13px;margin-bottom:14px">${esc(p.pagamento || '—')} · ${esc(p.tipo_entrega || '—')}${p.codigo_confirmacao ? ` · Código de confirmação: <strong>${esc(p.codigo_confirmacao)}</strong>` : ''}</p>
+      <p style="font-size:13px;margin-bottom:14px">${esc(p.pagamento || '—')} · ${p.tipo_entrega === 'fornecedor' ? '🚚 fornecedor (5 a 15 dias)' : esc(p.tipo_entrega || '—')}${p.codigo_confirmacao ? ` · Código de confirmação: <strong>${esc(p.codigo_confirmacao)}</strong>` : ''}</p>
 
       <p style="font-size:11px;color:var(--text-muted);text-transform:uppercase;font-weight:700;margin-bottom:6px">Itens</p>
       ${itensHTML || '<p style="font-size:13px;color:var(--text-muted)">Nenhum item registrado.</p>'}

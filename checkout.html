@@ -95,6 +95,10 @@ function comTimeout(promise, ms = 15000, mensagem = 'A operação demorou demais
 let selectedPayment = 'pix';
 let selectedDelivery = 'rota';
 let selectedHorario = '';
+// Produto de dropshipping (enviado pelo fornecedor) não sai na rota nem na
+// Exclusiva: o pedido inteiro vai como "fornecedor", prazo de 5 a 15 dias.
+let _temFornecedor = false;
+let _soFornecedor = false;
 // CORREÇÃO BUG 13: se um cupom já foi aplicado lá no carrinho, ele
 // continua aplicado aqui — não precisa digitar de novo.
 let _cupomAplicado = getCupomAplicado(); // { codigo, tipo, valor, id }
@@ -108,6 +112,7 @@ function calcDescontoSaldo(baseAposCupom) {
 
 function calcFrete(subtotal) {
   if (selectedDelivery === 'exclusiva') return 9.90;
+  // Fornecedor: mesma regra de frete da rota (grátis a partir de R$ 14,90)
   // Cupom de frete grátis
   if (_cupomAplicado?.tipo === 'frete_gratis') return 0;
   return subtotal >= 14.90 ? 0 : 2.90;
@@ -234,6 +239,22 @@ async function renderCheckout() {
   if (cart.length === 0) { window.location.href = 'carrinho.html'; return; }
 
   import('/js/analytics.js').then(m => m.registrarEvento('inicio_checkout', { meta: { subtotal } })).catch(() => {});
+
+  try {
+    const _sbProd = await _clienteSupabase();
+    const ids = [...new Set(cart.map(i => Number(i.id)).filter(Boolean))];
+    const { data: tipos } = await _sbProd.from('produtos').select('id, tipo_estoque').in('id', ids);
+    const doFornecedor = (tipos || []).filter(t => t.tipo_estoque === 'dropshipping');
+    _temFornecedor = doFornecedor.length > 0;
+    _soFornecedor = _temFornecedor && doFornecedor.length === ids.length;
+  } catch { /* sem conexão: o banco recusa o tipo errado na hora de confirmar */ }
+  if (_temFornecedor) {
+    selectedDelivery = 'fornecedor';
+    selectedHorario = '';
+    if (selectedPayment === 'dinheiro') selectedPayment = 'pix';
+  } else if (selectedDelivery === 'fornecedor') {
+    selectedDelivery = 'rota';
+  }
 
   const frete = calcFrete(subtotal);
   const subtotalComDesconto = calcSubtotalComDesconto(subtotal);
@@ -428,6 +449,25 @@ async function renderCheckout() {
       <!-- STEP 2 - ENTREGA -->
       <div class="checkout-step">
         <div class="checkout-step-title"><span class="step-num">2</span> Tipo de Entrega</div>
+        ${_temFornecedor ? `
+        <div id="card-fornecedor"
+          style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border:2px solid var(--primary);border-radius:12px;background:rgba(170,239,0,0.05)">
+          <div style="display:flex;align-items:center;gap:12px">
+            <span style="font-size:24px">🚚</span>
+            <div>
+              <div style="font-weight:700;font-size:14px">Envio pelo fornecedor</div>
+              <div style="font-size:12px;color:var(--text-muted)">Prazo: 5 a 15 dias</div>
+            </div>
+          </div>
+          <div style="text-align:right;font-weight:900;color:var(--primary)">
+            ${frete === 0 ? 'Grátis' : formatPrice(frete)}
+          </div>
+        </div>
+        <p style="font-size:12px;color:var(--text-muted);margin-top:10px">
+          ${_soFornecedor
+            ? 'Este produto é enviado direto do fornecedor. Você acompanha tudo em Meus Pedidos.'
+            : '⚠️ Seu carrinho tem produto enviado direto do fornecedor, então o pedido todo chega junto, em 5 a 15 dias. Quer receber os outros itens antes? Faça um pedido separado para eles.'}
+        </p>` : `
         <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px">
           <div onclick="selecionarEntrega('rota')" id="card-rota"
             style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border:2px solid var(--primary);border-radius:12px;cursor:pointer;background:rgba(170,239,0,0.05)">
@@ -485,6 +525,7 @@ async function renderCheckout() {
             <li id="exclusiva-aviso-corte" style="${infoEntregaExclusiva().foraDoHorario ? 'color:#eab308;font-weight:700' : ''}">${infoEntregaExclusiva().avisoExtra}</li>
           </ul>
         </div>
+        `}
       </div>
 
       <!-- STEP 3 - PAGAMENTO -->
@@ -499,7 +540,7 @@ async function renderCheckout() {
             <div class="payment-option-icon">💳</div>
             <div class="payment-option-label">Cartão</div>
           </div>
-          <div class="payment-option" onclick="selectPayment('dinheiro')" id="pay-dinheiro">
+          <div class="payment-option" onclick="selectPayment('dinheiro')" id="pay-dinheiro"${_temFornecedor ? ' style="display:none"' : ''}>
             <div class="payment-option-icon">💵</div>
             <div class="payment-option-label">Na Entrega</div>
           </div>
@@ -1023,8 +1064,10 @@ async function finalizarPedido() {
     nome: nomeLimpo, telefone, bairro: bairroLimpo, endereco: enderecoLimpo, referencia: referenciaLimpa,
     cidade: 'Santa Maria - RS',
     tipo: selectedDelivery,
-    horario_preferido: selectedDelivery === 'rota' ? selectedHorario : `Exclusiva - ${exclusivaInfo.previsao}`,
-    previsao: selectedDelivery === 'rota' ? `Janela: ${selectedHorario} (24-48h)` : exclusivaInfo.previsao,
+    horario_preferido: selectedDelivery === 'rota' ? selectedHorario
+      : selectedDelivery === 'fornecedor' ? 'Envio pelo fornecedor' : `Exclusiva - ${exclusivaInfo.previsao}`,
+    previsao: selectedDelivery === 'rota' ? `Janela: ${selectedHorario} (24-48h)`
+      : selectedDelivery === 'fornecedor' ? '5 a 15 dias' : exclusivaInfo.previsao,
     instrucao_ausencia: instrucaoAusencia
   };
 
@@ -1124,7 +1167,7 @@ async function finalizarPedido() {
           <div class="order-info-icon">🚀</div>
           <div class="order-info-text">
             <div class="order-info-label">Entrega</div>
-            <div class="order-info-value">${selectedDelivery === 'exclusiva' ? `Exclusiva — ${dadosEntrega.previsao}` : 'Por rota — 24-48h'}</div>
+            <div class="order-info-value">${selectedDelivery === 'exclusiva' ? `Exclusiva — ${dadosEntrega.previsao}` : selectedDelivery === 'fornecedor' ? 'Pelo fornecedor — 5 a 15 dias' : 'Por rota — 24-48h'}</div>
           </div>
         </div>
         ${selectedHorario ? `
