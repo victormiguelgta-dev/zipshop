@@ -781,7 +781,7 @@ footer {
 .input-wrapper { position: relative; }
 
 /* ===== ACCOUNT PAGE ===== */
-.account-layout { display: grid; grid-template-columns: 300px 1fr; gap: 24px; max-width: 1100px; margin: 0 auto; padding: 24px 16px 32px; }
+.account-layout { display: grid; grid-template-columns: 340px 1fr; gap: 24px; max-width: 1100px; margin: 0 auto; padding: 24px 16px 32px; }
 .account-layout > div { min-width: 0; }
 .account-layout aside { display: flex; flex-direction: column; gap: 12px; height: fit-content; position: sticky; top: 80px; }
 
@@ -793,19 +793,34 @@ footer {
 .conta-ola { font-size: 18px; font-weight: 900; line-height: 1.2; overflow-wrap: anywhere; }
 .conta-email { font-size: 12px; color: var(--text-muted); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .conta-perfil .avatar-remover { margin: 4px 0 0; padding: 0; font-size: 11px; }
-.conta-resumo { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 16px; }
-.conta-resumo-item { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 10px 4px; border-radius: var(--radius); background: rgba(0,0,0,0.35); border: 1px solid var(--border); text-decoration: none; color: var(--text); text-align: center; transition: border-color 0.2s, transform 0.2s; }
-.conta-resumo-item:hover { border-color: var(--primary); transform: translateY(-1px); }
-.conta-resumo-item strong { font-size: 15px; font-weight: 900; color: var(--primary); white-space: nowrap; }
-.conta-resumo-item span { font-size: 11px; color: var(--text-muted); }
+.conta-resumo { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; margin-top: 16px; }
+.conta-resumo a { text-decoration: none; color: var(--text); }
+.conta-resumo-saldo, .conta-resumo-dupla { border-radius: 16px; background: rgba(0,0,0,0.35); border: 1px solid var(--border); transition: border-color 0.2s; }
+.conta-resumo-saldo { display: flex; align-items: center; gap: 10px; padding: 14px 12px; min-width: 0; }
+.conta-resumo-saldo:hover, .conta-resumo-mini:hover { border-color: var(--primary); }
+.conta-resumo-saldo > span { display: flex; flex-direction: column; min-width: 0; }
+.conta-resumo-saldo strong { font-size: 20px; font-weight: 900; color: var(--primary); white-space: nowrap; line-height: 1.15; }
+.conta-resumo-dupla { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); min-width: 0; }
+.conta-resumo-mini { display: flex; flex-direction: column; justify-content: center; gap: 4px; padding: 12px 10px; min-width: 0; border: 1px solid transparent; border-radius: 16px; }
+.conta-resumo-mini + .conta-resumo-mini { border-left: 1px solid var(--border); border-radius: 0 16px 16px 0; }
+.conta-resumo-linha { display: flex; align-items: center; gap: 8px; }
+.conta-resumo-linha strong { font-size: 20px; font-weight: 800; }
+.conta-resumo-rotulo { font-size: 12px; color: var(--text-muted); line-height: 1.2; }
+.conta-resumo-icone { width: 24px; height: 24px; color: var(--primary); flex-shrink: 0; }
+.conta-resumo-icone-grande { width: 32px; height: 32px; }
+.avatar-vazio { width: 34px; height: 34px; color: var(--primary-dark, #0A0A0A); }
+.avatar-editar .icone { width: 14px; height: 14px; color: var(--text); }
 
-/* Menu em grade de ícones (estilo app) */
-.account-nav { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-.account-nav-item { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 14px 4px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--bg-card); font-size: 12px; font-weight: 600; text-align: center; cursor: pointer; color: var(--text-muted); transition: all 0.2s; text-decoration: none; }
-.account-nav-icone { font-size: 24px; line-height: 1; }
-.account-nav-item:hover { border-color: var(--primary); color: var(--text); }
-.account-nav-item.active { background: rgba(170,239,0,0.1); border-color: var(--primary); color: var(--primary); font-weight: 800; }
-.conta-sair { align-self: center; padding: 6px 12px; font-size: 13px; color: #e53e3e; text-decoration: none; opacity: 0.85; }
+/* Menu em grade com ícones de linha (estilo app) */
+.account-nav { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.account-nav-item { position: relative; display: flex; flex-direction: column; align-items: flex-start; justify-content: space-between; gap: 18px; min-height: 104px; padding: 14px 10px; border-radius: 16px; border: 1px solid var(--border); background: var(--bg-card); font-size: 13px; font-weight: 700; cursor: pointer; color: var(--text); transition: all 0.2s; text-decoration: none; }
+.account-nav-icone { width: 30px; height: 30px; color: var(--primary); }
+.account-nav-label { line-height: 1.2; }
+.account-nav-seta { position: absolute; right: 10px; top: 14px; width: 16px; height: 16px; color: var(--text-muted); }
+.account-nav-item:hover { border-color: var(--primary); }
+.account-nav-item.active { border-color: var(--primary); background: linear-gradient(135deg, rgba(170,239,0,0.12), rgba(170,239,0,0.02)); box-shadow: 0 0 0 1px rgba(170,239,0,0.25), 0 0 18px rgba(170,239,0,0.12); }
+.conta-sair { align-self: center; display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; font-size: 13px; color: #e53e3e; text-decoration: none; opacity: 0.85; }
+.conta-sair .icone { width: 16px; height: 16px; }
 .conta-sair:hover { opacity: 1; text-decoration: underline; }
 .conta-secao-titulo { font-size: 22px; font-weight: 900; margin-bottom: 14px; }
 
@@ -1065,6 +1080,14 @@ tr:hover td { background: rgba(255,255,255,0.02); }
   /* Conta: menu lateral vai para cima */
   .account-layout { grid-template-columns: 1fr; padding-top: 16px; }
   .account-layout aside { position: static; }
+  /* Celular: saldo e (cupons | compras ativas) lado a lado */
+  .conta-resumo { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); }
+  .conta-resumo-saldo strong { font-size: 18px; }
+  .conta-resumo-icone-grande { width: 28px; height: 28px; }
+  .conta-resumo-linha strong { font-size: 18px; }
+  .conta-resumo-icone { width: 22px; height: 22px; }
+  .conta-resumo-rotulo { font-size: 11px; }
+  .account-nav-item { font-size: 13px; padding: 12px 10px; min-height: 96px; }
 
   /* Admin: esconde sidebar, conteúdo ocupa tudo */
   .admin-sidebar { display: none; }
