@@ -105,9 +105,15 @@ let _cupomAplicado = getCupomAplicado(); // { codigo, tipo, valor, id }
 let _saldoDisponivel = 0;
 let _usarSaldo = false;
 
+// Arredonda em centavos igual ao banco (66,405 -> 66,41). Sem isso o
+// navegador mandava saldo com 3 casas e sobrava "R$ 0,01" pra pagar.
+function centavos(v) {
+  return Math.round(Number((Number(v || 0) * 100).toFixed(6))) / 100;
+}
+
 function calcDescontoSaldo(baseAposCupom) {
   if (!_usarSaldo || _saldoDisponivel <= 0) return 0;
-  return Math.min(_saldoDisponivel, baseAposCupom);
+  return centavos(Math.min(_saldoDisponivel, baseAposCupom));
 }
 
 function calcFrete(subtotal) {
@@ -138,12 +144,12 @@ function infoEntregaExclusiva() {
 
 // Desconto de 5% no PIX aplicado somente sobre o subtotal (produtos), não sobre o frete
 function calcSubtotalComDesconto(subtotal) {
-  return selectedPayment === 'pix' ? subtotal * 0.95 : subtotal;
+  return centavos(selectedPayment === 'pix' ? subtotal * 0.95 : subtotal);
 }
 
 function calcDescontoCupom(subtotalComDesconto) {
   if (!_cupomAplicado) return 0;
-  if (_cupomAplicado.tipo === 'percentual') return subtotalComDesconto * (_cupomAplicado.valor / 100);
+  if (_cupomAplicado.tipo === 'percentual') return centavos(subtotalComDesconto * (_cupomAplicado.valor / 100));
   if (_cupomAplicado.tipo === 'fixo') return Math.min(_cupomAplicado.valor, subtotalComDesconto);
   if (_cupomAplicado.tipo === 'frete_gratis') return 0;
   return 0;
@@ -260,7 +266,7 @@ async function renderCheckout() {
   const subtotalComDesconto = calcSubtotalComDesconto(subtotal);
   const descontoCupomInicial = calcDescontoCupom(subtotalComDesconto);
   const descontoSaldoInicial = calcDescontoSaldo(subtotalComDesconto - descontoCupomInicial);
-  const totalFinal = subtotalComDesconto - descontoCupomInicial - descontoSaldoInicial + frete;
+  const totalFinal = centavos(subtotalComDesconto - descontoCupomInicial - descontoSaldoInicial + frete);
 
   // Busca TODOS os endereços salvos e o perfil do usuário para pré-preencher
   // CORREÇÃO/MELHORIA: antes só buscava o favorito; agora busca a lista
@@ -280,7 +286,7 @@ async function renderCheckout() {
       ]);
       enderecosSalvos = endData || [];
       perfilUsuario = perfData;
-      _saldoDisponivel = (extratoData || []).reduce((s, e) => s + Number(e.valor), 0);
+      _saldoDisponivel = centavos((extratoData || []).reduce((s, e) => s + Number(e.valor), 0));
     }
   } catch(e) {}
 
@@ -621,7 +627,7 @@ function atualizarResumoTotal() {
   const subtotalComDesconto = calcSubtotalComDesconto(subtotal);
   const descontoCupom = calcDescontoCupom(subtotalComDesconto);
   const descontoSaldo = calcDescontoSaldo(subtotalComDesconto - descontoCupom);
-  const total = subtotalComDesconto - descontoCupom - descontoSaldo + frete;
+  const total = centavos(subtotalComDesconto - descontoCupom - descontoSaldo + frete);
 
   // Desconto PIX
   const descontoPixEl = document.getElementById('resumo-desconto-pix');
@@ -1039,7 +1045,7 @@ async function finalizarPedido() {
   const subtotalComDesconto = calcSubtotalComDesconto(subtotal);
   const descontoCupom = calcDescontoCupom(subtotalComDesconto);
   const descontoSaldo = calcDescontoSaldo(subtotalComDesconto - descontoCupom);
-  const total = subtotalComDesconto - descontoCupom - descontoSaldo + frete;
+  const total = centavos(subtotalComDesconto - descontoCupom - descontoSaldo + frete);
 
   // Indicação: o banco (trigger trg_a_blindar_pedido) descobre quem indicou
   // a partir do código e ignora se for o próprio comprador.
