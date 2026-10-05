@@ -146,6 +146,13 @@ function esc(str) {
 function formatPrice(v) {
   return Number(v||0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
+
+// Deixa claro no painel quando NÃO é para cobrar nada na entrega
+function rotuloPagamento(p) {
+  if (p.pagamento === 'saldo') return '<span style="color:#22c55e;font-weight:700">💰 Pago com saldo — não cobrar</span>';
+  if (p.pagamento === 'dinheiro') return `💵 Dinheiro — cobrar ${formatPrice(p.total)}`;
+  return esc(p.pagamento || '—');
+}
 function formatDate(d) {
   return new Date(d).toLocaleDateString('pt-BR');
 }
@@ -199,7 +206,7 @@ function renderTabela(lista) {
       <td style="color:var(--text-muted)">${formatDate(p.created_at)}</td>
       <td style="font-size:18px">${itens}</td>
       <td style="font-weight:700">${formatPrice(p.total)}</td>
-      <td style="font-size:12px;color:var(--text-muted)">${esc(p.pagamento||'—')}</td>
+      <td style="font-size:12px;color:var(--text-muted)">${rotuloPagamento(p)}</td>
       <td>
         <select onchange="updateStatus('${p.id}', this.value)"
           style="background:var(--bg-muted);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:4px 8px;font-size:12px">
@@ -276,7 +283,7 @@ window.abrirDetalhesPedido = function(id) {
       ${end.horario_preferido ? `<p style="font-size:13px;color:var(--text-muted);margin-bottom:14px">Janela/Previsão: ${esc(end.horario_preferido)}</p>` : ''}
 
       <p style="font-size:11px;color:var(--text-muted);text-transform:uppercase;font-weight:700;margin-bottom:4px">Pagamento / Entrega</p>
-      <p style="font-size:13px;margin-bottom:14px">${esc(p.pagamento || '—')} · ${p.tipo_entrega === 'fornecedor' ? '🚚 fornecedor (5 a 15 dias)' : esc(p.tipo_entrega || '—')}${p.codigo_confirmacao ? ` · Código de confirmação: <strong>${esc(p.codigo_confirmacao)}</strong>` : ''}</p>
+      <p style="font-size:13px;margin-bottom:14px">${rotuloPagamento(p)} · ${p.tipo_entrega === 'fornecedor' ? '🚚 fornecedor (5 a 15 dias)' : esc(p.tipo_entrega || '—')}${p.codigo_confirmacao ? ` · Código de confirmação: <strong>${esc(p.codigo_confirmacao)}</strong>` : ''}</p>
 
       <p style="font-size:11px;color:var(--text-muted);text-transform:uppercase;font-weight:700;margin-bottom:6px">Itens</p>
       ${itensHTML || '<p style="font-size:13px;color:var(--text-muted)">Nenhum item registrado.</p>'}

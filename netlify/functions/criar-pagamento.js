@@ -120,6 +120,11 @@ exports.handler = async (event) => {
       return { statusCode: 409, body: JSON.stringify({ erro: 'Este pedido não está mais aguardando pagamento.' }) };
     }
 
+    // 1b1. Pago com saldo ou na entrega: não há nada a cobrar no Mercado Pago
+    if (pedido.pagamento !== 'pix' && pedido.pagamento !== 'cartao') {
+      return { statusCode: 409, body: JSON.stringify({ erro: 'Este pedido não é pago pelo Mercado Pago.' }) };
+    }
+
     // 1b2. Prazo para pagar: depois disso o pedido é cancelado sozinho
     // (função expirar-pedidos-pendentes) e o saldo/cupom/estoque voltam.
     // created_at é gravado em UTC sem fuso, por isso o 'Z'.

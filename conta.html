@@ -381,6 +381,7 @@ async function loadOrders() {
           <div style="text-align:right">
             ${statusBadge(p.status, !!expiraEm)}
             <p style="font-weight:900;color:var(--primary);margin-top:6px">${formatPrice(p.total)}</p>
+            ${p.pagamento === 'saldo' ? '<p style="font-size:11px;color:#22c55e;margin-top:2px">💰 Pago com saldo</p>' : ''}
           </div>
         </div>
         ${podePagar ? `<div style="margin-top:10px;padding:10px 12px;border:1px solid rgba(245,158,11,0.4);background:rgba(245,158,11,0.08);border-radius:10px">
