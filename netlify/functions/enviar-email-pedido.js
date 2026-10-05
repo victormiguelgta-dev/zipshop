@@ -70,7 +70,11 @@ function gerarHTMLPedido(pedido) {
     <div style="background:#1a1a1a;border-radius:10px;padding:16px;margin-bottom:20px">
       <p style="margin:4px 0;font-size:13px">Subtotal: R$ ${Number(pedido.subtotal||0).toFixed(2).replace('.',',')}</p>
       <p style="margin:4px 0;font-size:13px">Frete: R$ ${Number(pedido.frete||0).toFixed(2).replace('.',',')}</p>
+      ${Number(pedido.saldo_usado||0) > 0 ? `<p style="margin:4px 0;font-size:13px">Saldo usado: -R$ ${Number(pedido.saldo_usado).toFixed(2).replace('.',',')}</p>` : ''}
       <p style="margin:8px 0 0;font-size:18px;font-weight:900;color:#AAEF00">Total: R$ ${Number(pedido.total||0).toFixed(2).replace('.',',')}</p>
+      <p style="margin:6px 0 0;font-size:13px;color:#ccc">${pedido.pagamento === 'saldo' ? '💰 Pago com saldo — nada a pagar na entrega'
+        : pedido.pagamento === 'dinheiro' ? '💵 Pagamento na entrega (dinheiro)'
+        : pedido.pagamento === 'cartao' ? '💳 Cartão (Mercado Pago)' : '📱 PIX (Mercado Pago)'}</p>
     </div>
     <div style="background:#1a1a1a;border-radius:10px;padding:16px;margin-bottom:20px">
       <p style="font-weight:700;margin-bottom:8px;font-size:13px">📍 Entrega</p>

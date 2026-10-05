@@ -546,6 +546,10 @@ async function renderCheckout() {
           </div>
         </div>
         <div id="payment-detail"></div>
+        <div id="aviso-pago-saldo" style="display:none;background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.4);border-radius:10px;padding:14px">
+          <p style="font-weight:700;font-size:14px;color:#22c55e;margin-bottom:4px">✓ Seu saldo cobre todo o pedido</p>
+          <p style="font-size:12px;color:var(--text-muted)">Nada a pagar — nem pelo app, nem na entrega.</p>
+        </div>
       </div>
 
       <!-- CUPOM DE DESCONTO -->
@@ -653,9 +657,23 @@ function atualizarResumoTotal() {
   if (freteEl) freteEl.innerHTML = `<span>Frete</span><span>${frete === 0 ? '<span style="color:#22c55e">Grátis</span>' : formatPrice(frete)}</span>`;
 
   const totalEl = document.getElementById('resumo-total');
-  if (totalEl) totalEl.textContent = formatPrice(total);
+  if (totalEl) totalEl.textContent = formatPrice(Math.max(total, 0));
+
+  // Saldo/cupom cobrem tudo: não há o que pagar (o banco grava como "saldo")
+  const quitado = totalQuitado(total);
+  const opcoes = document.getElementById('opcoes-pagamento');
+  const detalhe = document.getElementById('payment-detail');
+  const aviso = document.getElementById('aviso-pago-saldo');
+  if (opcoes) opcoes.style.display = quitado ? 'none' : '';
+  if (detalhe) detalhe.style.display = quitado ? 'none' : '';
+  if (aviso) aviso.style.display = quitado ? '' : 'none';
+
   const btn = document.getElementById('btn-confirmar');
-  if (btn) btn.textContent = `⚡ Confirmar Pedido — ${formatPrice(total)}`;
+  if (btn) btn.textContent = quitado ? '⚡ Confirmar Pedido — pago com saldo' : `⚡ Confirmar Pedido — ${formatPrice(total)}`;
+}
+
+function totalQuitado(total) {
+  return total < 0.005;
 }
 
 window.toggleUsarSaldo = function(checked) {
@@ -900,9 +918,8 @@ function selecionarEntrega(tipo) {
   document.getElementById('bloco-pagamento').style.pointerEvents = 'auto';
 
   // Atualiza resumo
+  atualizarResumoTotal();
   document.getElementById('resumo-frete').innerHTML = `<span>Frete (${tipo === 'exclusiva' ? 'Exclusiva' : 'Rota'})</span><span>${frete === 0 ? '<span style="color:#22c55e">Grátis</span>' : formatPrice(frete)}</span>`;
-  document.getElementById('resumo-total').textContent = formatPrice(total);
-  document.getElementById('btn-confirmar').textContent = `⚡ Confirmar Pedido — ${formatPrice(total)}`;
 }
 
 function selecionarHorario(h) {
@@ -940,21 +957,8 @@ function selectPayment(type) {
       📱 Você será redirecionado para pagar via PIX no Mercado Pago.</div>`;
   }
 
-  // Recalcula o resumo de valores ao trocar forma de pagamento (desconto PIX)
-  const cart = getCart();
-  const subtotal = getCartTotal();
-  const frete = calcFrete(subtotal);
-  const subtotalComDesconto = calcSubtotalComDesconto(subtotal);
-  const total = subtotalComDesconto + frete;
-
-  const descontoEl = document.getElementById('resumo-desconto-pix');
-  if (descontoEl) descontoEl.style.display = type === 'pix' ? '' : 'none';
-
-  const totalEl = document.getElementById('resumo-total');
-  if (totalEl) totalEl.textContent = formatPrice(total);
-
-  const btn = document.getElementById('btn-confirmar');
-  if (btn) btn.textContent = `⚡ Confirmar Pedido — ${formatPrice(total)}`;
+  // Recalcula o resumo (desconto PIX, cupom e saldo)
+  atualizarResumoTotal();
 }
 
 async function enviarEmailPedido(pedido, accessToken) {
@@ -1133,8 +1137,9 @@ async function finalizarPedido() {
   const pedidoId = pedido.id;
   const pedidoIdCurto = pedidoId.slice(0,8).toUpperCase();
 
-  // Pagamento na entrega — confirma direto
-  if (selectedPayment === 'dinheiro') {
+  // Pagamento na entrega ou pago com saldo — confirma direto
+  const pagoComSaldo = pedido.pagamento === 'saldo';
+  if (selectedPayment === 'dinheiro' || pagoComSaldo) {
     clearCart();
     const { data: { session: _sessaoEmail } } = await supabase.auth.getSession();
     enviarEmailPedido(pedido, _sessaoEmail?.access_token);
@@ -1179,10 +1184,12 @@ async function finalizarPedido() {
           </div>
         </div>` : ''}
         <div class="order-info-row">
-          <div class="order-info-icon">💵</div>
+          <div class="order-info-icon">${pagoComSaldo ? '💰' : '💵'}</div>
           <div class="order-info-text">
             <div class="order-info-label">Pagamento</div>
-            <div class="order-info-value">Na entrega — dinheiro trocado</div>
+            <div class="order-info-value">${pagoComSaldo
+              ? 'Pago com saldo — nada a pagar na entrega'
+              : `Na entrega — ${formatPrice(pedido.total)} em dinheiro trocado`}</div>
           </div>
         </div>
         <div class="order-info-row">
