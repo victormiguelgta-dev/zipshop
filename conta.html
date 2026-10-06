@@ -300,24 +300,82 @@ function prazoPagamento(p) {
   return isNaN(expira) ? null : expira;
 }
 
-function statusBadge(s, aguardandoPagamento) {
-  if (aguardandoPagamento) return '<span class="badge badge-yellow">Aguardando pagamento</span>';
-  const map = {
-    'pendente': 'badge-yellow',
-    'pago': 'badge-blue',
-    'enviado': 'badge-blue',
-    'entregue': 'badge-green',
-    'cancelado': 'badge-red'
-  };
-  const labels = {
-    'pendente': 'Recebido',
-    'pago': 'Pagamento confirmado',
-    'enviado': 'Saiu para entrega',
-    'entregue': 'Entregue',
-    'cancelado': 'Cancelado'
-  };
-  return `<span class="badge ${map[s] || 'badge-muted'}">${labels[s] || s}</span>`;
+// Ícones de linha (mesmo estilo do topo da Minha Conta)
+const ICONES = {
+  package: '<path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"/><path d="M12 22V12"/><path d="m3.3 7 8.7 5 8.7-5"/>',
+  clock: '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
+  check: '<circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/>',
+  truck: '<path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/><path d="M15 18H9"/><path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.624l-3.48-4.35A1 1 0 0 0 17.52 8H14"/><circle cx="17" cy="18" r="2"/><circle cx="7" cy="18" r="2"/>',
+  card: '<rect width="20" height="14" x="2" y="5" rx="2"/><path d="M2 10h20"/>',
+  x: '<circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/>',
+  wallet: '<path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/>',
+  calendar: '<path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/>',
+  pin: '<path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/>',
+  file: '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/>',
+  refresh: '<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>'
+};
+function icone(nome) {
+  return `<svg class="ped-icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONES[nome] || ''}</svg>`;
 }
+
+// Selo de status do pedido (estilo pílula com ícone)
+function seloStatus(s, aguardandoPagamento) {
+  if (aguardandoPagamento) return `<span class="ped-selo ped-selo-amarelo">${icone('clock')} A pagar</span>`;
+  const selos = {
+    pendente: ['package', 'Recebido', ''],
+    pago: ['card', 'Pagamento confirmado', ''],
+    enviado: ['truck', 'Em trânsito', ''],
+    entregue: ['check', 'Entregue', ''],
+    cancelado: ['x', 'Cancelado', ' ped-selo-vermelho']
+  };
+  const [ic, txt, cls] = selos[s] || ['package', esc(s), ''];
+  return `<span class="ped-selo${cls}">${icone(ic)} ${txt}</span>`;
+}
+
+// Conteúdo do "Ver detalhes": pagamento, entrega, endereço e valores
+function detalhesPedidoHTML(p) {
+  const end = p.endereco || {};
+  const pagamentos = { pix: 'PIX', cartao: 'Cartão', dinheiro: 'Na entrega (dinheiro)', saldo: 'Pago com saldo' };
+  const entregas = { rota: 'Por rota — 24 a 48h', exclusiva: 'Exclusiva', fornecedor: 'Pelo fornecedor — 5 a 15 dias' };
+  const linha = (rotulo, valor) => valor ? `<div class="ped-det-linha"><span>${rotulo}</span><span>${valor}</span></div>` : '';
+  return `
+    ${linha('Pagamento', esc(pagamentos[p.pagamento] || p.pagamento || ''))}
+    ${linha('Entrega', esc(entregas[p.tipo_entrega] || p.tipo_entrega || ''))}
+    ${p.tipo_entrega === 'rota' ? linha('Janela', esc(end.horario_preferido || '')) : ''}
+    ${linha('Endereço', esc([end.endereco, end.bairro].filter(Boolean).join(' — ')))}
+    ${linha('Recebedor', esc(end.nome || p.usuario_nome || ''))}
+    ${p.codigo_confirmacao && !['entregue', 'cancelado'].includes(p.status) ? linha('Código de entrega', esc(p.codigo_confirmacao)) : ''}
+    <div class="ped-det-valores">
+      ${linha('Subtotal', formatPrice(p.subtotal))}
+      ${Number(p.cupom_desconto) > 0 ? linha('Cupom', '- ' + formatPrice(p.cupom_desconto)) : ''}
+      ${Number(p.saldo_usado) > 0 ? linha('Saldo usado', '- ' + formatPrice(p.saldo_usado)) : ''}
+      ${linha('Frete', Number(p.frete) > 0 ? formatPrice(p.frete) : 'Grátis')}
+      ${linha('<strong>Total</strong>', `<strong>${formatPrice(p.total)}</strong>`)}
+    </div>`;
+}
+
+window.filtrarPedidos = function(aba) {
+  window._abaPedidos = aba;
+  document.querySelectorAll('.ped-aba').forEach(b => b.classList.toggle('ativa', b.dataset.aba === aba));
+  let visiveis = 0;
+  document.querySelectorAll('#ped-lista .ped-card').forEach(c => {
+    const mostra = aba === 'todos' || c.dataset.grupo === aba;
+    c.hidden = !mostra;
+    if (mostra) visiveis++;
+  });
+  const vazio = document.getElementById('ped-vazio');
+  if (vazio) {
+    vazio.hidden = visiveis > 0;
+    vazio.textContent = aba === 'entregues' ? 'Nenhum pedido entregue ainda.' : 'Nenhum pedido em andamento.';
+  }
+};
+
+window.alternarDetalhesPedido = function(id, btn) {
+  const painel = document.getElementById('detalhes-' + id);
+  if (!painel) return;
+  painel.hidden = !painel.hidden;
+  btn.classList.toggle('ativo', !painel.hidden);
+};
 
 // SEÇÃO PEDIDOS
 async function loadOrders() {
@@ -353,53 +411,88 @@ async function loadOrders() {
   const devolucaoPorPedido = {};
   (devolucoes || []).forEach(d => { devolucaoPorPedido[d.pedido_id] = d; });
 
-  content.innerHTML = pedidos.map(p => {
-    const itensHTML = (p.itens || []).map(i => {
-      const nome = esc(i.nome || i.name || 'Produto');
+  const cards = pedidos.map(p => {
+    const itens = p.itens || [];
+    const qtdItens = itens.reduce((t, i) => t + (Number(i.quantidade) || 1), 0);
+    const itensHTML = itens.map(i => {
+      const nomeCompleto = String(i.nome || i.name || 'Produto');
+      // "Fone ... — Branco" → nome em cima, variação embaixo
+      const corte = nomeCompleto.lastIndexOf(' — ');
+      const nome = esc(corte > 0 ? nomeCompleto.slice(0, corte) : nomeCompleto);
+      const variacao = esc(corte > 0 ? nomeCompleto.slice(corte + 3) : (i.variacao || i.cor || ''));
       const pid = i.produto_id;
       const foto = pid ? fotosMap[pid] : null;
       const thumb = foto?.image_url
-        ? `<img src="${foto.image_url}" style="width:28px;height:28px;object-fit:cover;border-radius:6px;flex-shrink:0">`
-        : `<span style="font-size:18px;line-height:1;flex-shrink:0">${foto?.emoji || i.emoji || '📦'}</span>`;
-      return pid
-        ? `<a href="produto.html?id=${pid}" style="color:var(--text);text-decoration:none;display:inline-flex;align-items:center;gap:6px;padding:4px 10px 4px 4px;border:1px solid var(--border);border-radius:20px;font-size:12px;margin:2px 2px 2px 0;transition:border-color .2s;background:var(--bg-muted)" onmouseover="this.style.borderColor='var(--primary)'" onmouseout="this.style.borderColor='var(--border)'">${thumb}<span>${nome}</span></a>`
-        : `<span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--text-muted)">${thumb}<span>${nome}</span></span>`;
+        ? `<img src="${esc(foto.image_url)}" alt="" loading="lazy">`
+        : `<span>${esc(foto?.emoji || i.emoji || '📦')}</span>`;
+      const tag = pid ? 'a' : 'div';
+      return `<${tag} class="ped-item"${pid ? ` href="produto.html?id=${pid}"` : ''}>
+        <div class="ped-item-foto">${thumb}</div>
+        <div class="ped-item-texto"><p class="ped-item-nome">${nome}</p>${variacao ? `<p class="ped-item-var">${variacao}</p>` : ''}</div>
+        <span class="ped-item-qtd">${Number(i.quantidade) || 1}x</span>
+      </${tag}>`;
     }).join('');
     const podeEditar = p.status === 'pendente';
     const expiraEm = prazoPagamento(p);
     const podePagar = expiraEm && expiraEm > new Date();
     const devolucao = devolucaoPorPedido[p.id];
-    const labelsDevolucao = { solicitado: '🔄 Devolução em análise', aprovado: '✅ Devolução aprovada', rejeitado: '❌ Devolução recusada', reembolsado: '💰 Reembolsado em saldo' };
-    return `<div class="card" style="margin-bottom:12px">
-      <div class="card-body">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px">
-          <div style="flex:1">
-            <p style="font-weight:700;margin-bottom:6px">#${p.id.slice(0,8).toUpperCase()}</p>
-            <div style="margin-bottom:6px">${itensHTML}</div>
-            <p style="font-size:12px;color:var(--text-muted);margin-top:4px">📅 ${formatDate(p.created_at)}</p>
-          </div>
-          <div style="text-align:right">
-            ${statusBadge(p.status, !!expiraEm)}
-            <p style="font-weight:900;color:var(--primary);margin-top:6px">${formatPrice(p.total)}</p>
-            ${p.pagamento === 'saldo' ? '<p style="font-size:11px;color:#22c55e;margin-top:2px">💰 Pago com saldo</p>' : ''}
-          </div>
+    const labelsDevolucao = { solicitado: 'Devolução em análise', aprovado: 'Devolução aprovada', rejeitado: 'Devolução recusada', reembolsado: 'Reembolsado em saldo' };
+    const grupo = p.status === 'entregue' ? 'entregues' : (['pendente', 'pago', 'enviado'].includes(p.status) ? 'andamento' : 'outros');
+    const temAcoes = podeEditar || (p.status === 'entregue' && !devolucao);
+    return `<div class="ped-card" data-grupo="${grupo}">
+      <div class="ped-topo">
+        <span class="ped-numero">#${p.id.slice(0,8).toUpperCase()}</span>
+        ${seloStatus(p.status, !!expiraEm)}
+      </div>
+      <div class="ped-itens">${itensHTML}</div>
+      <div class="ped-resumo">
+        <div class="ped-resumo-bloco">
+          ${icone('wallet')}
+          <div><span class="ped-rotulo">Total do pedido</span><strong class="ped-total">${formatPrice(p.total)}</strong>
+          ${p.pagamento === 'saldo' && p.status !== 'cancelado' ? '<span class="ped-obs-verde">Pago com saldo</span>' : ''}</div>
         </div>
-        ${podePagar ? `<div style="margin-top:10px;padding:10px 12px;border:1px solid rgba(245,158,11,0.4);background:rgba(245,158,11,0.08);border-radius:10px">
-          <p style="font-size:13px;font-weight:700">⏳ Tempo pra pagar: <span data-expira="${expiraEm.toISOString()}" style="font-variant-numeric:tabular-nums;color:#f59e0b">--:--:--</span></p>
-          <p style="font-size:12px;color:var(--text-muted);margin-top:2px">Depois disso o pedido é cancelado automaticamente e o saldo/cupom usados voltam pra você.</p>
-        </div>` : ''}
-        ${devolucao ? `<p style="font-size:12px;font-weight:700;margin-top:10px">${labelsDevolucao[devolucao.status] || devolucao.status}</p>` : ''}
-        ${(p.status !== 'cancelado' || podeEditar) ? `
-        <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);text-align:right;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap">
-          ${podePagar ? `<button onclick="pagarPedido('${p.id}', this)" class="btn btn-primary btn-sm">💳 Pagar agora</button>` : ''}
-          ${p.status !== 'cancelado' ? `<button onclick="abrirRastreio('${p.id}')" class="btn btn-outline btn-sm">📍 Rastrear Pedido</button>` : ''}
-          ${p.status === 'entregue' && !devolucao ? `<button onclick="abrirSolicitarDevolucao('${p.id}')" class="btn btn-outline btn-sm">↩️ Solicitar Devolução</button>` : ''}
-          ${podeEditar ? `<button onclick="abrirEdicaoPedido('${p.id}')" class="btn btn-outline btn-sm">✏️ Editar dados</button>
-          <button onclick="cancelarPedido('${p.id}')" class="btn btn-sm" style="background:#fee2e2;color:#b91c1c;border:none">Cancelar Pedido</button>` : ''}
+        <div class="ped-resumo-bloco ped-resumo-data">
+          ${icone('calendar')}
+          <div><span>${formatDate(p.created_at)}</span><span class="ped-rotulo">${qtdItens} ${qtdItens === 1 ? 'item' : 'itens'}</span></div>
+        </div>
+      </div>
+      ${podePagar ? `<div class="ped-aviso-pagar">
+        <p>${icone('clock')} Tempo pra pagar: <span data-expira="${expiraEm.toISOString()}">--:--:--</span></p>
+        <p class="ped-rotulo">Depois disso o pedido é cancelado automaticamente e o saldo/cupom usados voltam pra você.</p>
+        <button onclick="pagarPedido('${p.id}', this)" class="btn btn-primary ped-btn-pagar">Pagar agora</button>
+      </div>` : ''}
+      ${devolucao ? `<p class="ped-devolucao">${icone('refresh')} ${labelsDevolucao[devolucao.status] || esc(devolucao.status)}</p>` : ''}
+      <div class="ped-botoes${p.status === 'cancelado' ? ' ped-botoes-um' : ''}">
+        ${p.status !== 'cancelado' ? `<button onclick="abrirRastreio('${p.id}')" class="ped-btn">${icone('pin')} Rastrear Pedido</button>` : ''}
+        <button onclick="alternarDetalhesPedido('${p.id}', this)" class="ped-btn">${icone('file')} Ver detalhes</button>
+      </div>
+      <div class="ped-detalhes" id="detalhes-${p.id}" hidden>
+        ${detalhesPedidoHTML(p)}
+        ${temAcoes ? `<div class="ped-detalhes-acoes">
+          ${p.status === 'entregue' && !devolucao ? `<button onclick="abrirSolicitarDevolucao('${p.id}')" class="btn btn-outline btn-sm">Solicitar devolução</button>` : ''}
+          ${podeEditar ? `<button onclick="abrirEdicaoPedido('${p.id}')" class="btn btn-outline btn-sm">Editar dados</button>
+          <button onclick="cancelarPedido('${p.id}')" class="btn btn-sm ped-btn-cancelar">Cancelar pedido</button>` : ''}
         </div>` : ''}
       </div>
     </div>`;
   }).join('');
+
+  const contagem = {
+    todos: pedidos.length,
+    andamento: pedidos.filter(p => ['pendente', 'pago', 'enviado'].includes(p.status)).length,
+    entregues: pedidos.filter(p => p.status === 'entregue').length
+  };
+  const abaAtual = window._abaPedidos || 'todos';
+  content.innerHTML = `
+    <div class="ped-abas" role="tablist">
+      <button class="ped-aba${abaAtual === 'todos' ? ' ativa' : ''}" data-aba="todos" onclick="filtrarPedidos('todos')">${icone('package')} Todos</button>
+      <button class="ped-aba${abaAtual === 'andamento' ? ' ativa' : ''}" data-aba="andamento" onclick="filtrarPedidos('andamento')">${icone('clock')} Em andamento</button>
+      <button class="ped-aba${abaAtual === 'entregues' ? ' ativa' : ''}" data-aba="entregues" onclick="filtrarPedidos('entregues')">${icone('check')} Entregues</button>
+    </div>
+    <div id="ped-lista">${cards}</div>
+    <p id="ped-vazio" class="ped-vazio" hidden></p>`;
+  window._contagemPedidos = contagem;
+  filtrarPedidos(abaAtual);
 
   window._pedidosCache = pedidos;
 }
