@@ -3,7 +3,10 @@
 // destinatário é buscado no banco pelo id do pedido — nunca vem do corpo.
 const https = require('https');
 
-const CORS = { 'Access-Control-Allow-Origin': 'https://zipshop01.netlify.app' };
+// Endereço da loja: configurado no Netlify (SITE_URL); troque lá ao mudar de domínio
+const SITE_URL = process.env.SITE_URL || 'https://zipshop.netlify.app';
+
+const CORS = { 'Access-Control-Allow-Origin': SITE_URL };
 
 function adminEmails() {
   return (process.env.ADMIN_EMAILS || 'admin@zipshop.com,victormiguelgta@gmail.com')

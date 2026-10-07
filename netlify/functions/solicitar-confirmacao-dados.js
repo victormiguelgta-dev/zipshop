@@ -7,6 +7,9 @@
 const https = require('https');
 const crypto = require('crypto');
 
+// Endereço da loja: configurado no Netlify (SITE_URL); troque lá ao mudar de domínio
+const SITE_URL = process.env.SITE_URL || 'https://zipshop.netlify.app';
+
 const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function supabaseRequest(method, path, body) {
@@ -88,7 +91,7 @@ function validarTelefoneReal(telefone) {
 
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') return { statusCode: 405, body: 'Method Not Allowed' };
-  const CORS = { 'Access-Control-Allow-Origin': 'https://zipshop01.netlify.app' };
+  const CORS = { 'Access-Control-Allow-Origin': SITE_URL };
   try {
     // O e-mail NÃO é lido do corpo — é buscado no banco pelo usuario_id.
     const { usuario_id, campo, valor_novo } = JSON.parse(event.body || '{}');

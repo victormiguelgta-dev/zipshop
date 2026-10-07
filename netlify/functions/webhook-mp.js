@@ -1,6 +1,9 @@
 const https = require('https');
 const crypto = require('crypto');
 
+// Endereço da loja: configurado no Netlify (SITE_URL); troque lá ao mudar de domínio
+const SITE_URL = process.env.SITE_URL || 'https://zipshop.netlify.app';
+
 function buscarPagamento(paymentId, accessToken) {
   return new Promise((resolve, reject) => {
     const options = {
@@ -157,7 +160,7 @@ exports.handler = async (event) => {
     await atualizarPedido(pedidoId, novoStatus, paymentId);
 
     if (novoStatus === 'pago') {
-      await enviarEmailConfirmacao('https://zipshop01.netlify.app', pedidoId);
+      await enviarEmailConfirmacao(SITE_URL, pedidoId);
     }
 
     return { statusCode: 200, body: 'ok' };
