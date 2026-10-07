@@ -8,3 +8,6 @@ Loja online (HTML + JS puro, Supabase, Netlify). Arquivos SQL e notas internas f
 - Jeito de trabalhar em funcionalidades novas: (1) primeiro só analisar o pedido e o código,
   sem mudar nada; (2) mostrar os defeitos, riscos e dúvidas encontrados; (3) só implementar
   depois do OK do dono; (4) só publicar (merge na main / Netlify) quando ele pedir.
+- Toda alteração feita fica sempre salva no GitHub, numa branch (commit + push), nunca só
+  na máquina. Merge na main só quando o dono disser "publica": cada merge na main gera uma
+  publicação no Netlify e gasta créditos do plano. Juntar várias alterações numa publicação só.

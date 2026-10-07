@@ -1,5 +1,8 @@
 const https = require('https');
 
+// Endereço da loja: configurado no Netlify (SITE_URL); troque lá ao mudar de domínio
+const SITE_URL = process.env.SITE_URL || 'https://zipshop.netlify.app';
+
 // Tempo que o cliente tem para pagar um pedido online (Pix/cartão).
 // Tem que ser igual ao da função expirar-pedidos-pendentes.
 const PRAZO_PAGAMENTO_HORAS = 24;
@@ -96,7 +99,6 @@ exports.handler = async (event) => {
   try {
     const { pedidoId, email } = JSON.parse(event.body);
     const accessToken = process.env.MP_ACCESS_TOKEN;
-    const SITE_URL = 'https://zipshop01.netlify.app';
 
     if (!pedidoId) {
       return { statusCode: 400, body: JSON.stringify({ erro: 'pedidoId é obrigatório' }) };
@@ -261,7 +263,7 @@ exports.handler = async (event) => {
 
     return {
       statusCode: 200,
-      headers: { 'Access-Control-Allow-Origin': 'https://zipshop01.netlify.app' },
+      headers: { 'Access-Control-Allow-Origin': SITE_URL },
       body: JSON.stringify({
         url: result.init_point,
         preference_id: result.id

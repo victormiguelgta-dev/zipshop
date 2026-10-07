@@ -1,3 +1,6 @@
+// Endereço da loja: configurado no Netlify (SITE_URL); troque lá ao mudar de domínio
+const SITE_URL = process.env.SITE_URL || 'https://zipshop.netlify.app';
+
 /**
  * analisar-produto.js
  *
@@ -179,7 +182,7 @@ ${textoLimitado}`;
 
     return {
       statusCode: 200,
-      headers: { 'Access-Control-Allow-Origin': 'https://zipshop01.netlify.app' },
+      headers: { 'Access-Control-Allow-Origin': SITE_URL },
       body: JSON.stringify({
         name: String(dados.name || '').slice(0, 120),
         brand: String(dados.brand || ''),

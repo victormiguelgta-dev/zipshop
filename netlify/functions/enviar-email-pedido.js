@@ -1,6 +1,9 @@
 const https = require('https');
 
-const CORS = { 'Access-Control-Allow-Origin': 'https://zipshop01.netlify.app' };
+// Endereço da loja: configurado no Netlify (SITE_URL); troque lá ao mudar de domínio
+const SITE_URL = process.env.SITE_URL || 'https://zipshop.netlify.app';
+
+const CORS = { 'Access-Control-Allow-Origin': SITE_URL };
 const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function buscarPedido(pedidoId) {

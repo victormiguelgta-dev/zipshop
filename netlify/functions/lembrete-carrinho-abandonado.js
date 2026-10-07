@@ -3,6 +3,9 @@
 // vez por carrinho.
 const https = require('https');
 
+// Endereço da loja: configurado no Netlify (SITE_URL); troque lá ao mudar de domínio
+const SITE_URL = process.env.SITE_URL || 'https://zipshop.netlify.app';
+
 function supabaseRequest(path, options = {}) {
   return new Promise((resolve, reject) => {
     const url = new URL(`https://kkliwdphrdbguclsvxcw.supabase.co/rest/v1${path}`);
@@ -71,7 +74,7 @@ exports.handler = async () => {
           <p style="text-align:center;color:#999;margin-bottom:20px">Seu carrinho ainda está esperando por você!</p>
           <table style="width:100%;border-collapse:collapse;margin-bottom:20px">${itensHTML}</table>
           <div style="text-align:center">
-            <a href="https://zipshop01.netlify.app/carrinho.html" style="display:inline-block;background:#AAEF00;color:#000;font-weight:900;padding:12px 28px;border-radius:10px;text-decoration:none">Finalizar Compra →</a>
+            <a href="${SITE_URL}/carrinho.html" style="display:inline-block;background:#AAEF00;color:#000;font-weight:900;padding:12px 28px;border-radius:10px;text-decoration:none">Finalizar Compra →</a>
           </div>
         </div>`;
 
