@@ -57,9 +57,12 @@ function chamarGemini(prompt, apiKey) {
 
     const options = {
       hostname: 'generativelanguage.googleapis.com',
-      path: `/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`,
+      path: '/v1beta/models/gemini-3.6-flash:generateContent',
       method: 'POST',
       headers: {
+        // Chave no cabeçalho: funciona com as chaves antigas (AIza...) e as
+        // novas do Google (AQ....), que podem ser recusadas no endereço (?key=)
+        'x-goog-api-key': apiKey,
         'Content-Type': 'application/json',
         'Content-Length': Buffer.byteLength(body)
       }
@@ -148,9 +151,22 @@ ${textoLimitado}`;
     const resposta = await chamarGemini(prompt, apiKey);
 
     if (resposta.error) {
+      // Mostra o motivo real pro admin (chave inválida, limite de uso...)
+      const e = resposta.error;
+      console.error('Erro do Gemini:', JSON.stringify(e));
+      const motivos = {
+        400: 'pedido inválido ou chave do Gemini em formato não aceito',
+        401: 'chave do Gemini inválida ou sem permissão',
+        403: 'chave do Gemini sem permissão para a API Generative Language',
+        404: 'modelo do Gemini não encontrado',
+        429: 'limite de uso do Gemini atingido — aguarde e tente de novo',
+        500: 'instabilidade no Gemini — tente de novo em instantes',
+        503: 'Gemini sobrecarregado — tente de novo em instantes'
+      };
+      const motivo = motivos[e.code] || 'erro desconhecido';
       return {
         statusCode: 502,
-        body: JSON.stringify({ erro: 'A IA nao conseguiu processar agora. Tente de novo.' })
+        body: JSON.stringify({ erro: `A IA não conseguiu processar (${e.code || '?'}: ${motivo}). Detalhe: ${String(e.message || '').slice(0, 200)}` })
       };
     }
 

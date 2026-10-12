@@ -406,6 +406,10 @@ async function loadOrders() {
     (prods || []).forEach(pr => { fotosMap[pr.id] = { image_url: pr.image_url, emoji: pr.emoji }; });
   }
 
+  // Produtos que o cliente já avaliou (pra não mostrar "Avaliar" de novo)
+  const { data: minhasAval } = await supabase.from('avaliacoes').select('produto_id').eq('usuario_id', user.id);
+  const jaAvaliados = new Set((minhasAval || []).map(a => String(a.produto_id)));
+
   // Busca solicitações de devolução já feitas, pra não deixar pedir de novo
   const { data: devolucoes } = await supabase.from('solicitacoes_devolucao').select('*').eq('usuario_id', user.id);
   const devolucaoPorPedido = {};
@@ -426,11 +430,12 @@ async function loadOrders() {
         ? `<img src="${esc(foto.image_url)}" alt="" loading="lazy">`
         : `<span>${esc(foto?.emoji || i.emoji || '📦')}</span>`;
       const tag = pid ? 'a' : 'div';
+      const avaliar = pid && p.status === 'entregue' && !jaAvaliados.has(String(pid));
       return `<${tag} class="ped-item"${pid ? ` href="produto.html?id=${pid}"` : ''}>
         <div class="ped-item-foto">${thumb}</div>
         <div class="ped-item-texto"><p class="ped-item-nome">${nome}</p>${variacao ? `<p class="ped-item-var">${variacao}</p>` : ''}</div>
         <span class="ped-item-qtd">${Number(i.quantidade) || 1}x</span>
-      </${tag}>`;
+      </${tag}>${avaliar ? `<a class="ped-btn-avaliar" href="produto.html?id=${pid}#avaliar">⭐ Avaliar e ganhar até R$ 1,00*</a>` : ''}`;
     }).join('');
     const podeEditar = p.status === 'pendente';
     const expiraEm = prazoPagamento(p);
@@ -448,7 +453,7 @@ async function loadOrders() {
       <div class="ped-resumo">
         <div class="ped-resumo-bloco">
           ${icone('wallet')}
-          <div><span class="ped-rotulo">Total do pedido</span><strong class="ped-total">${formatPrice(p.total)}</strong>
+          <div><span class="ped-rotulo">Total do pedido</span><strong class="ped-total">${formatPrice(p.pagamento === 'saldo' ? Number(p.total || 0) + Number(p.saldo_usado || 0) : p.total)}</strong>
           ${p.pagamento === 'saldo' && p.status !== 'cancelado' ? '<span class="ped-obs-verde">Pago com saldo</span>' : ''}</div>
         </div>
         <div class="ped-resumo-bloco ped-resumo-data">

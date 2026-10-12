@@ -102,12 +102,12 @@ const HERO_CACHE_KEY = 'zipshop_banners_v1';
 </script>
 
 <!-- CATEGORIAS -->
-<div class="section">
+<div class="section secao-categorias">
   <div class="section-header">
     <h2 class="section-title" data-texto="home_titulo_categorias">Categorias</h2>
     <a href="produtos.html" class="section-link">Ver todas →</a>
   </div>
-  <div class="category-grid" id="cat-grid"></div>
+  <div class="category-grid" id="cat-grid"><div class="cat-card esqueleto"><div class="cat-icon"></div><div class="cat-name">&nbsp;</div></div><div class="cat-card esqueleto"><div class="cat-icon"></div><div class="cat-name">&nbsp;</div></div><div class="cat-card esqueleto"><div class="cat-icon"></div><div class="cat-name">&nbsp;</div></div><div class="cat-card esqueleto"><div class="cat-icon"></div><div class="cat-name">&nbsp;</div></div><div class="cat-card esqueleto"><div class="cat-icon"></div><div class="cat-name">&nbsp;</div></div><div class="cat-card esqueleto"><div class="cat-icon"></div><div class="cat-name">&nbsp;</div></div></div>
 </div>
 
 <!-- PRODUTOS EM DESTAQUE -->
@@ -116,7 +116,7 @@ const HERO_CACHE_KEY = 'zipshop_banners_v1';
     <h2 class="section-title" data-texto="home_titulo_ofertas">⚡ Ofertas do Dia</h2>
     <a href="produtos.html" class="section-link">Ver todos →</a>
   </div>
-  <div class="product-grid" id="featured-grid"></div>
+  <div class="product-grid" id="featured-grid"><div class="product-card esqueleto esqueleto-produto"></div><div class="product-card esqueleto esqueleto-produto"></div><div class="product-card esqueleto esqueleto-produto"></div><div class="product-card esqueleto esqueleto-produto"></div></div>
 </div>
 
 <!-- TODOS OS PRODUTOS -->
@@ -125,7 +125,7 @@ const HERO_CACHE_KEY = 'zipshop_banners_v1';
     <h2 class="section-title" data-texto="home_titulo_mais_vendidos">Mais Vendidos</h2>
     <a href="produtos.html" class="section-link">Ver todos →</a>
   </div>
-  <div class="product-grid" id="all-grid"></div>
+  <div class="product-grid" id="all-grid"><div class="product-card esqueleto esqueleto-produto"></div><div class="product-card esqueleto esqueleto-produto"></div><div class="product-card esqueleto esqueleto-produto"></div><div class="product-card esqueleto esqueleto-produto"></div></div>
 </div>
 
 <!-- NEWSLETTER -->
@@ -154,7 +154,26 @@ import { getFavoritosIds, toggleFavorito } from './js/favoritos.js';
 // Carrega banners do Supabase
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/+esm';
 const _sb = createClient('https://kkliwdphrdbguclsvxcw.supabase.co','sb_publishable_OMXANLsZK98fPWygp8ZHfA_xzSpWgYb');
-const { data: banners } = await _sb.from('banners').select('*').eq('ativo', true).order('ordem');
+
+// Busca tudo AO MESMO TEMPO (antes era um depois do outro e a página
+// ficava vazia nos primeiros segundos)
+const _pBanners = _sb.from('banners').select('*').eq('ativo', true).order('ordem');
+const _pProdutos = loadProducts();
+const _pFavoritos = getFavoritosIds();
+const _pCategorias = _sb.from('categorias').select('*').eq('ativo', true).order('name');
+
+// Cópia da última visita: desenha categorias e produtos na hora
+const HOME_CACHE_KEY = 'zipshop_home_v1';
+let _homeCache = null;
+try { _homeCache = JSON.parse(localStorage.getItem(HOME_CACHE_KEY) || 'null'); } catch (e) {}
+// Desenha na hora com a cópia salva (se houver), sem esperar o Supabase
+const _cacheJSON = _homeCache ? JSON.stringify(_homeCache) : null;
+if (_homeCache && Array.isArray(_homeCache.produtos) && _homeCache.produtos.length) {
+  try { renderVitrine(_homeCache.produtos, _homeCache.categorias); } catch (e) {}
+}
+
+
+const { data: banners } = await _pBanners;
 
 let heroIdx = 0;
 const BANNERS = banners && banners.length > 0 ? banners : [
@@ -237,9 +256,7 @@ function productCardHTML(p) {
   </a>`;
 }
 
-// Carrega produtos do Supabase
-const PRODUCTS = await loadProducts();
-const _favoritosIds = await getFavoritosIds();
+var _favoritosIds = null; // var: as funções abaixo são usadas antes desta linha (cópia salva)
 
 window.toggleFavoritoCard = async function(produtoId, btn) {
   const r = await toggleFavorito(produtoId);
@@ -248,41 +265,51 @@ window.toggleFavoritoCard = async function(produtoId, btn) {
   btn.dataset.fav = r.favoritado ? '1' : '0';
 };
 
-// Categorias — busca do Supabase com fotos
-const catGrid = document.getElementById('cat-grid');
-const { data: categoriasDB } = await _sb.from('categorias').select('*').eq('ativo', true).order('name');
-if (categoriasDB && categoriasDB.length > 0) {
-  categoriasDB.forEach(cat => {
-    catGrid.innerHTML += `<a href="produtos.html?cat=${encodeURIComponent(cat.name)}" class="cat-card">
+function categoriasHTML(categoriasDB, PRODUCTS) {
+  if (categoriasDB && categoriasDB.length > 0) {
+    return categoriasDB.map(cat => `<a href="produtos.html?cat=${encodeURIComponent(cat.name)}" class="cat-card">
       ${cat.image_url
-        ? `<div class="cat-icon"><img src="${cat.image_url}" alt="${cat.name}" loading="lazy"></div>`
-        : `<div class="cat-icon">${cat.emoji||'📦'}</div>`
+        ? `<div class="cat-icon"><img src="${esc(cat.image_url)}" alt="${esc(cat.name)}" loading="lazy"></div>`
+        : `<div class="cat-icon">${esc(cat.emoji||'📦')}</div>`
       }
-      <div class="cat-name">${cat.name}</div>
-    </a>`;
-  });
-} else {
+      <div class="cat-name">${esc(cat.name)}</div>
+    </a>`).join('');
+  }
   const cats = [...new Set(PRODUCTS.map(p => p.category))];
-  cats.forEach(cat => {
+  return cats.map(cat => {
     const icon = PRODUCTS.find(p => p.category === cat)?.emoji || '📦';
-    catGrid.innerHTML += `<a href="produtos.html?cat=${encodeURIComponent(cat)}" class="cat-card">
-      <div class="cat-icon">${icon}</div>
-      <div class="cat-name">${cat}</div>
+    return `<a href="produtos.html?cat=${encodeURIComponent(cat)}" class="cat-card">
+      <div class="cat-icon">${esc(icon)}</div>
+      <div class="cat-name">${esc(cat)}</div>
     </a>`;
-  });
+  }).join('');
 }
 
-// Produtos em destaque
-const featGrid = document.getElementById('featured-grid');
-// Oferta do dia: prioriza produtos marcados como oferta, fallback para discount > 0
-// Esgotados não aparecem nas ofertas — não faz sentido anunciar o que não dá pra comprar
-const ofertas = PRODUCTS.filter(p => (p.oferta || p.discount > 0) && !estaEsgotado(p));
-ofertas.forEach(p => featGrid.innerHTML += productCardHTML(p));
-if (ofertas.length === 0) featGrid.innerHTML = '<p style="color:var(--text-muted);padding:20px">Nenhuma oferta no momento.</p>';
+function renderVitrine(PRODUCTS, categoriasDB) {
+  document.getElementById('cat-grid').innerHTML = categoriasHTML(categoriasDB, PRODUCTS);
+  // Oferta do dia: prioriza produtos marcados como oferta, fallback para discount > 0
+  // Esgotados não aparecem nas ofertas — não faz sentido anunciar o que não dá pra comprar
+  const ofertas = PRODUCTS.filter(p => (p.oferta || p.discount > 0) && !estaEsgotado(p));
+  document.getElementById('featured-grid').innerHTML = ofertas.length
+    ? ofertas.map(productCardHTML).join('')
+    : '<p style="color:var(--text-muted);padding:20px">Nenhuma oferta no momento.</p>';
+  document.getElementById('all-grid').innerHTML = esgotadosNoFim(PRODUCTS).slice(0, 8).map(productCardHTML).join('');
+}
 
-// Todos os produtos
-const allGrid = document.getElementById('all-grid');
-esgotadosNoFim(PRODUCTS).slice(0, 8).forEach(p => allGrid.innerHTML += productCardHTML(p));
+// Atualiza com os dados novos do Supabase
+const [PRODUCTS, _favs, { data: categoriasDB }] = await Promise.all([_pProdutos, _pFavoritos, _pCategorias]);
+_favoritosIds = _favs;
+// Só a vitrine da home vai pro cache (ofertas + 8 primeiros), pra ficar pequeno
+const _vitrine = [...new Set([
+  ...PRODUCTS.filter(p => (p.oferta || p.discount > 0) && !estaEsgotado(p)),
+  ...esgotadosNoFim(PRODUCTS).slice(0, 8)
+])];
+const _novoCache = { produtos: _vitrine, categorias: categoriasDB || [] };
+try { localStorage.setItem(HOME_CACHE_KEY, JSON.stringify(_novoCache)); } catch (e) {}
+// Redesenha sempre que tem favoritos (corações) ou se algo mudou
+if (_favoritosIds?.size || _cacheJSON !== JSON.stringify(_novoCache)) {
+  renderVitrine(PRODUCTS, categoriasDB);
+}
 
 // Salva na tabela newsletter_inscritos (_interno/sql-newsletter.sql).
 // Antes só mostrava "Inscrito!" e o e-mail não ia pra lugar nenhum.
