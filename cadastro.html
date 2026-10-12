@@ -160,6 +160,14 @@
     // (_interno/sql-perfil-automatico.sql) — antes o site tentava salvar
     // sem estar logado e dava "erro ao salvar seus dados"
 
+    // Sem confirmação de e-mail (Supabase → "Confirm email" desligado) a
+    // conta já sai logada: segue direto pra loja
+    if (data.session) {
+      mostrarOk('Conta criada! Entrando...');
+      const destino = new URLSearchParams(location.search).get('redirect') === 'checkout' ? 'checkout.html' : 'index.html';
+      setTimeout(() => window.location.href = destino, 1200);
+      return;
+    }
     mostrarOk('Conta criada! Verifique seu e-mail para confirmar o cadastro.');
     setTimeout(() => window.location.href = 'login.html', 3000);
   });
