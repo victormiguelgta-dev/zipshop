@@ -382,7 +382,11 @@ window.analisar = async function() {
       : `Resposta inesperada do servidor (${resp.status}). Tente de novo.` }; }
 
     if (!resp.ok || dados.erro) {
-      status.textContent = '❌ ' + (dados.erro || 'Erro ao analisar');
+      // Mostra qualquer motivo que vier (o Netlify devolve "errorMessage"
+      // quando a função cai por tempo esgotado)
+      const motivo = dados.erro || dados.errorMessage || dados.message
+        || (resp.status === 502 || resp.status === 504 ? 'a IA demorou demais para responder' : '');
+      status.textContent = `❌ Erro ao analisar (${resp.status})${motivo ? ': ' + motivo : ''}`;
       return;
     }
 

@@ -50,23 +50,29 @@ const MODELOS = ['gemini-3.6-flash', 'gemini-flash-latest'];
 
 // O Netlify corta a função em ~10s: paramos antes pra devolver uma
 // mensagem clara em vez de uma página de erro que o painel não lê
-const LIMITE_MS = 8500;
+// Prazo total (contado desde o início da função), não por chamada:
+// assim as tentativas extras nunca passam do limite do Netlify
+const LIMITE_MS = 9000;
 
-async function chamarGeminiComReserva(prompt, apiKey) {
+async function chamarGeminiComReserva(prompt, apiKey, prazoFinal) {
   let resposta;
   for (const modelo of MODELOS) {
-    resposta = await chamarGemini(prompt, apiKey, modelo, true);
+    resposta = await chamarGemini(prompt, apiKey, modelo, true, prazoFinal);
     // Modelo que não aceita o ajuste de "pensamento": tenta sem ele
     if (resposta.error && resposta.error.code === 400 && /thinking/i.test(resposta.error.message || '')) {
-      resposta = await chamarGemini(prompt, apiKey, modelo, false);
+      resposta = await chamarGemini(prompt, apiKey, modelo, false, prazoFinal);
     }
     if (!(resposta.error && resposta.error.code === 404)) break;
   }
   return resposta;
 }
 
-function chamarGemini(prompt, apiKey, modelo, pensarPouco) {
-  return new Promise((resolve, reject) => {
+function chamarGemini(prompt, apiKey, modelo, pensarPouco, prazoFinal) {
+  return new Promise((resolve) => {
+    const restante = prazoFinal - Date.now();
+    if (restante < 1500) {
+      return resolve({ error: { code: 'tempo', message: 'A IA demorou demais para responder.' } });
+    }
     const body = JSON.stringify({
       contents: [{ parts: [{ text: prompt }] }],
       generationConfig: {
@@ -100,10 +106,11 @@ function chamarGemini(prompt, apiKey, modelo, pensarPouco) {
         }
       });
     });
-    req.setTimeout(LIMITE_MS, () => {
+    const relogio = setTimeout(() => {
       req.destroy();
       resolve({ error: { code: 'tempo', message: 'A IA demorou demais para responder.' } });
-    });
+    }, restante);
+    req.on('close', () => clearTimeout(relogio));
     req.on('error', (e) => resolve({ error: { code: 'rede', message: e.message } }));
     req.write(body);
     req.end();
@@ -111,6 +118,7 @@ function chamarGemini(prompt, apiKey, modelo, pensarPouco) {
 }
 
 exports.handler = async (event) => {
+  const prazoFinal = Date.now() + LIMITE_MS;
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: JSON.stringify({ erro: 'Method Not Allowed' }) };
   }
@@ -145,7 +153,7 @@ exports.handler = async (event) => {
     // Corta textos gigantes — página inteira copiada pode vir com
     // menu, rodapé, comentários e tudo mais. O começo costuma ter
     // o que interessa, e isso segura o custo/tempo da chamada.
-    const textoLimitado = texto.slice(0, 12000);
+    const textoLimitado = texto.slice(0, 8000); // menos texto = resposta mais rápida
 
     const prompt = `Você recebe um texto sobre UM produto que uma loja de eletrônicos brasileira vai cadastrar no próprio estoque. O texto pode ter sido copiado de um site (fabricante, fornecedor, marketplace), de um catálogo, da caixa do produto, ou escrito à mão pelo dono da loja. Pode vir bagunçado, com menus, avaliações e outras informações misturadas.
 
@@ -173,7 +181,7 @@ Regras:
 TEXTO SOBRE O PRODUTO:
 ${textoLimitado}`;
 
-    const resposta = await chamarGeminiComReserva(prompt, apiKey);
+    const resposta = await chamarGeminiComReserva(prompt, apiKey, prazoFinal);
 
     if (resposta.error) {
       // Mostra o motivo real pro admin (chave inválida, limite de uso...)
