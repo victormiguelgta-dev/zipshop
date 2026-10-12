@@ -159,8 +159,8 @@ function calcDescontoCupom(subtotalComDesconto) {
 // Antes: o cliente ia pro MP, desistia e voltava; o pedido Pix ficava
 // pendente segurando estoque/saldo/cupom, e o novo pedido podia falhar.
 async function _clienteSupabase() {
-  const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/+esm');
-  return createClient('https://kkliwdphrdbguclsvxcw.supabase.co', 'sb_publishable_OMXANLsZK98fPWygp8ZHfA_xzSpWgYb');
+  // Mesmo cliente do resto do site (um só por página)
+  return (await import('./js/supabase-config.js')).supabase;
 }
 
 let _pedidoPendenteCache; // consulta o banco uma vez só, mesmo se o checkout redesenhar
@@ -1008,8 +1008,7 @@ async function finalizarPedido() {
   const btn = document.getElementById('btn-confirmar');
   btn.disabled = true; btn.textContent = 'Verificando...';
 
-  const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/+esm');
-  const supabase = createClient('https://kkliwdphrdbguclsvxcw.supabase.co', 'sb_publishable_OMXANLsZK98fPWygp8ZHfA_xzSpWgYb');
+  const { supabase } = await import('./js/supabase-config.js');
   const { data: { session: sessaoConfirmar } } = await supabase.auth.getSession();
   const user = sessaoConfirmar?.user || null;
 

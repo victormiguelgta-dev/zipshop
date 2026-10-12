@@ -45,19 +45,40 @@ function categoriasDoPedido(lista) {
     .slice(0, 40);
 }
 
-function chamarGemini(prompt, apiKey) {
+// Modelo principal e reserva (se o principal sair do ar, usa o "mais recente")
+const MODELOS = ['gemini-3.6-flash', 'gemini-flash-latest'];
+
+// O Netlify corta a função em ~10s: paramos antes pra devolver uma
+// mensagem clara em vez de uma página de erro que o painel não lê
+const LIMITE_MS = 8500;
+
+async function chamarGeminiComReserva(prompt, apiKey) {
+  let resposta;
+  for (const modelo of MODELOS) {
+    resposta = await chamarGemini(prompt, apiKey, modelo, true);
+    // Modelo que não aceita o ajuste de "pensamento": tenta sem ele
+    if (resposta.error && resposta.error.code === 400 && /thinking/i.test(resposta.error.message || '')) {
+      resposta = await chamarGemini(prompt, apiKey, modelo, false);
+    }
+    if (!(resposta.error && resposta.error.code === 404)) break;
+  }
+  return resposta;
+}
+
+function chamarGemini(prompt, apiKey, modelo, pensarPouco) {
   return new Promise((resolve, reject) => {
     const body = JSON.stringify({
       contents: [{ parts: [{ text: prompt }] }],
       generationConfig: {
         temperature: 0.1,        // baixo = mais previsível, menos "criativo"
-        responseMimeType: 'application/json'
+        responseMimeType: 'application/json',
+        ...(pensarPouco ? { thinkingConfig: { thinkingLevel: 'low' } } : {}) // pensa pouco = responde rápido
       }
     });
 
     const options = {
       hostname: 'generativelanguage.googleapis.com',
-      path: '/v1beta/models/gemini-3.6-flash:generateContent',
+      path: `/v1beta/models/${modelo}:generateContent`,
       method: 'POST',
       headers: {
         // Chave no cabeçalho: funciona com as chaves antigas (AIza...) e as
@@ -75,11 +96,15 @@ function chamarGemini(prompt, apiKey) {
         try {
           resolve(JSON.parse(data));
         } catch (e) {
-          reject(new Error('Resposta inválida da API do Gemini'));
+          resolve({ error: { code: res.statusCode, message: 'Resposta inválida da API do Gemini: ' + data.slice(0, 120) } });
         }
       });
     });
-    req.on('error', reject);
+    req.setTimeout(LIMITE_MS, () => {
+      req.destroy();
+      resolve({ error: { code: 'tempo', message: 'A IA demorou demais para responder.' } });
+    });
+    req.on('error', (e) => resolve({ error: { code: 'rede', message: e.message } }));
     req.write(body);
     req.end();
   });
@@ -148,7 +173,7 @@ Regras:
 TEXTO SOBRE O PRODUTO:
 ${textoLimitado}`;
 
-    const resposta = await chamarGemini(prompt, apiKey);
+    const resposta = await chamarGeminiComReserva(prompt, apiKey);
 
     if (resposta.error) {
       // Mostra o motivo real pro admin (chave inválida, limite de uso...)
@@ -161,7 +186,9 @@ ${textoLimitado}`;
         404: 'modelo do Gemini não encontrado',
         429: 'limite de uso do Gemini atingido — aguarde e tente de novo',
         500: 'instabilidade no Gemini — tente de novo em instantes',
-        503: 'Gemini sobrecarregado — tente de novo em instantes'
+        503: 'Gemini sobrecarregado — tente de novo em instantes',
+        tempo: 'a IA demorou demais — tente de novo ou cole um texto menor',
+        rede: 'não consegui falar com o Gemini — tente de novo'
       };
       const motivo = motivos[e.code] || 'erro desconhecido';
       return {
@@ -170,11 +197,14 @@ ${textoLimitado}`;
       };
     }
 
-    const textoResposta = resposta?.candidates?.[0]?.content?.parts?.[0]?.text;
+    // Junta os pedaços de texto da resposta (ignora os de "pensamento")
+    const textoResposta = (resposta?.candidates?.[0]?.content?.parts || [])
+      .filter(pt => pt && typeof pt.text === 'string' && !pt.thought)
+      .map(pt => pt.text).join('');
     if (!textoResposta) {
       return {
         statusCode: 502,
-        body: JSON.stringify({ erro: 'Gemini não retornou conteúdo. Tente colar o texto novamente.' })
+        body: JSON.stringify({ erro: `Gemini não retornou conteúdo (${resposta?.candidates?.[0]?.finishReason || resposta?.promptFeedback?.blockReason || 'sem motivo'}). Tente colar o texto novamente.` })
       };
     }
 

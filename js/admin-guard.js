@@ -10,12 +10,8 @@
  * Para adicionar um admin novo, acrescente o e-mail na lista ADMIN_EMAILS abaixo.
  */
 
-import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/+esm';
-
-const supabase = createClient(
-  'https://kkliwdphrdbguclsvxcw.supabase.co',
-  'sb_publishable_OMXANLsZK98fPWygp8ZHfA_xzSpWgYb'
-);
+// Mesmo cliente do resto do site (um só por página)
+import { supabase } from './supabase-config.js';
 
 // ✏️ LISTA DE ADMINS — adicione o e-mail do cliente aqui quando precisar
 const ADMIN_EMAILS = [
@@ -71,6 +67,24 @@ async function verificarAdmin() {
   return true; // É admin — pode continuar
 }
 
+// Apaga do armazenamento as fotos que nenhum produto, banner, categoria
+// ou pedido usa mais (ex.: a foto antiga quando você troca por outra).
+// Só mexe em arquivos com mais de 1h, pra não apagar foto de um cadastro
+// que ainda está sendo feito. A lista vem do banco (fotos_sem_uso).
+async function limparFotosSemUso({ forcar = false } = {}) {
+  try {
+    const CHAVE = 'zipshop_limpeza_fotos';
+    if (!forcar && Date.now() - Number(localStorage.getItem(CHAVE) || 0) < 3600000) return 0;
+    localStorage.setItem(CHAVE, String(Date.now()));
+    const { data: nomes, error } = await supabase.rpc('fotos_sem_uso', { p_min_horas: 1 });
+    if (error || !nomes?.length) return 0;
+    const { error: erroRemover } = await supabase.storage.from('Produtos').remove(nomes);
+    if (erroRemover) { console.warn('Limpeza de fotos:', erroRemover.message); return 0; }
+    return nomes.length;
+  } catch (e) { return 0; }
+}
+
 // Executa a verificação ao carregar
 const isAdmin = await verificarAdmin();
-export { isAdmin, supabase };
+if (isAdmin) setTimeout(() => limparFotosSemUso(), 3000); // em segundo plano
+export { isAdmin, supabase, limparFotosSemUso };
