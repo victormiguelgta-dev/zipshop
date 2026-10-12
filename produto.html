@@ -43,6 +43,43 @@ let qty = 1;
 let _corSelecionada = null;
 let _variacaoSelecionada = null;
 
+// Ícones de linha (no lugar dos emojis)
+const svg = d => `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+const ICO = {
+  cartao: svg('<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20M6 15h4"/>'),
+  carteira: svg('<path d="M20 7V5a2 2 0 0 0-2-2H5a2 2 0 0 0 0 4h15v13H5a2 2 0 0 1-2-2V5"/><path d="M16 13h.01"/>'),
+  pessoas: svg('<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>'),
+  caminhao: svg('<path d="M1 3h15v13H1zM16 8h4l3 3v5h-7z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/>'),
+  raio: svg('<path d="M13 2 3 14h9l-1 8 10-12h-9z"/>'),
+  seta: '<span class="pd-seta">' + svg('<path d="m9 18 6-6-6-6"/>') + '</span>',
+  carrinho: svg('<circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.7 13.4a2 2 0 0 0 2 1.6h9.7a2 2 0 0 0 2-1.6L23 6H6"/>'),
+  cadeado: svg('<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>'),
+  troca: svg('<path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.5 9a9 9 0 0 1 14.9-3.4L23 10M1 14l4.6 4.4A9 9 0 0 0 20.5 15"/>'),
+  escudo: svg('<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>')
+};
+
+// Corte da logística: pedidos até as 20h saem no dia seguinte (horário de Brasília)
+const HORA_CORTE = 20;
+function textoEntrega() {
+  const agora = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
+  const corte = new Date(agora); corte.setHours(HORA_CORTE, 0, 0, 0);
+  const falta = corte - agora;
+  if (falta <= 0) {
+    return `<strong>Entrega em até 2 dias</strong><span>Pedidos após as ${HORA_CORTE}h entram na separação de amanhã</span>`;
+  }
+  const h = Math.floor(falta / 3600000), m = Math.floor((falta % 3600000) / 60000);
+  const resta = h > 0 ? `${h}h${m ? ' ' + m + 'min' : ''}` : `${m}min`;
+  return `<strong>Entrega amanhã</strong><span>Peça em até ${resta} para garantir</span>`;
+}
+setInterval(() => { const el = document.getElementById('entrega-texto'); if (el) el.innerHTML = textoEntrega(); }, 60000);
+
+window.alternarInfo = function(id, btn) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.hidden = !el.hidden;
+  btn.classList.toggle('aberto', !el.hidden);
+};
+
 async function render() {
   const p = await getProduct(id);
   window._produto = p;
@@ -116,7 +153,7 @@ async function render() {
 
   const coresHTML = !variacoes.length && cores.length ? `
     <div style="margin-bottom:20px">
-      <div class="detail-label" style="margin-bottom:8px">Cor</div>
+      <div class="detail-label" style="margin-bottom:8px">Cor: <span id="cor-escolhida" style="color:var(--text);text-transform:none;letter-spacing:0">escolha uma</span></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap" id="cores-container">
         ${cores.map((c, i) => `
           <button onclick="selecionarCor('${esc(c.nome)}', this)"
@@ -146,21 +183,45 @@ async function render() {
         </div>
         <div class="detail-price-old" id="detail-price-old" ${p.oldPrice && !variacoes.length ? '' : 'hidden'}>${p.oldPrice ? formatPrice(p.oldPrice) : ''}</div>
         <div class="detail-price" id="detail-price">${variacoes.length ? '<span style="font-size:14px;font-weight:600;color:var(--text-muted)">a partir de </span>' : ''}${formatPrice(p.price)}</div>
-        <div class="detail-installment" id="detail-installment">ou 12x de ${formatPrice(p.price/12)} sem juros</div>
-        ${p.cashback_percentual > 0 ? `<div style="display:inline-flex;align-items:center;gap:6px;background:rgba(170,239,0,0.12);border:1px solid var(--primary);color:var(--primary);font-size:12px;font-weight:700;padding:5px 10px;border-radius:20px;margin-top:8px">💰 Receba <span id="valor-cashback">${formatPrice(p.price * p.cashback_percentual / 100)}</span> de volta em saldo</div>` : ''}
-        ${p.indicacao_percentual > 0 ? `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px">
-          <span style="display:inline-flex;align-items:center;gap:6px;background:rgba(170,239,0,0.12);border:1px solid var(--primary);color:var(--primary);font-size:12px;font-weight:700;padding:5px 10px;border-radius:20px">🤝 Indique e ganhe <span id="valor-indicacao">${formatPrice(p.price * p.indicacao_percentual / 100)}</span> por venda</span>
-          <button type="button" onclick="compartilharIndicacao(this)" style="background:none;border:none;color:var(--text-muted);font-size:12px;font-weight:700;text-decoration:underline;cursor:pointer;padding:4px 0">Copiar meu link</button>
+        <div class="detail-installment pd-parcela">${ICO.cartao}<span id="detail-installment">ou 12x de ${formatPrice(p.price/12)} sem juros</span></div>
+        ${p.cashback_percentual > 0 || p.indicacao_percentual > 0 ? `
+        <div class="pd-card pd-beneficios">
+          <button type="button" class="pd-card-topo" onclick="alternarInfo('info-beneficios', this)">
+            <strong>Benefícios ZipShop</strong>${ICO.seta}
+          </button>
+          <div class="pd-beneficios-grade">
+            ${p.cashback_percentual > 0 ? `<div class="pd-beneficio">
+              <span class="pd-ico">${ICO.carteira}</span>
+              <div><span class="pd-rotulo">Cashback</span><strong><span id="valor-cashback">${formatPrice(p.price * p.cashback_percentual / 100)}</span> de volta em saldo</strong></div>
+            </div>` : ''}
+            ${p.indicacao_percentual > 0 ? `<div class="pd-beneficio">
+              <span class="pd-ico">${ICO.pessoas}</span>
+              <div><span class="pd-rotulo">Indique e ganhe</span><strong><span id="valor-indicacao">${formatPrice(p.price * p.indicacao_percentual / 100)}</span> por venda</strong>
+              <button type="button" class="pd-link" onclick="compartilharIndicacao(this)">Copiar meu link</button></div>
+            </div>` : ''}
+          </div>
+          <div class="pd-info" id="info-beneficios" hidden>
+            ${p.cashback_percentual > 0 ? '<p>Cashback: o valor entra como saldo na sua conta quando o pedido é entregue e pode ser usado na próxima compra.</p>' : ''}
+            ${p.indicacao_percentual > 0 ? '<p>Indicação: compartilhe seu link; quando alguém compra por ele e o pedido é entregue, você ganha o valor em saldo.</p>' : ''}
+          </div>
         </div>` : ''}
         <hr class="detail-divider">
         ${p.tipo_estoque === 'dropshipping' ? `
-        <div style="background:rgba(96,165,250,.08);border:2px solid rgba(96,165,250,.45);border-radius:14px;padding:16px 18px;margin-bottom:20px;display:flex;align-items:center;gap:14px">
-          <span style="font-size:32px;line-height:1">🚚</span>
-          <span><strong style="display:block;font-size:17px;color:#93c5fd">Entrega em 5 a 15 dias</strong>
-          <span style="font-size:13px;color:var(--text-muted)">Enviado direto do fornecedor. Você acompanha tudo em Meus Pedidos.</span></span>
+        <div class="pd-card pd-entrega pd-entrega-azul">
+          <button type="button" class="pd-card-topo" onclick="alternarInfo('info-entrega', this)">
+            <span class="pd-ico">${ICO.caminhao}</span>
+            <span class="pd-entrega-texto"><strong>Entrega em 5 a 15 dias</strong><span>Enviado direto do fornecedor</span></span>
+            ${ICO.seta}
+          </button>
+          <div class="pd-info" id="info-entrega" hidden><p>Este produto sai direto do fornecedor. Você acompanha cada etapa em Meus Pedidos.</p></div>
         </div>` : `
-        <div style="background:rgba(170,239,0,.07);border:1px solid rgba(170,239,0,.2);border-radius:12px;padding:12px 16px;margin-bottom:20px;font-size:13px;display:flex;align-items:center;gap:8px">
-          <span>⚡</span><span><strong>Entrega amanhã</strong> — Peça em até 3h para garantir.</span>
+        <div class="pd-card pd-entrega">
+          <button type="button" class="pd-card-topo" onclick="alternarInfo('info-entrega', this)">
+            <span class="pd-ico">${ICO.raio}</span>
+            <span class="pd-entrega-texto" id="entrega-texto">${textoEntrega()}</span>
+            ${ICO.seta}
+          </button>
+          <div class="pd-info" id="info-entrega" hidden><p>Pedidos feitos até as ${HORA_CORTE}h entram na separação do dia e são entregues no dia seguinte. Depois das ${HORA_CORTE}h, entram na separação de amanhã.</p></div>
         </div>`}
 
         ${variacoesHTML}
@@ -173,15 +234,15 @@ async function render() {
           <button class="qty-btn" onclick="changeQty(1)">+</button>
         </div>
         <div id="estoque-info">${estoqueHTML}</div>
-        <div style="display:flex;gap:12px;margin-bottom:24px;flex-wrap:wrap">
-          <button class="btn btn-primary btn-lg" style="flex:1" onclick="doAddToCart(event)" ${semEstoque ? 'disabled style="opacity:.5;cursor:not-allowed"' : ''}>🛒 Adicionar ao Carrinho</button>
-          <a href="carrinho.html" class="btn btn-outline btn-lg" onclick="${semEstoque ? 'event.preventDefault()' : 'if (!doAddToCart(event)) event.preventDefault()'}" ${semEstoque ? 'style="opacity:.5;cursor:not-allowed;pointer-events:none"' : ''}>⚡ Comprar Agora</a>
+        <div style="display:flex;gap:12px;margin-bottom:12px">
+          <button class="btn btn-primary btn-lg pd-btn-ico" style="flex:1${semEstoque ? ';opacity:.5;cursor:not-allowed' : ''}" onclick="doAddToCart(event)" ${semEstoque ? 'disabled' : ''}>${ICO.carrinho} Adicionar ao Carrinho</button>
           <button id="btn-fav-detalhe" onclick="toggleFavoritoDetalhe(${p.id})" class="btn btn-outline btn-lg" style="width:52px;flex:0" aria-label="Favoritar">🤍</button>
         </div>
-        <div style="display:flex;gap:16px;flex-wrap:wrap">
-          <span style="font-size:13px;color:var(--text-muted)">🔒 Compra 100% segura</span>
-          <span style="font-size:13px;color:var(--text-muted)">🔄 30 dias para troca</span>
-          ${p.garantia ? `<span style="font-size:13px;color:var(--text-muted)">🛡️ Garantia ${esc(p.garantia)}</span>` : ''}
+        <a href="carrinho.html" class="btn btn-outline btn-lg pd-btn-comprar" onclick="${semEstoque ? 'event.preventDefault()' : 'if (!doAddToCart(event)) event.preventDefault()'}" ${semEstoque ? 'style="opacity:.5;cursor:not-allowed;pointer-events:none"' : ''}>Comprar agora</a>
+        <div class="pd-garantias">
+          <span>${ICO.cadeado} Compra 100% segura</span>
+          <span>${ICO.troca} 30 dias para troca</span>
+          ${p.garantia ? `<span>${ICO.escudo} Garantia ${esc(p.garantia)}</span>` : ''}
         </div>
       </div>
     </div>
@@ -313,6 +374,8 @@ window.selecionarCor = function(nome, btn) {
   });
   btn.style.borderColor = 'var(--primary)';
   btn.style.color = 'var(--primary)';
+  const rotulo = document.getElementById('cor-escolhida');
+  if (rotulo) rotulo.textContent = nome;
 };
 
 function avisarEscolherCor() {
@@ -695,7 +758,12 @@ window.showTab = function(tab) {
   if (tab === 'avaliacoes') carregarAvaliacoes(window._produto);
 };
 
-render();
+render().then(() => {
+  if (location.hash === '#avaliar' && window._produto) {
+    showTab('avaliacoes');
+    document.getElementById('tab-avaliacoes')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+});
 </script>
 </body>
 </html>
