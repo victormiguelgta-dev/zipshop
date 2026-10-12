@@ -1230,7 +1230,15 @@ document.getElementById('btn-logout').addEventListener('click', async (e) => {
 // Verifica se veio com parâmetro de seção na URL (ex: conta.html?secao=profile)
 const urlParamsC = new URLSearchParams(window.location.search);
 const secaoInicial = urlParamsC.get('secao');
-if (secaoInicial === 'profile') {
+if (veioDeLinkRecuperacao && !erroNoLink) {
+  // Link de "esqueci minha senha": vai direto pra tela de nova senha,
+  // venha ele com ?secao=security ou não (antes caía em Meus Pedidos
+  // e a pessoa só ficava logada, sem trocar a senha)
+  document.querySelectorAll('.account-nav-item').forEach(a => a.classList.remove('active'));
+  document.querySelector('[onclick*="security"]')?.classList.add('active');
+  document.getElementById('page-title').textContent = 'Segurança';
+  renderPassoNovaSenhaDireta();
+} else if (secaoInicial === 'profile') {
   const linkProfile = document.querySelector('[onclick*="profile"]');
   if (linkProfile) {
     document.querySelectorAll('.account-nav-item').forEach(a => a.classList.remove('active'));

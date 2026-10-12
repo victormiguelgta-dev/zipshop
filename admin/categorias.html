@@ -154,7 +154,7 @@
 
 <script src="../js/imagem.js"></script>
 <script type="module">
-import { isAdmin, supabase } from '../js/admin-guard.js';
+import { isAdmin, supabase, limparFotosSemUso } from '../js/admin-guard.js';
 if (!isAdmin) throw new Error('acesso negado');
 
 let fotoFile = null;
@@ -289,6 +289,7 @@ window.salvar = async function() {
   btn.disabled = false; btn.textContent = 'Salvar';
   if (error) { alert('Erro: ' + error.message); return; }
   fecharModal();
+  limparFotosSemUso({ forcar: true }); // apaga fotos antigas que ficaram sem uso
   await carregar();
   const t = document.createElement('div');
   t.className = 'toast success show';
@@ -305,6 +306,7 @@ window.toggleAtivo = async (id, ativo) => {
 window.deletar = async (id) => {
   if (!confirm('Deletar esta categoria?')) return;
   await supabase.from('categorias').delete().eq('id', id);
+  limparFotosSemUso({ forcar: true }); // apaga fotos antigas que ficaram sem uso
   await carregar();
 };
 

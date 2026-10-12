@@ -372,7 +372,14 @@ window.analisar = async function() {
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (_sess?.access_token || '') },
       body: JSON.stringify({ texto, categorias: categoriasPainel })
     });
-    const dados = await resp.json();
+    // Lê como texto primeiro: se o servidor cair (ex.: tempo esgotado), a
+    // resposta não é JSON e antes aparecia só "Erro de conexão"
+    const bruto = await resp.text();
+    let dados;
+    try { dados = JSON.parse(bruto); }
+    catch { dados = { erro: resp.status === 502 || resp.status === 504
+      ? `A IA demorou demais para responder (${resp.status}). Tente de novo ou cole um texto menor.`
+      : `Resposta inesperada do servidor (${resp.status}). Tente de novo.` }; }
 
     if (!resp.ok || dados.erro) {
       status.textContent = '❌ ' + (dados.erro || 'Erro ao analisar');

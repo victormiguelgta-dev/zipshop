@@ -206,7 +206,7 @@
 
 <script src="../js/imagem.js"></script>
 <script type="module">
-import { isAdmin, supabase } from '../js/admin-guard.js';
+import { isAdmin, supabase, limparFotosSemUso } from '../js/admin-guard.js';
 if (!isAdmin) throw new Error('not admin');
 
 let fotoFile = null;
@@ -370,6 +370,7 @@ window.salvarBanner = async function() {
   if (error) { alert('Erro ao salvar: ' + error.message); return; }
 
   fecharModal();
+  limparFotosSemUso({ forcar: true }); // apaga fotos antigas que ficaram sem uso
   await carregar();
 
   const toast = document.createElement('div');
@@ -382,6 +383,7 @@ window.salvarBanner = async function() {
 window.deletar = async function(id) {
   if (!confirm('Deletar este banner?')) return;
   await supabase.from('banners').delete().eq('id', id);
+  limparFotosSemUso({ forcar: true }); // apaga fotos antigas que ficaram sem uso
   await carregar();
 };
 

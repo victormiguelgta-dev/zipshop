@@ -152,8 +152,7 @@ import { loadProducts, formatPrice, starsHTML, estaEsgotado, esgotadosNoFim } fr
 import { getFavoritosIds, toggleFavorito } from './js/favoritos.js';
 
 // Carrega banners do Supabase
-import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/+esm';
-const _sb = createClient('https://kkliwdphrdbguclsvxcw.supabase.co','sb_publishable_OMXANLsZK98fPWygp8ZHfA_xzSpWgYb');
+import { supabase as _sb } from './js/supabase-config.js';
 
 // Busca tudo AO MESMO TEMPO (antes era um depois do outro e a página
 // ficava vazia nos primeiros segundos)

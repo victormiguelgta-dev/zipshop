@@ -233,7 +233,7 @@
 
 <script src="../js/imagem.js"></script>
 <script type="module">
-import { isAdmin, supabase } from '../js/admin-guard.js';
+import { isAdmin, supabase, limparFotosSemUso } from '../js/admin-guard.js';
 import { preencherCategorias, carregarMarcas, sugerirMarcas, normalizarMarca } from '../js/admin-catalogo.js';
 if (!isAdmin) throw new Error('not admin');
 let marcas = [];
@@ -730,6 +730,7 @@ window.salvarProduto = async function() {
 
   fecharModal();
   await carregar();
+  limparFotosSemUso({ forcar: true }); // apaga fotos antigas que ficaram sem uso
 
   const toast = document.createElement('div');
   toast.className = 'toast success show';
@@ -745,6 +746,7 @@ window.toggleAtivo = async function(id, ativo) {
 window.deletarProduto = async function(id) {
   if (!confirm('Deletar este produto?')) return;
   await supabase.from('produtos').delete().eq('id', id);
+  limparFotosSemUso({ forcar: true }); // apaga fotos antigas que ficaram sem uso
   await carregar();
 };
 

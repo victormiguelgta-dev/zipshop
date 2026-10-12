@@ -1,5 +1,11 @@
 const BASE = document.querySelector('meta[name="base"]')?.content || '';
 
+// Link de "esqueci minha senha" que caiu em outra página (ex.: a inicial):
+// manda pra tela de nova senha mantendo o código do link
+if (/[#&]type=recovery/.test(location.hash) && !/conta(\.html)?$/.test(location.pathname)) {
+  location.replace(BASE + '/conta.html?secao=security' + location.hash);
+}
+
 // Captura o código de indicação (?ref=CODIGO) em qualquer página do site,
 // não só na home — assim funciona mesmo se o link compartilhado for de
 // um produto específico.
@@ -202,8 +208,9 @@ let _searchClient = null;
 let _searchDebounce = null;
 async function getSearchClient() {
   if (_searchClient) return _searchClient;
-  const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/+esm');
-  _searchClient = createClient('https://kkliwdphrdbguclsvxcw.supabase.co', 'sb_publishable_OMXANLsZK98fPWygp8ZHfA_xzSpWgYb');
+  // Mesmo cliente do resto do site (um só por página — evita o aviso
+  // "Multiple GoTrueClient" e briga entre eles pelo login)
+  _searchClient = (await import('./supabase-config.js')).supabase;
   return _searchClient;
 }
 
@@ -278,8 +285,7 @@ async function initPage() {
   let isAdmin = false;
   let sb = null;
   try {
-    const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/+esm');
-    sb = createClient('https://kkliwdphrdbguclsvxcw.supabase.co', 'sb_publishable_OMXANLsZK98fPWygp8ZHfA_xzSpWgYb');
+    sb = (await import('./supabase-config.js')).supabase;
     // getSession() lê a sessão salva localmente (sem depender de uma
     // chamada de rede terminar a tempo). getUser() faz essa chamada
     // de rede pra revalidar no servidor — se ela falhar ou demorar,

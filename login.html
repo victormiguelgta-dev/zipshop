@@ -145,7 +145,7 @@
     if (!email) { mostrarErro('Digite seu e-mail primeiro.'); return; }
     if (!validarEmail(email)) { mostrarErro('Digite um e-mail válido.'); return; }
     await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: window.location.origin + '/conta.html'
+      redirectTo: window.location.origin + '/conta.html?secao=security'
     });
     showToast('E-mail de recuperação enviado!', 'success');
   });
