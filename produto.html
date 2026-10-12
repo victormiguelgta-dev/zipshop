@@ -238,7 +238,7 @@ async function render() {
           <button class="btn btn-primary btn-lg pd-btn-ico" style="flex:1${semEstoque ? ';opacity:.5;cursor:not-allowed' : ''}" onclick="doAddToCart(event)" ${semEstoque ? 'disabled' : ''}>${ICO.carrinho} Adicionar ao Carrinho</button>
           <button id="btn-fav-detalhe" onclick="toggleFavoritoDetalhe(${p.id})" class="btn btn-outline btn-lg" style="width:52px;flex:0" aria-label="Favoritar">🤍</button>
         </div>
-        <a href="carrinho.html" class="btn btn-outline btn-lg pd-btn-comprar" onclick="${semEstoque ? 'event.preventDefault()' : 'if (!doAddToCart(event)) event.preventDefault()'}" ${semEstoque ? 'style="opacity:.5;cursor:not-allowed;pointer-events:none"' : ''}>Comprar agora</a>
+        <a href="carrinho.html" class="btn btn-outline btn-lg pd-btn-comprar pd-btn-ico" onclick="${semEstoque ? 'event.preventDefault()' : 'if (!doAddToCart(event)) event.preventDefault()'}" ${semEstoque ? 'style="opacity:.5;cursor:not-allowed;pointer-events:none"' : ''}>${ICO.raio} Comprar agora</a>
         <div class="pd-garantias">
           <span>${ICO.cadeado} Compra 100% segura</span>
           <span>${ICO.troca} 30 dias para troca</span>

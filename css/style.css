@@ -1579,3 +1579,5 @@ a.ped-item:hover { border-color: var(--primary); }
 .esqueleto .cat-name { background: rgba(255,255,255,0.05); border-radius: 6px; width: 70%; margin: 6px auto 0; }
 .esqueleto-produto { min-height: 300px; border-color: transparent; }
 @keyframes esqueleto-brilho { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+.pd-beneficio + .pd-beneficio { border-left: 1px solid var(--border); padding-left: 12px; }
+.pd-btn-comprar svg { color: var(--primary); }
