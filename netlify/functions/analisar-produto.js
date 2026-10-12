@@ -52,8 +52,10 @@ function categoriasDoPedido(lista) {
     .slice(0, 40);
 }
 
-// Modelo principal e reserva (se o principal sair do ar, usa o "mais recente")
-const MODELOS = ['gemini-3.6-flash', 'gemini-flash-latest'];
+// Modelo principal e reservas: se um estiver sobrecarregado (503), no limite
+// (429), fora do ar (500) ou não existir mais (404), tenta o próximo
+const MODELOS = ['gemini-3.6-flash', 'gemini-flash-latest', 'gemini-flash-lite-latest', 'gemini-2.5-flash'];
+const TENTAR_OUTRO = [404, 429, 500, 503];
 
 // O Netlify corta a função em ~10s: paramos antes pra devolver uma
 // mensagem clara em vez de uma página de erro que o painel não lê
@@ -69,7 +71,8 @@ async function chamarGeminiComReserva(prompt, apiKey, prazoFinal) {
     if (resposta.error && resposta.error.code === 400 && /thinking/i.test(resposta.error.message || '')) {
       resposta = await chamarGemini(prompt, apiKey, modelo, false, prazoFinal);
     }
-    if (!(resposta.error && resposta.error.code === 404)) break;
+    if (!(resposta.error && TENTAR_OUTRO.includes(resposta.error.code))) break;
+    console.warn(`Gemini ${modelo} respondeu ${resposta.error.code}; tentando o próximo modelo`);
   }
   return resposta;
 }
