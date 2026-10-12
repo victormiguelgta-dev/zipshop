@@ -135,7 +135,7 @@
 
     const { data, error } = await supabase.auth.signUp({
       email, password: p1,
-      options: { data: { full_name: nome, cpf } }
+      options: { data: { full_name: nome, cpf }, emailRedirectTo: window.location.origin + '/login.html' }
     });
 
     btn.disabled = false; btn.textContent = 'Criar Conta Grátis';
@@ -143,27 +143,22 @@
     if (error) {
       const msgs = {
         'User already registered': 'Este e-mail já está cadastrado.',
-        'Password should be at least 6 characters': 'Senha muito curta.'
+        'Password should be at least 6 characters': 'Senha muito curta.',
+        'email rate limit exceeded': 'Muitos cadastros em pouco tempo. Aguarde alguns minutos e tente de novo.'
       };
       mostrarErro(msgs[error.message] || 'Erro ao criar conta. Tente novamente.');
       return;
     }
 
-    if (data.user) {
-      const { error: erroPerfil } = await supabase.from('usuarios').insert({ id: data.user.id, email, nome, cpf });
-      if (erroPerfil) {
-        // Alguém cadastrou o mesmo CPF entre a checagem acima e agora
-        // (caso raro). A conta de login já foi criada, mas o perfil
-        // não foi salvo com esse CPF — orienta o usuário em vez de
-        // mostrar sucesso de forma enganosa.
-        if (erroPerfil.code === '23505') {
-          mostrarErro('Este CPF já está em uso por outra conta. Fale com o suporte para regularizar seu cadastro.');
-        } else {
-          mostrarErro('Conta criada, mas houve um erro ao salvar seus dados. Complete seu perfil após confirmar o e-mail.');
-        }
-        return;
-      }
+    // E-mail que já tem conta: o Supabase não dá erro (por segurança) e não
+    // manda e-mail nenhum — só devolve um usuário sem "identities"
+    if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+      mostrarErro('Este e-mail já tem conta. Faça login ou use "Esqueceu sua senha?" na tela de entrar.');
+      return;
     }
+    // O perfil (nome, CPF) é criado pelo próprio banco no cadastro
+    // (_interno/sql-perfil-automatico.sql) — antes o site tentava salvar
+    // sem estar logado e dava "erro ao salvar seus dados"
 
     mostrarOk('Conta criada! Verifique seu e-mail para confirmar o cadastro.');
     setTimeout(() => window.location.href = 'login.html', 3000);
