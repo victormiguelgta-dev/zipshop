@@ -1,3 +1,10 @@
+// Limpa espaços, quebras de linha e aspas coladas sem querer nas variáveis
+// do Netlify (uma chave com quebra de linha derruba a função: "Invalid character in header")
+['SUPABASE_URL', 'SUPABASE_SERVICE_KEY', 'MP_ACCESS_TOKEN', 'MP_WEBHOOK_SECRET', 'RESEND_API_KEY',
+ 'GEMINI_API_KEY', 'INTERNAL_SECRET', 'SITE_URL', 'ADMIN_EMAILS'].forEach(k => {
+  if (process.env[k]) process.env[k] = process.env[k].replace(/[\s"'\u200B-\u200D\uFEFF]+/g, '');
+});
+
 // Endereço da loja: configurado no Netlify (SITE_URL); troque lá ao mudar de domínio
 const SITE_URL = process.env.SITE_URL || 'https://zipshop.netlify.app';
 
@@ -121,6 +128,14 @@ exports.handler = async (event) => {
   const prazoFinal = Date.now() + LIMITE_MS;
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: JSON.stringify({ erro: 'Method Not Allowed' }) };
+  }
+
+  // Chave com caractere que não pode (ex.: "…" de uma chave copiada cortada)
+  // derruba a função sem explicação — avisa qual variável corrigir
+  for (const nome of ['SUPABASE_SERVICE_KEY', 'GEMINI_API_KEY']) {
+    if (/[^\x21-\x7e]/.test(process.env[nome] || '')) {
+      return { statusCode: 500, body: JSON.stringify({ erro: `A variável ${nome} no Netlify tem um caractere inválido (ex.: "…" ou acento). Copie a chave de novo pelo botão de copiar e cole no Netlify.` }) };
+    }
   }
 
   // Só admin usa a importação por IA (evita queimar a cota do Gemini)

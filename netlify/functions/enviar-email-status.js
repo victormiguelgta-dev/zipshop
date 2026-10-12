@@ -1,3 +1,10 @@
+// Limpa espaços, quebras de linha e aspas coladas sem querer nas variáveis
+// do Netlify (uma chave com quebra de linha derruba a função: "Invalid character in header")
+['SUPABASE_URL', 'SUPABASE_SERVICE_KEY', 'MP_ACCESS_TOKEN', 'MP_WEBHOOK_SECRET', 'RESEND_API_KEY',
+ 'GEMINI_API_KEY', 'INTERNAL_SECRET', 'SITE_URL', 'ADMIN_EMAILS'].forEach(k => {
+  if (process.env[k]) process.env[k] = process.env[k].replace(/[\s"'\u200B-\u200D\uFEFF]+/g, '');
+});
+
 // Envia e-mails de atualização de pedido (saiu para entrega, entregue)
 // e de devolução. SÓ ADMIN pode disparar (verificação por token), e o
 // destinatário é buscado no banco pelo id do pedido — nunca vem do corpo.
