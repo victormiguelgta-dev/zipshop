@@ -246,7 +246,7 @@ supabase.auth.onAuthStateChange((event) => {
 function renderPassoNovaSenhaDireta() {
   document.getElementById('account-content').innerHTML = `
   <div class="card"><div class="card-body" style="max-width:480px">
-    <p style="font-weight:700;font-size:16px;margin-bottom:4px">🔒 Redefinir Senha</p>
+    <p style="font-weight:700;font-size:16px;margin-bottom:4px;display:flex;align-items:center;gap:8px">${window.icone('cadeado', 18)} Redefinir Senha</p>
     <p style="font-size:13px;color:var(--text-muted);margin-bottom:20px">Identidade confirmada pelo link do e-mail. Escolha sua nova senha.</p>
     <div class="form-group">
       <label class="form-label">Nova senha *</label>
@@ -256,7 +256,7 @@ function renderPassoNovaSenhaDireta() {
       <label class="form-label">Confirmar nova senha *</label>
       <input type="password" class="form-input" id="new-pass2-direto" placeholder="Repita a nova senha">
     </div>
-    <button class="btn btn-primary" onclick="confirmarNovaSenhaDireta()" style="width:100%">✅ Salvar Nova Senha</button>
+    <button class="btn btn-primary" onclick="confirmarNovaSenhaDireta()" style="width:100%">Salvar Nova Senha</button>
   </div></div>`;
 }
 
@@ -270,13 +270,13 @@ window.confirmarNovaSenhaDireta = async function() {
   btn.disabled = true; btn.textContent = 'Salvando...';
 
   const { error } = await supabase.auth.updateUser({ password: p1 });
-  btn.disabled = false; btn.textContent = '✅ Salvar Nova Senha';
+  btn.disabled = false; btn.textContent = 'Salvar Nova Senha';
 
   if (error) { showToast('Erro ao salvar nova senha. Tente novamente.', 'error'); return; }
 
   document.getElementById('account-content').innerHTML = `
   <div class="card"><div class="card-body" style="text-align:center;padding:48px">
-    <p style="font-size:48px;margin-bottom:16px">✅</p>
+    <p style="margin-bottom:16px;color:var(--primary)">${window.icone('checkCirculo', 52)}</p>
     <p style="font-weight:700;font-size:18px;margin-bottom:8px">Senha alterada!</p>
     <p style="color:var(--text-muted);margin-bottom:24px">Sua senha foi atualizada com sucesso.</p>
     <a href="conta.html" class="btn btn-primary">Ok</a>
@@ -313,6 +313,11 @@ const ICONES = {
   calendar: '<path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/>',
   pin: '<path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/>',
   file: '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/>',
+  pencil: '<path d="M17 3a2.8 2.8 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5z"/>',
+  more: '<circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>',
+  chevron: '<path d="m9 18 6-6-6-6"/>',
+  ok: '<path d="M20 6 9 17l-5-5"/>',
+  boxOpen: '<path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5M12 13v8M7.5 5.5l9 5"/>',
   refresh: '<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>'
 };
 function icone(nome) {
@@ -391,7 +396,7 @@ async function loadOrders() {
 
   if (error || !pedidos?.length) {
     content.innerHTML = `<div class="card"><div class="card-body" style="text-align:center;padding:48px">
-      <p style="font-size:40px;margin-bottom:12px">📦</p>
+      <p style="margin-bottom:12px;color:var(--text-muted)">${window.icone('caixa', 44)}</p>
       <p style="font-weight:700;margin-bottom:8px">Nenhum pedido ainda</p>
       <p style="color:var(--text-muted);margin-bottom:20px">Seus pedidos aparecerão aqui após a compra.</p>
       <a href="produtos.html" class="btn btn-primary">Ver Produtos</a>
@@ -429,14 +434,14 @@ async function loadOrders() {
       const foto = pid ? fotosMap[pid] : null;
       const thumb = foto?.image_url
         ? `<img src="${esc(foto.image_url)}" alt="" loading="lazy">`
-        : `<span>${esc(foto?.emoji || i.emoji || '📦')}</span>`;
+        : `<span>${foto?.emoji || i.emoji ? esc(foto?.emoji || i.emoji) : window.icone('caixa', 22)}</span>`;
       const tag = pid ? 'a' : 'div';
       const avaliar = pid && p.status === 'entregue' && !jaAvaliados.has(String(pid));
       return `<${tag} class="ped-item"${pid ? ` href="produto.html?id=${pid}"` : ''}>
         <div class="ped-item-foto">${thumb}</div>
         <div class="ped-item-texto"><p class="ped-item-nome">${nome}</p>${variacao ? `<p class="ped-item-var">${variacao}</p>` : ''}</div>
         <span class="ped-item-qtd">${Number(i.quantidade) || 1}x</span>
-      </${tag}>${avaliar ? `<a class="ped-btn-avaliar" href="produto.html?id=${pid}#avaliar">⭐ Avaliar e ganhar até R$ 1,00*</a>` : ''}`;
+      </${tag}>${avaliar ? `<a class="ped-btn-avaliar" href="produto.html?id=${pid}#avaliar">${window.icone('estrela', 14)} Avaliar e ganhar até R$ 1,00*</a>` : ''}`;
     }).join('');
     const podeEditar = p.status === 'pendente';
     const expiraEm = prazoPagamento(p);
@@ -444,7 +449,7 @@ async function loadOrders() {
     const devolucao = devolucaoPorPedido[p.id];
     const labelsDevolucao = { solicitado: 'Devolução em análise', aprovado: 'Devolução aprovada', rejeitado: 'Devolução recusada', reembolsado: 'Reembolsado em saldo' };
     const grupo = p.status === 'entregue' ? 'entregues' : (['pendente', 'pago', 'enviado'].includes(p.status) ? 'andamento' : 'outros');
-    const temAcoes = podeEditar || (p.status === 'entregue' && !devolucao);
+    const temAcoes = p.status === 'entregue' && !devolucao;
     return `<div class="ped-card" data-grupo="${grupo}">
       <div class="ped-topo">
         <span class="ped-numero">#${p.id.slice(0,8).toUpperCase()}</span>
@@ -469,15 +474,14 @@ async function loadOrders() {
       </div>` : ''}
       ${devolucao ? `<p class="ped-devolucao">${icone('refresh')} ${labelsDevolucao[devolucao.status] || esc(devolucao.status)}</p>` : ''}
       <div class="ped-botoes${p.status === 'cancelado' ? ' ped-botoes-um' : ''}">
-        ${p.status !== 'cancelado' ? `<button onclick="abrirRastreio('${p.id}')" class="ped-btn">${icone('pin')} Rastrear Pedido</button>` : ''}
+        ${p.status !== 'cancelado' ? `<button onclick="alternarRastreio('${p.id}')" class="ped-btn" id="btn-rastreio-${p.id}">${icone('pin')} Rastrear Pedido</button>` : ''}
         <button onclick="alternarDetalhesPedido('${p.id}', this)" class="ped-btn">${icone('file')} Ver detalhes</button>
       </div>
+      ${p.status !== 'cancelado' ? `<div class="rst-card" id="rastreio-${p.id}" hidden></div>` : ''}
       <div class="ped-detalhes" id="detalhes-${p.id}" hidden>
         ${detalhesPedidoHTML(p)}
         ${temAcoes ? `<div class="ped-detalhes-acoes">
           ${p.status === 'entregue' && !devolucao ? `<button onclick="abrirSolicitarDevolucao('${p.id}')" class="btn btn-outline btn-sm">Solicitar devolução</button>` : ''}
-          ${podeEditar ? `<button onclick="abrirEdicaoPedido('${p.id}')" class="btn btn-outline btn-sm">Editar dados</button>
-          <button onclick="cancelarPedido('${p.id}')" class="btn btn-sm ped-btn-cancelar">Cancelar pedido</button>` : ''}
         </div>` : ''}
       </div>
     </div>`;
@@ -501,6 +505,10 @@ async function loadOrders() {
   filtrarPedidos(abaAtual);
 
   window._pedidosCache = pedidos;
+
+  // O pedido em andamento mais recente já abre com o rastreio à mostra
+  const recente = pedidos.find(p => ['pendente', 'pago', 'enviado'].includes(p.status));
+  if (recente) alternarRastreio(recente.id, true);
 }
 
 window.abrirSolicitarDevolucao = function(pedidoId) {
@@ -573,99 +581,102 @@ window.cancelarPedido = async function(id) {
   carregarResumo();
 };
 
-// ===== RASTREIO DO PEDIDO (linha do tempo tipo iFood, ao vivo) =====
+// ===== RASTREIO DO PEDIDO (cartão dentro do pedido, ao vivo) =====
+// Modelo do cliente: etapas com ícone de linha, check verde nas já
+// cumpridas, a etapa atual destacada e os botões Editar/Cancelar embaixo.
 const ETAPAS_RASTREIO = [
-  { status: 'pendente', label: 'Pedido recebido', icone: '🧾' },
-  { status: 'pago', label: 'Pagamento confirmado', icone: '💳' },
-  { status: 'enviado', label: 'Saiu para entrega', icone: '🛵' },
-  { status: 'entregue', label: 'Entregue', icone: '📦' }
+  { status: 'pendente', label: 'Pedido recebido', icone: 'package' },
+  { status: 'pago', label: 'Pagamento confirmado', icone: 'card' },
+  { status: 'enviado', label: 'Saiu para entrega', icone: 'truck' },
+  { status: 'entregue', label: 'Entregue', icone: 'boxOpen' }
 ];
 
 let _canalRastreio = null;
-
-window.fecharRastreio = function() {
-  const modal = document.getElementById('modal-rastreio');
-  if (modal) modal.remove();
-  if (_canalRastreio) { supabase.removeChannel(_canalRastreio); _canalRastreio = null; }
-};
+let _rastreioAberto = null;
 
 function renderRastreioConteudo(pedido, historico) {
-  if (pedido.status === 'cancelado') {
-    return `<div style="text-align:center;padding:24px 8px">
-      <p style="font-size:40px;margin-bottom:10px">❌</p>
-      <p style="font-weight:700;margin-bottom:4px">Pedido cancelado</p>
-      <p style="color:var(--text-muted);font-size:13px">Este pedido não está mais em andamento.</p>
-    </div>`;
-  }
-
   const idxAtual = ETAPAS_RASTREIO.findIndex(e => e.status === pedido.status);
   const horaPorStatus = {};
   (historico || []).forEach(h => { if (!horaPorStatus[h.status]) horaPorStatus[h.status] = h.criado_em; });
-
   const mostrarCodigo = pedido.status === 'enviado' && pedido.codigo_confirmacao;
+  const podeEditar = pedido.status === 'pendente';
 
-  return `<div style="padding:4px 4px 0">
+  return `
+    <div class="rst-topo">
+      <span class="rst-pin">${icone('pin')}</span>
+      <div><p class="rst-titulo">Rastrear pedido</p><p class="rst-num">#${pedido.id.slice(0, 8).toUpperCase()}</p></div>
+      <button type="button" class="rst-fechar" onclick="alternarRastreio('${pedido.id}')" aria-label="Fechar rastreio">${icone('chevron')}</button>
+    </div>
     ${mostrarCodigo ? `
-    <div style="background:rgba(170,239,0,0.08);border:1px solid var(--primary);border-radius:12px;padding:12px 14px;margin-bottom:18px">
-      <p style="font-size:11px;color:var(--text-muted);text-transform:uppercase;font-weight:700;letter-spacing:.04em">Código de confirmação</p>
-      <p style="font-size:20px;font-weight:900;letter-spacing:.05em;margin-top:2px">${pedido.codigo_confirmacao}</p>
-      <p style="font-size:11px;color:var(--text-muted);margin-top:2px">Informe esse código pro entregador quando o pedido chegar.</p>
+    <div class="rst-codigo">
+      <p class="ped-rotulo">Código de confirmação</p>
+      <p class="rst-codigo-num">${esc(pedido.codigo_confirmacao)}</p>
+      <p class="ped-rotulo">Informe esse código pro entregador quando o pedido chegar.</p>
     </div>` : ''}
+    <div class="rst-etapas">
     ${ETAPAS_RASTREIO.map((etapa, i) => {
       const feito = idxAtual >= 0 && i <= idxAtual;
       const atual = i === idxAtual;
       const hora = horaPorStatus[etapa.status];
+      const ultimo = i === ETAPAS_RASTREIO.length - 1;
       return `
-      <div style="display:flex;gap:14px">
-        <div style="display:flex;flex-direction:column;align-items:center">
-          <div style="width:36px;height:36px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:16px;
-            background:${feito ? 'rgba(170,239,0,0.15)' : 'var(--bg-muted)'};
-            border:2px solid ${feito ? 'var(--primary)' : 'var(--border)'};
-            ${atual ? 'animation: successRing 1.4s ease-out infinite;' : ''}">
-            ${feito ? (i === idxAtual ? etapa.icone : '✓') : etapa.icone}
-          </div>
-          ${i < ETAPAS_RASTREIO.length - 1 ? `<div style="width:2px;flex:1;min-height:28px;background:${i < idxAtual ? 'var(--primary)' : 'var(--border)'}"></div>` : ''}
+      <div class="rst-etapa${feito ? ' feito' : ''}${atual ? ' atual' : ''}">
+        <div class="rst-trilho">
+          <span class="rst-bolinha">${feito ? icone('ok') : icone(etapa.icone)}</span>
+          ${ultimo ? '' : `<span class="rst-linha${i < idxAtual ? ' feita' : ''}"></span>`}
         </div>
-        <div style="padding-bottom:26px">
-          <p style="font-weight:${atual ? '900' : '700'};font-size:14px;color:${feito ? 'var(--text)' : 'var(--text-muted)'}">${etapa.label}</p>
-          <p style="font-size:11px;color:var(--text-muted);margin-top:2px">${hora ? new Date(hora).toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' }) : (feito ? '' : 'Aguardando...')}</p>
+        <div class="rst-info">
+          ${atual ? `<span class="rst-info-ico">${icone(etapa.icone)}</span>` : ''}
+          <div><p class="rst-label">${etapa.label}</p>
+          <p class="rst-hora">${hora ? new Date(hora).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : (feito ? '' : 'Aguardando...')}</p></div>
         </div>
       </div>`;
     }).join('')}
-  </div>`;
+    </div>
+    ${podeEditar ? `
+    <div class="rst-acoes">
+      <button type="button" class="rst-btn" onclick="abrirEdicaoPedido('${pedido.id}')">${icone('pencil')} Editar dados</button>
+      <button type="button" class="rst-btn rst-btn-cancelar" onclick="cancelarPedido('${pedido.id}')">${icone('x')} Cancelar pedido</button>
+    </div>` : ''}`;
 }
 
-window.abrirRastreio = async function(pedidoId) {
-  const modal = document.createElement('div');
-  modal.id = 'modal-rastreio';
-  modal.style = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;display:flex;align-items:center;justify-content:center;padding:16px';
-  modal.innerHTML = `
-    <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:20px;padding:24px;width:100%;max-width:420px;max-height:90vh;overflow-y:auto">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">
-        <p style="font-weight:900;font-size:17px">📍 Rastrear Pedido</p>
-        <button onclick="fecharRastreio()" style="background:none;border:none;color:var(--text-muted);font-size:20px;cursor:pointer">✕</button>
-      </div>
-      <p style="font-size:12px;color:var(--text-muted);margin-bottom:16px">#${pedidoId.slice(0,8).toUpperCase()}</p>
-      <div id="rastreio-conteudo"><div style="padding:30px;text-align:center;color:var(--text-muted)">Carregando...</div></div>
-    </div>`;
-  document.body.appendChild(modal);
+async function atualizarRastreio(pedidoId) {
+  const alvo = document.getElementById('rastreio-' + pedidoId);
+  if (!alvo || alvo.hidden) return;
+  const [{ data: pedido }, { data: historico }] = await Promise.all([
+    supabase.from('pedidos').select('*').eq('id', pedidoId).single(),
+    supabase.from('pedidos_status_historico').select('*').eq('pedido_id', pedidoId).order('criado_em', { ascending: true })
+  ]);
+  if (pedido && pedido.status !== 'cancelado') alvo.innerHTML = renderRastreioConteudo(pedido, historico);
+  else if (pedido) { alvo.hidden = true; loadOrders(); }
+}
 
-  async function atualizarConteudo() {
-    const { data: pedido } = await supabase.from('pedidos').select('*').eq('id', pedidoId).single();
-    const { data: historico } = await supabase.from('pedidos_status_historico').select('*').eq('pedido_id', pedidoId).order('criado_em', { ascending: true });
-    const alvo = document.getElementById('rastreio-conteudo');
-    if (alvo && pedido) alvo.innerHTML = renderRastreioConteudo(pedido, historico);
+window.alternarRastreio = async function(pedidoId, abrir) {
+  const alvo = document.getElementById('rastreio-' + pedidoId);
+  if (!alvo) return;
+  const vaiAbrir = abrir === undefined ? alvo.hidden : abrir;
+  if (_canalRastreio) { supabase.removeChannel(_canalRastreio); _canalRastreio = null; }
+  // Um rastreio aberto por vez
+  if (_rastreioAberto && _rastreioAberto !== pedidoId) {
+    const anterior = document.getElementById('rastreio-' + _rastreioAberto);
+    if (anterior) anterior.hidden = true;
+    document.getElementById('btn-rastreio-' + _rastreioAberto)?.classList.remove('ativo');
   }
-
-  await atualizarConteudo();
-
-  // Assina atualizações em tempo real: quando o admin muda o status,
-  // a tela do cliente atualiza sozinha, sem precisar recarregar.
+  alvo.hidden = !vaiAbrir;
+  document.getElementById('btn-rastreio-' + pedidoId)?.classList.toggle('ativo', vaiAbrir);
+  _rastreioAberto = vaiAbrir ? pedidoId : null;
+  if (!vaiAbrir) return;
+  alvo.innerHTML = '<p class="rst-carregando">Carregando...</p>';
+  await atualizarRastreio(pedidoId);
+  // Ao vivo: quando o admin muda o status, o cartão atualiza sozinho
   _canalRastreio = supabase
     .channel('rastreio-' + pedidoId)
-    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'pedidos', filter: `id=eq.${pedidoId}` }, atualizarConteudo)
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'pedidos', filter: `id=eq.${pedidoId}` }, () => atualizarRastreio(pedidoId))
     .subscribe();
 };
+// Links antigos que chamam abrirRastreio continuam funcionando
+window.abrirRastreio = (id) => alternarRastreio(id, true);
+window.fecharRastreio = () => { if (_rastreioAberto) alternarRastreio(_rastreioAberto, false); };
 
 // Edição de dados do pedido — só permitida enquanto status = pendente
 window.abrirEdicaoPedido = function(id) {
@@ -680,7 +691,7 @@ window.abrirEdicaoPedido = function(id) {
     <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:20px;padding:24px;width:100%;max-width:420px;max-height:90vh;overflow-y:auto">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
         <h2 style="font-size:16px;font-weight:900">Editar dados do pedido</h2>
-        <button onclick="document.getElementById('modal-editar-pedido').remove()" style="background:none;border:none;color:var(--text-muted);font-size:20px;cursor:pointer">✕</button>
+        <button onclick="document.getElementById('modal-editar-pedido').remove()" style="background:none;border:none;color:var(--text-muted);font-size:20px;cursor:pointer;display:inline-flex">${window.icone('x', 20)}</button>
       </div>
       <div class="form-group"><label class="form-label">Nome completo</label>
         <input type="text" class="form-input" id="edit-pedido-nome" value="${esc(end.nome || '')}"></div>
@@ -752,7 +763,7 @@ async function loadProfile() {
       <div id="cpf-status" style="margin-bottom:10px;font-size:13px">
         ${cpfAtual
           ? `<strong>${window.mascararCPF(cpfAtual)}</strong> <button type="button" id="btn-trocar-cpf" class="btn" style="padding:2px 10px;font-size:12px;margin-left:8px">Trocar CPF</button>`
-          : `<span style="color:#ef4444">⚠️ Nenhum CPF cadastrado</span>`}
+          : `<span style="color:#ef4444">Nenhum CPF cadastrado</span>`}
       </div>
       <div id="bloco-editar-cpf" style="display:${cpfAtual ? 'none' : 'block'}">
         <div class="form-group">
@@ -768,7 +779,7 @@ async function loadProfile() {
       <div id="telefone-status" style="margin-bottom:10px;font-size:13px">
         ${telefoneAtual
           ? `<strong>${formatarTelExibicao(telefoneAtual)}</strong> <button type="button" id="btn-trocar-tel" class="btn" style="padding:2px 10px;font-size:12px;margin-left:8px">Trocar número</button>`
-          : `<span style="color:#ef4444">⚠️ Nenhum telefone cadastrado</span>`}
+          : `<span style="color:#ef4444">Nenhum telefone cadastrado</span>`}
       </div>
       <div id="bloco-editar-tel" style="display:${telefoneAtual ? 'none' : 'block'}">
         <div class="form-group">
@@ -865,7 +876,7 @@ async function loadAddresses() {
   if (error || !enderecos?.length) {
     content.innerHTML = `
     <div class="card"><div class="card-body" style="text-align:center;padding:48px">
-      <p style="font-size:40px;margin-bottom:12px">📍</p>
+      <p style="margin-bottom:12px;color:var(--text-muted)">${window.icone('local', 44)}</p>
       <p style="font-weight:700;margin-bottom:8px">Nenhum endereço cadastrado</p>
       <p style="color:var(--text-muted);margin-bottom:20px">Adicione um endereço para agilizar suas compras.</p>
       <button class="btn btn-primary" onclick="abrirModalEndereco()">+ Adicionar Endereço</button>
@@ -885,16 +896,16 @@ async function loadAddresses() {
           <div style="flex:1">
             <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
               <p style="font-weight:700;font-size:14px">${esc(end.apelido || 'Endereço')}</p>
-              ${end.favorito ? '<span style="background:var(--primary);color:#000;font-size:10px;font-weight:900;padding:2px 8px;border-radius:20px">⭐ FAVORITO</span>' : ''}
+              ${end.favorito ? '<span style="background:var(--primary);color:#000;font-size:10px;font-weight:900;padding:2px 8px;border-radius:20px">FAVORITO</span>' : ''}
             </div>
             <p style="font-size:13px;color:var(--text-muted)">${esc(end.rua)}, ${esc(end.numero)}${end.complemento ? ' - ' + esc(end.complemento) : ''}</p>
             <p style="font-size:13px;color:var(--text-muted)">${esc(end.bairro)} — Santa Maria, RS</p>
-            ${end.referencia ? `<p style="font-size:12px;color:var(--text-muted);margin-top:2px">📌 ${esc(end.referencia)}</p>` : ''}
+            ${end.referencia ? `<p style="font-size:12px;color:var(--text-muted);margin-top:2px">Ref.: ${esc(end.referencia)}</p>` : ''}
           </div>
           <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0">
-            ${!end.favorito ? `<button onclick="tornarFavorito('${end.id}')" style="background:none;border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:12px;cursor:pointer;color:var(--text-muted);white-space:nowrap">⭐ Favoritar</button>` : ''}
-            <button onclick="abrirModalEndereco('${end.id}')" style="background:none;border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:12px;cursor:pointer;color:var(--text)">✏️ Editar</button>
-            <button onclick="excluirEndereco('${end.id}')" style="background:none;border:1px solid rgba(239,68,68,0.3);border-radius:8px;padding:6px 10px;font-size:12px;cursor:pointer;color:#ef4444">🗑️ Excluir</button>
+            ${!end.favorito ? `<button onclick="tornarFavorito('${end.id}')" style="background:none;border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:12px;cursor:pointer;color:var(--text-muted);white-space:nowrap">Favoritar</button>` : ''}
+            <button onclick="abrirModalEndereco('${end.id}')" style="background:none;border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:12px;cursor:pointer;color:var(--text)">Editar</button>
+            <button onclick="excluirEndereco('${end.id}')" style="background:none;border:1px solid rgba(239,68,68,0.3);border-radius:8px;padding:6px 10px;font-size:12px;cursor:pointer;color:#ef4444">Excluir</button>
           </div>
         </div>
       </div>
@@ -930,7 +941,7 @@ window.abrirModalEndereco = async function(id = null) {
     <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:20px;padding:24px;width:100%;max-width:440px;max-height:92vh;overflow-y:auto">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
         <h2 style="font-size:16px;font-weight:900">${id ? 'Editar Endereço' : 'Novo Endereço'}</h2>
-        <button onclick="document.getElementById('modal-endereco').remove()" style="background:none;border:none;color:var(--text-muted);font-size:20px;cursor:pointer">✕</button>
+        <button onclick="document.getElementById('modal-endereco').remove()" style="background:none;border:none;color:var(--text-muted);font-size:20px;cursor:pointer;display:inline-flex">${window.icone('x', 20)}</button>
       </div>
 
       <div class="form-group">
@@ -963,7 +974,7 @@ window.abrirModalEndereco = async function(id = null) {
       <label style="display:flex;align-items:center;gap:10px;margin-bottom:20px;cursor:pointer;padding:12px;border:1px solid var(--border);border-radius:12px">
         <input type="checkbox" id="end-favorito" ${dados.favorito ? 'checked' : ''} style="width:18px;height:18px;accent-color:var(--primary)">
         <div>
-          <p style="font-size:13px;font-weight:700">⭐ Definir como favorito</p>
+          <p style="font-size:13px;font-weight:700">Definir como favorito</p>
           <p style="font-size:11px;color:var(--text-muted)">Será pré-preenchido automaticamente no checkout</p>
         </div>
       </label>
@@ -1020,7 +1031,7 @@ function loadSecurity() {
 function renderPassoSenhaAtual() {
   document.getElementById('account-content').innerHTML = `
   <div class="card"><div class="card-body" style="max-width:480px">
-    <p style="font-weight:700;font-size:16px;margin-bottom:4px">🔒 Alterar Senha</p>
+    <p style="font-weight:700;font-size:16px;margin-bottom:4px;display:flex;align-items:center;gap:8px">${window.icone('cadeado', 18)} Alterar Senha</p>
     <p style="font-size:13px;color:var(--text-muted);margin-bottom:20px">Passo 1 de 3 — Confirme sua identidade</p>
 
     <div class="form-group">
@@ -1065,13 +1076,13 @@ function renderPassoEscolherCanal() {
 
   document.getElementById('account-content').innerHTML = `
   <div class="card"><div class="card-body" style="max-width:480px">
-    <p style="font-weight:700;font-size:16px;margin-bottom:4px">🔒 Alterar Senha</p>
+    <p style="font-weight:700;font-size:16px;margin-bottom:4px;display:flex;align-items:center;gap:8px">${window.icone('cadeado', 18)} Alterar Senha</p>
     <p style="font-size:13px;color:var(--text-muted);margin-bottom:20px">Passo 2 de 3 — Como deseja receber o código?</p>
 
     <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px">
       <div onclick="selecionarCanal('email')" id="canal-email"
         style="display:flex;align-items:center;gap:12px;padding:14px 16px;border:2px solid var(--primary);border-radius:12px;cursor:pointer;background:rgba(170,239,0,0.05)">
-        <span style="font-size:22px">📧</span>
+        <span style="color:var(--primary);display:inline-flex">${window.icone('email', 22)}</span>
         <div>
           <p style="font-weight:700;font-size:13px">E-mail</p>
           <p style="font-size:12px;color:var(--text-muted)">${user.email}</p>
@@ -1081,7 +1092,7 @@ function renderPassoEscolherCanal() {
 
       <div onclick="selecionarCanal('whatsapp')" id="canal-whatsapp"
         style="display:flex;align-items:center;gap:12px;padding:14px 16px;border:2px solid var(--border);border-radius:12px;cursor:pointer">
-        <span style="font-size:22px">💬</span>
+        <span style="color:var(--primary);display:inline-flex">${window.icone('whatsapp', 22)}</span>
         <div>
           <p style="font-weight:700;font-size:13px">WhatsApp / SMS</p>
           <p style="font-size:12px;color:var(--text-muted)">Código enviado pelo suporte</p>
@@ -1134,7 +1145,7 @@ function renderPassoNovasSenha(canal) {
 
   document.getElementById('account-content').innerHTML = `
   <div class="card"><div class="card-body" style="max-width:480px">
-    <p style="font-weight:700;font-size:16px;margin-bottom:4px">🔒 Alterar Senha</p>
+    <p style="font-weight:700;font-size:16px;margin-bottom:4px;display:flex;align-items:center;gap:8px">${window.icone('cadeado', 18)} Alterar Senha</p>
     <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px">Passo 3 de 3 — Código e nova senha</p>
 
     <div style="background:rgba(170,239,0,0.06);border:1px solid rgba(170,239,0,0.25);border-radius:10px;padding:12px 14px;margin-bottom:16px;font-size:13px">
@@ -1155,7 +1166,7 @@ function renderPassoNovasSenha(canal) {
       <input type="password" class="form-input" id="new-pass2" placeholder="Repita a nova senha">
     </div>
 
-    <button class="btn btn-primary" onclick="confirmarNovaSenha('${canal}')" style="width:100%">✅ Confirmar Nova Senha</button>
+    <button class="btn btn-primary" onclick="confirmarNovaSenha('${canal}')" style="width:100%">Confirmar Nova Senha</button>
     <button onclick="renderPassoEscolherCanal()" style="width:100%;background:none;border:none;color:var(--text-muted);font-size:13px;cursor:pointer;margin-top:12px">← Voltar</button>
   </div></div>`;
 }
@@ -1176,7 +1187,7 @@ window.confirmarNovaSenha = async function(canal) {
     // Verifica OTP e já atualiza a senha
     const { error } = await supabase.auth.verifyOtp({ email: user.email, token: codigo, type: 'email' });
     if (error) {
-      btn.disabled = false; btn.textContent = '✅ Confirmar Nova Senha';
+      btn.disabled = false; btn.textContent = 'Confirmar Nova Senha';
       showToast('Código inválido ou expirado. Tente novamente.', 'error');
       return;
     }
@@ -1186,14 +1197,14 @@ window.confirmarNovaSenha = async function(canal) {
   btn.textContent = 'Salvando senha...';
   const { error: errSenha } = await supabase.auth.updateUser({ password: p1 });
   if (errSenha) {
-    btn.disabled = false; btn.textContent = '✅ Confirmar Nova Senha';
+    btn.disabled = false; btn.textContent = 'Confirmar Nova Senha';
     showToast('Erro ao salvar nova senha. Tente novamente.', 'error');
     return;
   }
 
   document.getElementById('account-content').innerHTML = `
   <div class="card"><div class="card-body" style="text-align:center;padding:48px">
-    <p style="font-size:48px;margin-bottom:16px">✅</p>
+    <p style="margin-bottom:16px;color:var(--primary)">${window.icone('checkCirculo', 52)}</p>
     <p style="font-weight:700;font-size:18px;margin-bottom:8px">Senha alterada!</p>
     <p style="color:var(--text-muted);margin-bottom:24px">Sua senha foi atualizada com sucesso.</p>
     <button onclick="loadSecurity()" class="btn btn-primary">Ok</button>

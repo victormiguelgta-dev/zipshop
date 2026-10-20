@@ -1705,3 +1705,38 @@ a.cart-item-name:hover { color: var(--primary); }
 
 @media (max-width: 420px) { .av-midias { grid-template-columns: 1fr 1fr; } .av-midia-btn { padding: 10px; gap: 6px; font-size: 12px; } }
 @media (max-width: 340px) { .av-midias { grid-template-columns: 1fr; } }
+
+/* ===== Meus Pedidos: rastreio em cartão (modelo do cliente) ===== */
+.rst-card { margin-top: 12px; border: 1px solid rgba(170,239,0,.45); border-radius: 18px; padding: 16px; background: linear-gradient(180deg, rgba(170,239,0,.06), rgba(170,239,0,0) 60%), var(--bg-card); }
+.rst-card[hidden] { display: none; }
+.rst-carregando { text-align: center; color: var(--text-muted); padding: 20px; font-size: 13px; }
+.rst-topo { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+.rst-pin { color: var(--primary); display: inline-flex; }
+.rst-pin .ped-icone { width: 28px; height: 28px; }
+.rst-titulo { font-size: 18px; font-weight: 900; }
+.rst-num { font-size: 12px; color: var(--text-muted); }
+.rst-fechar { margin-left: auto; background: none; border: none; color: var(--text-muted); cursor: pointer; display: inline-flex; transform: rotate(90deg); }
+.rst-codigo { background: rgba(170,239,0,.08); border: 1px solid var(--primary); border-radius: 12px; padding: 12px 14px; margin-bottom: 14px; }
+.rst-codigo-num { font-size: 20px; font-weight: 900; letter-spacing: .05em; margin: 2px 0; }
+.rst-etapa { display: flex; gap: 14px; }
+.rst-trilho { display: flex; flex-direction: column; align-items: center; }
+.rst-bolinha { width: 40px; height: 40px; border-radius: 50%; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; border: 2px solid var(--border); color: var(--text); background: var(--bg-card); }
+.rst-bolinha .ped-icone { width: 20px; height: 20px; }
+.rst-etapa.feito .rst-bolinha { background: var(--primary); border-color: var(--primary); color: var(--primary-dark); }
+.rst-etapa.feito .rst-bolinha .ped-icone { stroke-width: 3; }
+.rst-linha { width: 3px; flex: 1; min-height: 22px; margin: 4px 0; border-radius: 2px; background: var(--border); }
+.rst-linha.feita { background: var(--primary); }
+.rst-info { flex: 1; display: flex; align-items: center; gap: 12px; padding: 8px 4px 22px; min-width: 0; }
+.rst-etapa.atual .rst-info { background: rgba(170,239,0,.08); border: 1px solid rgba(170,239,0,.3); border-radius: 14px; padding: 12px; margin-bottom: 16px; }
+.rst-info-ico { width: 40px; height: 40px; border-radius: 50%; border: 1px solid rgba(170,239,0,.4); color: var(--text); display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.rst-label { font-weight: 700; font-size: 15px; color: var(--text-muted); }
+.rst-etapa.feito .rst-label, .rst-etapa.atual .rst-label { color: var(--text); }
+.rst-etapa.atual .rst-label { font-weight: 900; }
+.rst-hora { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+.rst-acoes { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding-top: 14px; margin-top: 4px; border-top: 1px solid var(--border); }
+.rst-btn { display: flex; align-items: center; justify-content: center; gap: 8px; background: none; border: 1px solid var(--border); border-radius: 999px; color: var(--text); font: inherit; font-size: 14px; font-weight: 700; padding: 12px 10px; cursor: pointer; }
+.rst-btn .ped-icone { width: 18px; height: 18px; }
+.rst-btn-cancelar { border-color: rgba(239,68,68,.6); color: #ef4444; }
+.ped-btn.ativo { border-color: var(--primary); color: var(--primary); }
+.rst-btn { white-space: nowrap; font-size: 13px; padding: 12px 8px; gap: 6px; }
+@media (max-width: 360px) { .rst-acoes { grid-template-columns: 1fr; } }
