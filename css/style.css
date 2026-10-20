@@ -1740,3 +1740,5 @@ a.cart-item-name:hover { color: var(--primary); }
 .ped-btn.ativo { border-color: var(--primary); color: var(--primary); }
 .rst-btn { white-space: nowrap; font-size: 13px; padding: 12px 8px; gap: 6px; }
 @media (max-width: 360px) { .rst-acoes { grid-template-columns: 1fr; } }
+.lp-cat-todos { color: var(--primary); background: #0a0a0a; }
+.lp-cat.ativo .lp-cat-todos { color: var(--primary); }
