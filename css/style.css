@@ -1603,3 +1603,105 @@ a.cart-item-name:hover { color: var(--primary); }
 .resumo-finalizar { margin-top: 20px; font-size: 16px; display: flex; align-items: center; justify-content: center; gap: 10px; color: var(--primary-dark); }
 .resumo-continuar { margin-top: 10px; display: flex; align-items: center; justify-content: center; gap: 10px; background: none; border: 1px solid var(--border); color: var(--text); font-weight: 700; }
 .resumo-continuar:hover { border-color: var(--primary); }
+
+/* ===== Página do produto: galeria deslizante e selo de desconto ===== */
+.pd-carrossel-box { position: relative; overflow: hidden; padding: 0; }
+.pd-carrossel { display: flex; width: 100%; height: 100%; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; outline: none; -webkit-overflow-scrolling: touch; border-radius: inherit; }
+.pd-carrossel::-webkit-scrollbar { display: none; }
+.pd-carrossel img { flex: 0 0 100%; width: 100%; height: 100%; object-fit: contain; scroll-snap-align: center; cursor: zoom-in; user-select: none; }
+.pd-contador { position: absolute; right: 12px; bottom: 12px; background: rgba(0,0,0,.55); color: #fff; font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 999px; pointer-events: none; }
+.pd-selo-desconto, .selo-desconto { position: absolute; top: 0; right: 0; background: #ffe4e6; color: #e11d48; font-weight: 800; border-bottom-left-radius: 10px; z-index: 2; pointer-events: none; }
+.pd-selo-desconto { font-size: 15px; padding: 6px 12px; }
+.selo-desconto { font-size: 12px; padding: 3px 8px; }
+.pd-selo-desconto[hidden] { display: none; }
+.pd-miniaturas { display: flex; gap: 8px; margin-top: 10px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; }
+.pd-miniaturas::-webkit-scrollbar { display: none; }
+.pd-miniaturas button { flex-shrink: 0; width: 64px; height: 64px; border-radius: 10px; overflow: hidden; padding: 0; cursor: pointer; background: #fff; border: 2px solid var(--border); }
+.pd-miniaturas button.ativa { border-color: var(--primary); }
+.pd-miniaturas img { width: 100%; height: 100%; object-fit: cover; }
+
+/* Benefícios numa linha só (modelo Shopee) */
+.pd-beneficios-linha .pd-card-topo { gap: 10px; flex-wrap: wrap; font-size: 13px; padding: 12px 14px; }
+.pd-ben-item { display: inline-flex; align-items: center; gap: 6px; color: var(--text-muted); }
+.pd-ben-item .ico { color: var(--primary); }
+.pd-ben-item b { color: var(--primary); }
+.pd-ben-sep { width: 1px; height: 16px; background: var(--border); }
+.pd-beneficios-linha .pd-seta { margin-left: auto; }
+.pd-beneficios-linha .pd-link { margin-top: 6px; }
+
+/* Cor/opção: botão único + gaveta que sobe de baixo */
+.pd-opcao-btn { display: flex; align-items: center; gap: 8px; width: 100%; background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 14px; color: var(--text); font: inherit; font-size: 14px; cursor: pointer; margin-bottom: 18px; text-align: left; }
+.pd-opcao-btn .ico { margin-left: auto; color: var(--text-muted); }
+.pd-opcao-btn.erro { border-color: #ef4444; }
+.pd-opcao-rotulo { font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .05em; }
+.pd-opcao-valor { color: var(--text-muted); }
+.pd-opcao-valor.escolhida { color: var(--primary); font-weight: 700; }
+.pd-sheet-fundo { position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 10000; }
+.pd-sheet { position: fixed; left: 0; right: 0; bottom: 0; max-height: 75vh; overflow-y: auto; background: var(--bg-card); border-top: 1px solid var(--border); border-radius: 20px 20px 0 0; z-index: 10001; padding: 0 16px calc(16px + env(safe-area-inset-bottom)); transform: translateY(100%); visibility: hidden; transition: transform .25s ease; }
+.pd-sheet.aberta { transform: none; visibility: visible; }
+.pd-sheet-topo { display: flex; align-items: center; justify-content: space-between; padding: 16px 0 12px; position: sticky; top: 0; background: var(--bg-card); }
+.pd-sheet-fechar { background: var(--bg-muted); border: none; color: var(--text); width: 32px; height: 32px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+.pd-sheet-lista { display: flex; flex-direction: column; gap: 8px; }
+.pd-sheet-item { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; padding: 14px; background: var(--bg-muted); border: 2px solid transparent; border-radius: 12px; color: var(--text); font: inherit; font-size: 14px; cursor: pointer; text-align: left; }
+.pd-sheet-item.ativa { border-color: var(--primary); }
+.pd-sheet-item.esgotada { opacity: .45; cursor: not-allowed; text-decoration: line-through; }
+.pd-sheet-nome { display: inline-flex; align-items: center; gap: 10px; font-weight: 700; }
+.pd-sheet-preco { font-size: 13px; color: var(--primary); font-weight: 700; white-space: nowrap; }
+.pd-sheet-preco s { color: var(--text-muted); font-weight: 400; }
+.pd-cor-bolinha { width: 18px; height: 18px; border-radius: 50%; border: 1px solid rgba(255,255,255,.25); flex-shrink: 0; }
+@media (min-width: 901px) {
+  .pd-sheet { left: 50%; right: auto; bottom: 50%; width: 420px; border-radius: 20px; border: 1px solid var(--border); transform: translate(-50%, 60%); opacity: 0; transition: transform .2s ease, opacity .2s ease; }
+  .pd-sheet.aberta { transform: translate(-50%, 50%); opacity: 1; }
+}
+
+/* ===== Avaliações (modelo do cliente) ===== */
+.av-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 20px; margin-bottom: 16px; }
+.av-resumo { display: flex; align-items: center; gap: 16px; padding: 16px 20px; }
+.av-media { font-size: 40px; font-weight: 900; line-height: 1; color: var(--primary); }
+.av-estrelas { display: inline-flex; gap: 4px; }
+.av-estrela { color: #facc15; display: inline-flex; }
+.av-estrela.cheia svg { fill: #facc15; }
+.av-total { font-size: 14px; color: var(--text-muted); margin-top: 6px; }
+.av-form-topo { display: flex; gap: 14px; margin-bottom: 16px; }
+.av-form-ico { width: 40px; height: 40px; flex-shrink: 0; border-radius: 50%; border: 2px solid var(--primary); color: var(--primary); display: inline-flex; align-items: center; justify-content: center; }
+.av-form-ico svg { fill: var(--primary); }
+.av-form-titulo { font-size: 18px; font-weight: 800; margin-bottom: 4px; }
+.av-form-sub { font-size: 13px; color: var(--text-muted); line-height: 1.5; }
+.av-form-sub strong { color: var(--primary); }
+.av-notas { display: flex; gap: 14px; margin-bottom: 16px; }
+.av-nota { background: none; border: none; padding: 0; cursor: pointer; color: var(--primary); opacity: .55; transition: opacity .15s, transform .15s; }
+.av-nota:hover { opacity: .85; }
+.av-nota.cheia { opacity: 1; }
+.av-nota.cheia svg { fill: var(--primary); }
+.av-texto { display: flex; gap: 12px; background: var(--bg-muted); border: 1px solid var(--border); border-radius: 14px; padding: 12px 14px; margin-bottom: 12px; cursor: text; }
+.av-texto:focus-within { border-color: var(--primary); }
+.av-texto-ico { color: var(--text-muted); display: inline-flex; padding-top: 2px; }
+.av-texto textarea { flex: 1; background: none; border: none; outline: none; color: var(--text); font: inherit; font-size: 14px; resize: vertical; min-height: 64px; }
+.av-midias { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+.av-midia-btn { display: flex; align-items: center; gap: 10px; border: 1px solid var(--border); border-radius: 14px; padding: 12px 14px; cursor: pointer; font-size: 13px; font-weight: 700; }
+.av-midia-btn:hover { border-color: var(--primary); }
+.av-midia-btn > .ico:first-child { color: var(--primary); }
+.av-midia-btn span { flex: 1; min-width: 0; }
+.av-midia-btn > .ico:last-of-type { color: var(--primary); }
+.av-bonus { margin-bottom: 14px; }
+.av-reqs { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 13px; color: var(--text-muted); margin-bottom: 8px; }
+.av-req { display: inline-flex; align-items: center; gap: 6px; }
+.av-req.ok { color: var(--primary); }
+.av-req-sep { width: 1px; height: 14px; background: var(--border); }
+.av-bonus-linha { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-muted); }
+.av-bonus-linha strong { color: var(--primary); }
+.av-enviar { display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 15px; padding: 14px; }
+.av-vazio { text-align: center; padding: 28px 16px; color: var(--text-muted); font-size: 14px; }
+.av-vazio-ico { color: var(--primary); display: inline-flex; margin-bottom: 8px; }
+.av-vazio strong { display: block; color: var(--text); margin-top: 2px; }
+.av-lista > div { padding: 16px 0; }
+.av-estrelas-p { gap: 2px; }
+@media (max-width: 420px) { .av-midias { grid-template-columns: 1fr; } }
+/* Nos cards o coração fica à direita: o selo de % vai pra esquerda */
+.product-card-img .selo-desconto { right: auto; left: 0; border-bottom-left-radius: 0; border-bottom-right-radius: 10px; }
+.fav-btn .ico-fav { display: block; }
+.pd-beneficios-linha .pd-card-topo { flex-wrap: nowrap; gap: 8px; font-size: 12.5px; }
+.pd-ben-item { white-space: nowrap; min-width: 0; }
+
+@media (max-width: 420px) { .av-midias { grid-template-columns: 1fr 1fr; } .av-midia-btn { padding: 10px; gap: 6px; font-size: 12px; } }
+@media (max-width: 340px) { .av-midias { grid-template-columns: 1fr; } }

@@ -35,7 +35,7 @@ function esc(str) {
 }
 
 import { supabase } from './js/supabase-config.js';
-import { getProduct, formatPrice, starsHTML, variacoesDe, precoVariacao, variacaoDisponivel } from './js/data.js';
+import { getProduct, formatPrice, starsHTML, variacoesDe, precoVariacao, variacaoDisponivel, percentualDesconto } from './js/data.js';
 import { getFavoritosIds, toggleFavorito } from './js/favoritos.js';
 import { registrarEvento } from './js/analytics.js';
 
@@ -86,7 +86,7 @@ async function render() {
   window._produto = p;
   registrarEvento('visualizacao_produto', { produtoId: p.id });
   if (!p) {
-    document.getElementById('content').innerHTML = `<div style="text-align:center;padding:80px 16px"><p style="font-size:48px">😕</p><h2 style="margin:16px 0 8px">Produto não encontrado</h2><a href="produtos.html" class="btn btn-primary">Ver Produtos</a></div>`;
+    document.getElementById('content').innerHTML = `<div style="text-align:center;padding:80px 16px"><p style="color:var(--text-muted)">${icone('busca', 48)}</p><h2 style="margin:16px 0 8px">Produto não encontrado</h2><a href="produtos.html" class="btn btn-primary">Ver Produtos</a></div>`;
     return;
   }
   document.title = p.name + ' — Zipshop';
@@ -116,13 +116,13 @@ async function render() {
     galeria.push({ url, thumb: (typeof item === 'object' && item.thumb) || url });
   });
   const galeriaHTML = galeria.length > 1 ? `
-    <div style="display:flex;gap:8px;margin-top:10px;overflow-x:auto;padding-bottom:4px">
+    <div class="pd-miniaturas" id="pd-miniaturas">
       ${galeria.map((img, i) => `
-        <button onclick="trocarFotoGaleria('${(img.url||'').replace(/'/g,"\\'")}', this)"
-          style="flex-shrink:0;width:64px;height:64px;border-radius:10px;overflow:hidden;padding:0;cursor:pointer;background:var(--bg-muted);border:2px solid ${i===0 ? 'var(--primary)' : 'var(--border)'}">
-          <img src="${img.thumb || img.url}" loading="lazy" alt="" style="width:100%;height:100%;object-fit:cover" onerror="this.closest('button').remove()">
+        <button type="button" onclick="irParaFoto(${i})" class="${i === 0 ? 'ativa' : ''}" aria-label="Foto ${i + 1}">
+          <img src="${img.thumb || img.url}" loading="lazy" alt="" onerror="this.closest('button').remove()">
         </button>`).join('')}
     </div>` : '';
+  const descontoPct = percentualDesconto(p);
 
   // Variações/kits com preço e estoque próprios: substituem as cores
   const variacoes = variacoesDe(p);
@@ -130,47 +130,57 @@ async function render() {
   const semEstoque = variacoes.length ? !variacoes.some(variacaoDisponivel) : (temControleEstoque && p.stock <= 0);
   let estoqueHTML = '';
   if (semEstoque) {
-    estoqueHTML = `<p style="font-size:13px;color:#ef4444;font-weight:700;margin-bottom:16px">❌ Fora de estoque no momento</p>`;
+    estoqueHTML = `<p style="font-size:13px;color:#ef4444;font-weight:700;margin-bottom:16px;display:flex;align-items:center;gap:6px">${icone('xCirculo', 16)} Fora de estoque no momento</p>`;
   } else if (temControleEstoque && p.stock <= 5) {
-    estoqueHTML = `<p style="font-size:13px;color:#f59e0b;font-weight:700;margin-bottom:16px">⚠️ Últimas ${p.stock} unidades!</p>`;
+    estoqueHTML = `<p style="font-size:13px;color:#f59e0b;font-weight:700;margin-bottom:16px;display:flex;align-items:center;gap:6px">${icone('alerta', 16)} Últimas ${p.stock} unidades!</p>`;
   } else {
     estoqueHTML = `<div style="margin-bottom:16px"></div>`;
   }
 
-  const variacoesHTML = variacoes.length ? `
-    <div style="margin-bottom:20px">
-      <div class="detail-label" style="margin-bottom:8px">Opção</div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap" id="variacoes-container">
+  // Cor/opção: um botão só ("Cor: escolha ›") que abre a lista numa gaveta
+  // que sobe de baixo, igual ao modelo do cliente.
+  const gavetaOpcoes = (rotulo, conteudo) => `
+    <button type="button" class="pd-opcao-btn" id="pd-opcao-btn" onclick="abrirOpcoes()">
+      <span class="pd-opcao-rotulo">${rotulo}:</span>
+      <span class="pd-opcao-valor" id="opcao-escolhida">escolha uma</span>
+      ${icone('chevron', 18)}
+    </button>
+    <div class="pd-sheet-fundo" id="pd-sheet-fundo" onclick="fecharOpcoes()" hidden></div>
+    <div class="pd-sheet" id="pd-sheet" aria-hidden="true">
+      <div class="pd-sheet-topo"><strong>Escolha ${rotulo.toLowerCase() === 'cor' ? 'a cor' : 'uma opção'}</strong>
+        <button type="button" class="pd-sheet-fechar" onclick="fecharOpcoes()" aria-label="Fechar">${icone('x', 16)}</button></div>
+      ${conteudo}
+    </div>`;
+
+  const variacoesHTML = variacoes.length ? gavetaOpcoes('Opção', `
+      <div class="pd-sheet-lista" id="variacoes-container">
         ${variacoes.map((v, i) => {
           const disp = variacaoDisponivel(v);
-          return `<button type="button" onclick="selecionarVariacao(${i})" id="var-${i}" ${disp ? '' : 'disabled'}
-            style="display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:8px 14px;border:2px solid var(--border);border-radius:12px;background:none;cursor:${disp ? 'pointer' : 'not-allowed'};font-size:13px;color:var(--text);transition:border-color .2s;${disp ? '' : 'opacity:.45;text-decoration:line-through'}">
-            <span style="font-weight:700">${esc(v.nome)}</span>
-            <span style="font-size:12px;color:var(--text-muted)">${Number(v.preco_antigo) > precoVariacao(p, v) ? `<s style="opacity:.7">${formatPrice(Number(v.preco_antigo))}</s> ` : ''}${formatPrice(precoVariacao(p, v))}${disp ? '' : ' · esgotado'}</span>
+          return `<button type="button" onclick="selecionarVariacao(${i})" id="var-${i}" ${disp ? '' : 'disabled'} class="pd-sheet-item${disp ? '' : ' esgotada'}">
+            <span class="pd-sheet-nome">${esc(v.nome)}</span>
+            <span class="pd-sheet-preco">${Number(v.preco_antigo) > precoVariacao(p, v) ? `<s>${formatPrice(Number(v.preco_antigo))}</s> ` : ''}${formatPrice(precoVariacao(p, v))}${disp ? '' : ' · esgotado'}</span>
           </button>`;
         }).join('')}
-      </div>
-    </div>` : '';
+      </div>`) : '';
 
-  const coresHTML = !variacoes.length && cores.length ? `
-    <div style="margin-bottom:20px">
-      <div class="detail-label" style="margin-bottom:8px">Cor: <span id="cor-escolhida" style="color:var(--text);text-transform:none;letter-spacing:0">escolha uma</span></div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap" id="cores-container">
+  const coresHTML = !variacoes.length && cores.length ? gavetaOpcoes('Cor', `
+      <div class="pd-sheet-lista" id="cores-container">
         ${cores.map((c, i) => `
-          <button onclick="selecionarCor('${esc(c.nome)}', this)"
-            style="display:flex;align-items:center;gap:6px;padding:6px 14px;border:2px solid var(--border);border-radius:20px;background:none;cursor:pointer;font-size:13px;color:var(--text);transition:border-color .2s"
-            id="cor-${i}">
-            ${c.hex ? `<span style="width:14px;height:14px;border-radius:50%;background:${c.hex};border:1px solid rgba(255,255,255,.2);flex-shrink:0"></span>` : ''}
-            ${esc(c.nome)}
+          <button type="button" onclick="selecionarCor(this.dataset.nome, this)" data-nome="${esc(c.nome)}" id="cor-${i}" class="pd-sheet-item">
+            <span class="pd-sheet-nome">${c.hex ? `<span class="pd-cor-bolinha" style="background:${esc(c.hex)}"></span>` : ''}${esc(c.nome)}</span>
           </button>`).join('')}
-      </div>
-    </div>` : '';
+      </div>`) : '';
 
   document.getElementById('content').innerHTML = `
     <div class="detail-layout">
       <div>
-        <div class="detail-img" id="detail-img-wrap" style="background:${p.image_url ? '#fff' : 'linear-gradient(135deg,#1e3a6e,#2563eb)'};${p.image_url ? 'cursor:zoom-in' : ''}" ${p.image_url ? `onclick="abrirImagemCheia(document.getElementById('detail-main-img').src)"` : ''}>
-          ${p.image_url ? `<img id="detail-main-img" src="${p.image_url}" alt="${esc(p.name)}" style="width:100%;height:100%;object-fit:contain;border-radius:12px">` : `<span style="font-size:140px">${p.emoji}</span>`}
+        <div class="detail-img pd-carrossel-box" id="detail-img-wrap" style="background:${galeria.length ? '#fff' : 'linear-gradient(135deg,#1e3a6e,#2563eb)'}">
+          ${galeria.length ? `
+          <div class="pd-carrossel" id="pd-carrossel">
+            ${galeria.map((img, i) => `<img src="${img.url}" alt="${esc(p.name)}" ${i === 0 ? 'id="detail-main-img"' : 'loading="lazy"'} draggable="false" onclick="abrirImagemCheia(this.src)">`).join('')}
+          </div>
+          ${galeria.length > 1 ? `<span class="pd-contador" id="pd-contador">1/${galeria.length}</span>` : ''}` : `<span style="font-size:140px">${p.emoji ? esc(p.emoji) : icone('caixa', 120)}</span>`}
+          <span class="pd-selo-desconto" id="pd-selo-desconto" ${descontoPct > 0 && !variacoes.length ? '' : 'hidden'}>-${descontoPct}%</span>
         </div>
         ${galeriaHTML}
       </div>
@@ -180,30 +190,21 @@ async function render() {
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
           <span class="stars">${starsHTML(p.rating)}</span>
           <span class="stars-count">(${p.reviews} avaliações)</span>
-          ${p.discount ? `<span class="badge badge-red">-${p.discount}%</span>` : ''}
         </div>
         <div class="detail-price-old" id="detail-price-old" ${p.oldPrice && !variacoes.length ? '' : 'hidden'}>${p.oldPrice ? formatPrice(p.oldPrice) : ''}</div>
         <div class="detail-price" id="detail-price">${variacoes.length ? '<span style="font-size:14px;font-weight:600;color:var(--text-muted)">a partir de </span>' : ''}${formatPrice(p.price)}</div>
         <div class="detail-installment pd-parcela">${ICO.cartao}<span id="detail-installment">ou 12x de ${formatPrice(p.price/12)} sem juros</span></div>
         ${p.cashback_percentual > 0 || p.indicacao_percentual > 0 ? `
-        <div class="pd-card pd-beneficios">
+        <div class="pd-card pd-beneficios-linha">
           <button type="button" class="pd-card-topo" onclick="alternarInfo('info-beneficios', this)">
-            <strong>Benefícios ZipShop</strong>${ICO.seta}
+            ${p.cashback_percentual > 0 ? `<span class="pd-ben-item">${icone('carteira', 16)} <span><b id="valor-cashback">${formatPrice(p.price * p.cashback_percentual / 100)}</b> de volta</span></span>` : ''}
+            ${p.cashback_percentual > 0 && p.indicacao_percentual > 0 ? '<span class="pd-ben-sep"></span>' : ''}
+            ${p.indicacao_percentual > 0 ? `<span class="pd-ben-item">${icone('pessoas', 16)} <span>Indique: <b id="valor-indicacao">${formatPrice(p.price * p.indicacao_percentual / 100)}</b></span></span>` : ''}
+            ${ICO.seta}
           </button>
-          <div class="pd-beneficios-grade">
-            ${p.cashback_percentual > 0 ? `<div class="pd-beneficio">
-              <span class="pd-ico">${ICO.carteira}</span>
-              <div><span class="pd-rotulo">Cashback</span><strong><span id="valor-cashback">${formatPrice(p.price * p.cashback_percentual / 100)}</span> de volta em saldo</strong></div>
-            </div>` : ''}
-            ${p.indicacao_percentual > 0 ? `<div class="pd-beneficio">
-              <span class="pd-ico">${ICO.pessoas}</span>
-              <div><span class="pd-rotulo">Indique e ganhe</span><strong><span id="valor-indicacao">${formatPrice(p.price * p.indicacao_percentual / 100)}</span> por venda</strong>
-              <button type="button" class="pd-link" onclick="compartilharIndicacao(this)">Copiar meu link</button></div>
-            </div>` : ''}
-          </div>
           <div class="pd-info" id="info-beneficios" hidden>
-            ${p.cashback_percentual > 0 ? '<p>Cashback: o valor entra como saldo na sua conta quando o pedido é entregue e pode ser usado na próxima compra.</p>' : ''}
-            ${p.indicacao_percentual > 0 ? '<p>Indicação: compartilhe seu link; quando alguém compra por ele e o pedido é entregue, você ganha o valor em saldo.</p>' : ''}
+            ${p.cashback_percentual > 0 ? '<p><b>Cashback:</b> o valor entra como saldo na sua conta quando o pedido é entregue e pode ser usado na próxima compra.</p>' : ''}
+            ${p.indicacao_percentual > 0 ? '<p><b>Indique e ganhe:</b> compartilhe seu link; quando alguém compra por ele e o pedido é entregue, você ganha o valor em saldo.</p><button type="button" class="pd-link" onclick="compartilharIndicacao(this)">Copiar meu link</button>' : ''}
           </div>
         </div>` : ''}
         <hr class="detail-divider">
@@ -237,7 +238,7 @@ async function render() {
         <div id="estoque-info">${estoqueHTML}</div>
         <div style="display:flex;gap:12px;margin-bottom:12px">
           <button class="btn btn-primary btn-lg pd-btn-ico" style="flex:1${semEstoque ? ';opacity:.5;cursor:not-allowed' : ''}" onclick="doAddToCart(event)" ${semEstoque ? 'disabled' : ''}>${ICO.carrinho} Adicionar ao Carrinho</button>
-          <button id="btn-fav-detalhe" onclick="toggleFavoritoDetalhe(${p.id})" class="btn btn-outline btn-lg" style="width:52px;flex:0" aria-label="Favoritar">🤍</button>
+          <button id="btn-fav-detalhe" onclick="toggleFavoritoDetalhe(${p.id})" class="btn btn-outline btn-lg" style="width:52px;flex:0" aria-label="Favoritar">${iconeFav(false, 22)}</button>
         </div>
         <a href="carrinho.html" class="btn btn-outline btn-lg pd-btn-comprar pd-btn-ico" onclick="${semEstoque ? 'event.preventDefault()' : 'if (!doAddToCart(event)) event.preventDefault()'}" ${semEstoque ? 'style="opacity:.5;cursor:not-allowed;pointer-events:none"' : ''}>${ICO.raio} Comprar agora</a>
         <div class="pd-garantias">
@@ -274,7 +275,7 @@ async function render() {
 
     <!-- PRODUTOS RELACIONADOS (vinculados no admin) -->
     <div id="relacionados-section" style="max-width:1200px;margin:0 auto;padding:0 16px 32px;display:none">
-      <h2 style="font-size:18px;font-weight:900;margin-bottom:16px">🔗 Produtos Relacionados</h2>
+      <h2 style="font-size:18px;font-weight:900;margin-bottom:16px">Produtos Relacionados</h2>
       <div id="relacionados-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px"></div>
     </div>
 
@@ -289,13 +290,14 @@ async function render() {
     </div>`;
 
   // Carrega avaliações, relacionados e "tbm pode gostar" em paralelo
+  ligarCarrossel();
   carregarAvaliacoes(p);
   carregarRelacionados(p);
   carregarTbmPodeGostar(p);
 
   getFavoritosIds().then(favs => {
     const btn = document.getElementById('btn-fav-detalhe');
-    if (btn && favs.has(p.id)) btn.textContent = '💚';
+    if (btn && favs.has(p.id)) btn.innerHTML = iconeFav(true, 22);
   });
 }
 
@@ -303,15 +305,40 @@ window.toggleFavoritoDetalhe = async function(produtoId) {
   const r = await toggleFavorito(produtoId);
   if (r.precisaLogin) { window.location.href = 'login.html'; return; }
   const btn = document.getElementById('btn-fav-detalhe');
-  if (btn) btn.textContent = r.favoritado ? '💚' : '🤍';
+  if (btn) btn.innerHTML = iconeFav(r.favoritado, 22);
 }
 
 // ——— CORES ———
-window.trocarFotoGaleria = function(url, btn) {
-  document.getElementById('detail-main-img').src = url;
-  btn.parentElement.querySelectorAll('button').forEach(b => b.style.borderColor = 'var(--border)');
-  btn.style.borderColor = 'var(--primary)';
+// Galeria: as fotos ficam lado a lado e o cliente desliza com o dedo
+// (scroll-snap). O contador "1/9" e as miniaturas acompanham.
+window.irParaFoto = function(i) {
+  const c = document.getElementById('pd-carrossel');
+  if (c) c.scrollTo({ left: c.clientWidth * i, behavior: 'smooth' });
 };
+function ligarCarrossel() {
+  const c = document.getElementById('pd-carrossel');
+  if (!c) return;
+  let quadro = null;
+  c.addEventListener('scroll', () => {
+    if (quadro) return;
+    quadro = requestAnimationFrame(() => {
+      quadro = null;
+      const i = Math.round(c.scrollLeft / Math.max(1, c.clientWidth));
+      const total = c.children.length;
+      const cont = document.getElementById('pd-contador');
+      if (cont) cont.textContent = `${i + 1}/${total}`;
+      document.querySelectorAll('#pd-miniaturas button').forEach((b, j) => b.classList.toggle('ativa', j === i));
+      document.querySelectorAll('#pd-miniaturas button')[i]?.scrollIntoView({ inline: 'nearest', block: 'nearest' });
+    });
+  }, { passive: true });
+  // No computador: setas do teclado passam as fotos
+  c.tabIndex = 0;
+  c.addEventListener('keydown', e => {
+    const i = Math.round(c.scrollLeft / c.clientWidth);
+    if (e.key === 'ArrowRight') irParaFoto(i + 1);
+    if (e.key === 'ArrowLeft') irParaFoto(Math.max(0, i - 1));
+  });
+}
 
 // Lightbox: abre a foto do produto em tela cheia ao clicar nela
 window.abrirImagemCheia = function(url) {
@@ -320,7 +347,7 @@ window.abrirImagemCheia = function(url) {
   overlay.style = 'position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:300;display:flex;align-items:center;justify-content:center;padding:16px;cursor:zoom-out';
   overlay.onclick = fecharImagemCheia;
   overlay.innerHTML = `
-    <button onclick="fecharImagemCheia()" style="position:absolute;top:16px;right:16px;background:rgba(255,255,255,.1);border:none;color:#fff;width:38px;height:38px;border-radius:50%;font-size:20px;cursor:pointer;z-index:1">✕</button>
+    <button onclick="fecharImagemCheia()" style="position:absolute;top:16px;right:16px;background:rgba(255,255,255,.1);border:none;color:#fff;width:38px;height:38px;border-radius:50%;font-size:20px;cursor:pointer;z-index:1;display:inline-flex;align-items:center;justify-content:center">${icone('x', 18)}</button>
     <img src="${url}" style="max-width:100%;max-height:100%;object-fit:contain;border-radius:8px" onclick="event.stopPropagation()">`;
   document.body.appendChild(overlay);
   document.body.style.overflow = 'hidden';
@@ -336,8 +363,9 @@ window.selecionarVariacao = function(i) {
   const v = variacoesDe(p)[i];
   if (!v || !variacaoDisponivel(v)) return;
   _variacaoSelecionada = v;
+  mostrarOpcaoEscolhida(v.nome);
   document.querySelectorAll('#variacoes-container button').forEach((b, j) => {
-    b.style.borderColor = j === i ? 'var(--primary)' : 'var(--border)';
+    b.classList.toggle('ativa', j === i);
   });
   const preco = precoVariacao(p, v);
   document.getElementById('detail-price').textContent = formatPrice(preco);
@@ -347,9 +375,12 @@ window.selecionarVariacao = function(i) {
   const antigo = Number(v.preco_antigo);
   antigoEl.hidden = !(antigo > preco);
   if (antigo > preco) antigoEl.textContent = formatPrice(antigo);
+  const selo = document.getElementById('pd-selo-desconto');
+  const pct = antigo > preco ? Math.round((1 - preco / antigo) * 100) : 0;
+  if (selo) { selo.hidden = !pct; selo.textContent = `-${pct}%`; }
   const est = (v.estoque === null || v.estoque === undefined || v.estoque === '') ? null : Number(v.estoque);
   document.getElementById('estoque-info').innerHTML = est !== null && est <= 5
-    ? `<p style="font-size:13px;color:#f59e0b;font-weight:700;margin-bottom:16px">⚠️ Últimas ${est} unidades dessa opção!</p>`
+    ? `<p style="font-size:13px;color:#f59e0b;font-weight:700;margin-bottom:16px;display:flex;align-items:center;gap:6px">${icone('alerta', 16)} Últimas ${est} unidades dessa opção!</p>`
     : '<div style="margin-bottom:16px"></div>';
   if (est !== null && qty > est) { qty = Math.max(1, est); document.getElementById('qty-display').textContent = qty; }
   atualizarGanhos();
@@ -367,24 +398,41 @@ function atualizarGanhos() {
   if (ind) ind.textContent = formatPrice(total * (p.indicacao_percentual || 0) / 100);
 }
 
+window.abrirOpcoes = function() {
+  document.getElementById('pd-sheet-fundo').hidden = false;
+  const g = document.getElementById('pd-sheet');
+  g.classList.add('aberta'); g.setAttribute('aria-hidden', 'false');
+  document.body.style.overflow = 'hidden';
+};
+window.fecharOpcoes = function() {
+  const f = document.getElementById('pd-sheet-fundo');
+  if (f) f.hidden = true;
+  const g = document.getElementById('pd-sheet');
+  if (g) { g.classList.remove('aberta'); g.setAttribute('aria-hidden', 'true'); }
+  document.body.style.overflow = '';
+};
+function mostrarOpcaoEscolhida(texto) {
+  const v = document.getElementById('opcao-escolhida');
+  if (v) { v.textContent = texto; v.classList.add('escolhida'); }
+  document.getElementById('pd-opcao-btn')?.classList.remove('erro');
+  setTimeout(fecharOpcoes, 150);
+}
+
 window.selecionarCor = function(nome, btn) {
   _corSelecionada = nome;
-  document.querySelectorAll('#cores-container button').forEach(b => {
-    b.style.borderColor = 'var(--border)';
-    b.style.color = 'var(--text)';
-  });
-  btn.style.borderColor = 'var(--primary)';
-  btn.style.color = 'var(--primary)';
-  const rotulo = document.getElementById('cor-escolhida');
-  if (rotulo) rotulo.textContent = nome;
+  document.querySelectorAll('#cores-container button').forEach(b => b.classList.remove('ativa'));
+  btn.classList.add('ativa');
+  mostrarOpcaoEscolhida(nome);
 };
 
 function avisarEscolherCor() {
   const box = document.getElementById('variacoes-container') || document.getElementById('cores-container');
   if (!box) return;
   showToast(box.id === 'variacoes-container' ? 'Escolha uma opção antes de adicionar ao carrinho' : 'Escolha a cor antes de adicionar ao carrinho', 'error');
-  box.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  box.querySelectorAll('button:not([disabled])').forEach(b => { b.style.borderColor = '#ef4444'; });
+  const botao = document.getElementById('pd-opcao-btn');
+  botao?.classList.add('erro');
+  botao?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  setTimeout(abrirOpcoes, 350);
 }
 
 // ——— AVALIAÇÕES ———
@@ -406,25 +454,32 @@ function midiaAvaliacaoHTML(a) {
 
 function formAvaliacaoHTML(p, existente) {
   return `
-    <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:20px">
-      <p style="font-weight:700;margin-bottom:4px">⭐ ${existente ? 'Editar sua avaliação' : 'Deixe sua avaliação'}</p>
-      <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px">Ganhe <strong style="color:var(--primary)">R$ 0,50</strong> de saldo, ou <strong style="color:var(--primary)">R$ 1,00</strong> escrevendo ${AV_MIN_CARACTERES}+ caracteres com 1 foto e 1 vídeo. O saldo cai quando a avaliação for aprovada.</p>
-      <div style="display:flex;gap:8px;margin-bottom:12px" id="estrelas-form">
-        ${[1,2,3,4,5].map(n => `<button onclick="selecionarNota(${n})" id="star-${n}"
-          style="font-size:28px;background:none;border:none;cursor:pointer;opacity:.4;transition:opacity .15s">💚</button>`).join('')}
+    <div class="av-card">
+      <div class="av-form-topo">
+        <span class="av-form-ico">${icone('estrela', 18)}</span>
+        <div>
+          <p class="av-form-titulo">${existente ? 'Editar sua avaliação' : 'Deixe sua avaliação'}</p>
+          <p class="av-form-sub">Ganhe <strong>R$ 0,50</strong> de saldo, ou <strong>R$ 1,00</strong> escrevendo ${AV_MIN_CARACTERES}+ caracteres com 1 foto e 1 vídeo. O saldo cai quando a avaliação for aprovada.</p>
+        </div>
       </div>
-      <textarea id="av-texto" class="form-input" rows="4" maxlength="1000" placeholder="Conte sua experiência com o produto..." style="resize:vertical;margin-bottom:4px" oninput="atualizarBonusAvaliacao()">${esc(existente?.texto || '')}</textarea>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0">
-        <label class="btn btn-outline btn-sm" style="cursor:pointer">📷 Fotos (até ${AV_MAX_FOTOS})
+      <div class="av-notas" id="estrelas-form">
+        ${[1,2,3,4,5].map(n => `<button type="button" onclick="selecionarNota(${n})" id="star-${n}" class="av-nota" aria-label="Nota ${n}">${icone('coracao', 34)}</button>`).join('')}
+      </div>
+      <label class="av-texto">
+        <span class="av-texto-ico">${icone('lapis', 18)}</span>
+        <textarea id="av-texto" rows="3" maxlength="1000" placeholder="Conte sua experiência com o produto..." oninput="atualizarBonusAvaliacao()">${esc(existente?.texto || '')}</textarea>
+      </label>
+      <div class="av-midias">
+        <label class="av-midia-btn">${icone('camera', 22)}<span>Fotos (até ${AV_MAX_FOTOS})</span>${icone('chevron', 16)}
           <input type="file" id="av-fotos" accept="image/*" multiple hidden onchange="adicionarFotosAvaliacao(this)">
         </label>
-        <label class="btn btn-outline btn-sm" style="cursor:pointer">🎥 Vídeo (até ${AV_MAX_VIDEO_MB} MB)
+        <label class="av-midia-btn">${icone('video', 22)}<span>Vídeo (até ${AV_MAX_VIDEO_MB} MB)</span>${icone('chevron', 16)}
           <input type="file" id="av-video" accept="video/*" hidden onchange="adicionarVideoAvaliacao(this)">
         </label>
       </div>
       <div id="av-previews" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px"></div>
-      <div id="av-bonus" style="font-size:12px;color:var(--text-muted);margin-bottom:12px"></div>
-      <button class="btn btn-primary" id="btn-enviar-avaliacao" onclick="enviarAvaliacao('${p.id}')">${existente ? 'Reenviar Avaliação' : 'Enviar Avaliação'}</button>
+      <div id="av-bonus" class="av-bonus"></div>
+      <button class="btn btn-primary btn-full av-enviar" id="btn-enviar-avaliacao" onclick="enviarAvaliacao('${p.id}')">${icone('enviar', 18)} ${existente ? 'Reenviar avaliação' : 'Enviar avaliação'}</button>
     </div>`;
 }
 
@@ -465,13 +520,13 @@ async function carregarAvaliacoes(p) {
   } else if (!minha) {
     formAvaliar = recebeuProduto
       ? formAvaliacaoHTML(p, null)
-      : `<div style="background:var(--bg-muted);border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:13px;color:var(--text-muted)">Você poderá avaliar este produto depois de recebê-lo. 📦</div>`;
+      : `<div style="background:var(--bg-muted);border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:13px;color:var(--text-muted)">Você poderá avaliar este produto depois de recebê-lo.</div>`;
   } else if (minha.status === 'pendente') {
-    formAvaliar = `<div style="background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.4);border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:13px">⏳ Sua avaliação foi enviada e está aguardando aprovação. O saldo cai assim que ela for aprovada.</div>`;
+    formAvaliar = `<div style="background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.4);border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:13px">Sua avaliação foi enviada e está aguardando aprovação. O saldo cai assim que ela for aprovada.</div>`;
   } else if (minha.status === 'reprovada') {
-    formAvaliar = `<div style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.4);border-radius:10px;padding:12px 16px;margin-bottom:12px;font-size:13px">❌ Sua avaliação não foi aprovada${minha.motivo_reprovacao ? `: ${esc(minha.motivo_reprovacao)}` : '.'} Você pode ajustar e reenviar.</div>` + formAvaliacaoHTML(p, minha);
+    formAvaliar = `<div style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.4);border-radius:10px;padding:12px 16px;margin-bottom:12px;font-size:13px">Sua avaliação não foi aprovada${minha.motivo_reprovacao ? `: ${esc(minha.motivo_reprovacao)}` : '.'} Você pode ajustar e reenviar.</div>` + formAvaliacaoHTML(p, minha);
   } else {
-    formAvaliar = `<div style="background:rgba(170,239,0,0.06);border:1px solid rgba(170,239,0,0.25);border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:13px">✅ Você já avaliou este produto.</div>`;
+    formAvaliar = `<div style="background:rgba(170,239,0,0.06);border:1px solid rgba(170,239,0,0.25);border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:13px">Você já avaliou este produto.</div>`;
   }
 
   const listaHTML = totalAv ? aprovadas.map(a => `
@@ -479,27 +534,24 @@ async function carregarAvaliacoes(p) {
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
         <div style="display:flex;align-items:center;gap:8px">
           <span style="font-weight:700;font-size:13px">${esc(a.autor_nome || 'Cliente')}</span>
-          <span style="color:#facc15;font-size:16px">${'★'.repeat(a.nota)}${'☆'.repeat(5 - a.nota)}</span>
+          <span class="av-estrelas av-estrelas-p">${[1,2,3,4,5].map(n => `<span class="av-estrela${n <= a.nota ? ' cheia' : ''}">${icone('estrela', 14)}</span>`).join('')}</span>
         </div>
         <span style="font-size:11px;color:var(--text-muted)">${new Date(a.created_at).toLocaleDateString('pt-BR')}</span>
       </div>
       ${a.texto ? `<p style="font-size:13px;color:var(--text-muted);line-height:1.6">${esc(a.texto)}</p>` : ''}
       ${midiaAvaliacaoHTML(a)}
     </div>`).join('')
-    : `<p style="color:var(--text-muted);font-size:13px;padding:16px 0">Nenhuma avaliação ainda. Seja o primeiro!</p>`;
+    : `<div class="av-vazio"><span class="av-vazio-ico">${icone('balao', 40)}</span><p>Nenhuma avaliação ainda.</p><strong>Seja o primeiro!</strong></div>`;
 
+  const estrelasMedia = [1,2,3,4,5].map(n => `<span class="av-estrela${mediaAv !== '-' && n <= Math.round(Number(mediaAv)) ? ' cheia' : ''}">${icone('estrela', 24)}</span>`).join('');
   document.getElementById('avaliacoes-content').innerHTML = `
-    <div style="background:var(--bg-card);border:1px solid var(--primary);border-radius:var(--radius-lg);padding:24px">
-      <div style="display:flex;align-items:center;gap:16px;margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid var(--border)">
-        <div style="text-align:center">
-          ${totalAv ? `<p style="font-size:48px;font-weight:900;line-height:1;color:var(--primary)">${mediaAv}</p>` : ''}
-          <p style="color:#facc15;font-size:20px">${mediaAv !== '-' ? '★'.repeat(Math.round(Number(mediaAv))) + '☆'.repeat(5 - Math.round(Number(mediaAv))) : '☆☆☆☆☆'}</p>
-          <p style="font-size:12px;color:var(--text-muted)">${totalAv} ${totalAv === 1 ? 'avaliação' : 'avaliações'}</p>
-        </div>
-      </div>
-      ${formAvaliar}
-      ${listaHTML}
-    </div>`;
+    <div class="av-card av-resumo">
+      ${totalAv ? `<p class="av-media">${mediaAv}</p>` : ''}
+      <div><div class="av-estrelas">${estrelasMedia}</div>
+      <p class="av-total">${totalAv} ${totalAv === 1 ? 'avaliação' : 'avaliações'}</p></div>
+    </div>
+    ${formAvaliar}
+    <div class="av-lista">${listaHTML}</div>`;
 
   if (_avExistente) selecionarNota(_avExistente.nota);
   if (document.getElementById('av-previews')) { renderPreviewsAvaliacao(); atualizarBonusAvaliacao(); }
@@ -510,7 +562,7 @@ window.selecionarNota = function(n) {
   _notaSelecionada = n;
   [1,2,3,4,5].forEach(i => {
     const el = document.getElementById('star-' + i);
-    if (el) el.style.opacity = i <= n ? '1' : '.3';
+    if (el) el.classList.toggle('cheia', i <= n);
   });
 };
 
@@ -528,10 +580,10 @@ window.atualizarBonusAvaliacao = function() {
   if (!el) return;
   const chars = (document.getElementById('av-texto')?.value || '').trim().length;
   const { fotos, videos } = contagemMidiasAvaliacao();
-  const ok = (c) => c ? '<span style="color:var(--primary)">✓</span>' : '○';
+  const item = (ok, ico, texto) => `<span class="av-req${ok ? ' ok' : ''}">${icone(ok ? 'checkCirculo' : ico, 16)} ${texto}</span>`;
   const completo = chars >= AV_MIN_CARACTERES && fotos >= 1 && videos >= 1;
-  el.innerHTML = `${ok(chars >= AV_MIN_CARACTERES)} ${Math.min(chars, AV_MIN_CARACTERES)}/${AV_MIN_CARACTERES} caracteres &nbsp; ${ok(fotos >= 1)} 1 foto &nbsp; ${ok(videos >= 1)} 1 vídeo
-    <br>Bônus ao aprovar: <strong style="color:var(--primary)">${completo ? 'R$ 1,00' : 'R$ 0,50'}</strong>`;
+  el.innerHTML = `<div class="av-reqs">${item(chars >= AV_MIN_CARACTERES, 'arquivo', `${Math.min(chars, AV_MIN_CARACTERES)}/${AV_MIN_CARACTERES} caracteres`)}<span class="av-req-sep"></span>${item(fotos >= 1, 'imagem', '1 foto')}<span class="av-req-sep"></span>${item(videos >= 1, 'video', '1 vídeo')}</div>
+    <p class="av-bonus-linha"><span style="color:var(--primary);display:inline-flex">${icone('moedas', 18)}</span> Bônus ao aprovar: <strong>${completo ? 'R$ 1,00' : 'R$ 0,50'}</strong></p>`;
 };
 
 function renderPreviewsAvaliacao() {
@@ -585,7 +637,7 @@ async function enviarArquivoAvaliacao(userId, file, extPadrao) {
 }
 
 window.enviarAvaliacao = async function(produtoId) {
-  if (!_notaSelecionada) { showToast('Selecione uma nota de 1 a 5 ★', 'error'); return; }
+  if (!_notaSelecionada) { showToast('Selecione uma nota de 1 a 5', 'error'); return; }
   const texto = document.getElementById('av-texto').value.trim();
   const { data: { session: _sessEnviar } } = await supabase.auth.getSession();
   const user = _sessEnviar?.user || null;
@@ -617,7 +669,7 @@ window.enviarAvaliacao = async function(produtoId) {
       : await supabase.from('avaliacoes').insert({ ...dados, produto_id: produtoId, usuario_id: user.id });
     if (error) throw error;
 
-    showToast('Avaliação enviada! Ela aparece depois de aprovada 🙏', 'success');
+    showToast('Avaliação enviada! Ela aparece depois de aprovada.', 'success');
     carregarAvaliacoes(window._produto);
   } catch (e) {
     console.error(e);
@@ -635,10 +687,10 @@ function miniCard(r) {
   return `
     <a href="produto.html?id=${r.id}" style="text-decoration:none;display:flex;flex-direction:column;background:var(--bg-card);border:1px solid var(--border);border-radius:12px;overflow:hidden;transition:border-color .2s" onmouseover="this.style.borderColor='var(--primary)'" onmouseout="this.style.borderColor='var(--border)'">
       <div style="aspect-ratio:1;background:#fff;display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative">
-        ${r.discount ? `<div style="position:absolute;top:6px;left:6px;background:#e53e3e;color:#fff;font-size:10px;font-weight:900;padding:2px 6px;border-radius:5px">-${r.discount}%</div>` : ''}
+        ${percentualDesconto(r) ? `<span class="selo-desconto">-${percentualDesconto(r)}%</span>` : ''}
         ${r.image_url
-          ? `<img src="${r.image_thumb_url || r.image_url}" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:contain;padding:6px">`
-          : `<span style="font-size:52px">${r.emoji || '📦'}</span>`}
+          ? `<img src="${r.image_thumb_url || r.image_url}" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:cover;display:block">`
+          : `<span style="font-size:52px">${r.emoji ? esc(r.emoji) : icone('caixa', 44)}</span>`}
       </div>
       <div style="padding:8px">
         <div style="font-size:12px;font-weight:600;color:var(--text);line-height:1.3;margin-bottom:5px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${esc(r.name)}</div>
@@ -712,7 +764,7 @@ window.compartilharIndicacao = async function(btn) {
   try {
     await navigator.clipboard.writeText(link);
     const original = btn.textContent;
-    btn.textContent = '✅ Link copiado!';
+    btn.innerHTML = icone('check', 14) + ' Link copiado!';
     setTimeout(() => { btn.textContent = original; }, 2000);
   } catch {
     prompt('Copie seu link:', link);

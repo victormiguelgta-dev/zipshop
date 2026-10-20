@@ -127,6 +127,14 @@ async function loadSinonimos() {
 
 // Produto esgotado: só quando o estoque é controlado (stock preenchido) e chegou a 0.
 // Mesma regra usada em produto.html. stock vazio = sem controle de estoque.
+// % de desconto pra mostrar na foto: o campo 'desconto' do cadastro ou,
+// sem ele, a diferença entre o preço antigo e o atual.
+function percentualDesconto(p) {
+  if (Number(p?.discount) > 0) return Math.round(Number(p.discount));
+  const antigo = Number(p?.oldPrice ?? p?.old_price), atual = Number(p?.price);
+  return antigo > atual && atual > 0 ? Math.round((1 - atual / antigo) * 100) : 0;
+}
+
 // Com variações: esgotado só quando nenhuma variação tem estoque.
 function estaEsgotado(p) {
   const vars = variacoesDe(p);
@@ -139,4 +147,4 @@ function esgotadosNoFim(lista) {
   return [...lista].sort((a, b) => estaEsgotado(a) - estaEsgotado(b));
 }
 
-export { variacoesDe, precoVariacao, variacaoDisponivel, loadProducts, getProduct, formatPrice, starsHTML, loadSinonimos, estaEsgotado, esgotadosNoFim, PRODUCTS, CATEGORIES };
+export { percentualDesconto, variacoesDe, precoVariacao, variacaoDisponivel, loadProducts, getProduct, formatPrice, starsHTML, loadSinonimos, estaEsgotado, esgotadosNoFim, PRODUCTS, CATEGORIES };

@@ -149,7 +149,7 @@ const HERO_CACHE_KEY = 'zipshop_banners_v1';
 <script type="module">
 // esc() e heroHTML() vêm do <script> normal logo abaixo do banner (globais)
 
-import { loadProducts, formatPrice, starsHTML, estaEsgotado, esgotadosNoFim } from './js/data.js';
+import { loadProducts, formatPrice, starsHTML, estaEsgotado, esgotadosNoFim, percentualDesconto } from './js/data.js';
 import { getFavoritosIds, toggleFavorito } from './js/favoritos.js';
 
 // Carrega banners do Supabase
@@ -228,7 +228,7 @@ function productCardHTML(p) {
   return `
   <a href="produto.html?id=${p.id}" class="product-card${esgotado ? ' esgotado' : ''}">
     <div class="product-card-img" style="background:linear-gradient(135deg,#1e3a6e,#2563eb)">
-      ${p.discount ? `<div class="discount-badge">-${p.discount}%</div>` : ''}
+      ${percentualDesconto(p) ? `<span class="selo-desconto">-${percentualDesconto(p)}%</span>` : ''}
       ${esgotado ? '<div class="esgotado-badge">Esgotado</div>' : ''}
       <button onclick="event.preventDefault(); toggleFavoritoCard(${p.id}, this)" class="fav-btn" data-fav="${favoritado ? '1' : '0'}" aria-label="Favoritar">${iconeFav(favoritado)}</button>
       ${p.image_url ? `<img src="${p.image_thumb_url || p.image_url}" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:cover">` : `<span style="font-size:64px">${p.emoji}</span>`}
