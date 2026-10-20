@@ -72,7 +72,7 @@ function heroHTML(banners) {
         <a href="${esc(link)}" class="hero-link-total" aria-label="${esc(b.titulo || textoBotao)}"></a>
         ${b.image_url
           ? `<img src="${esc(b.image_url)}" alt="" decoding="async" ${i === 0 ? 'fetchpriority="high"' : 'fetchpriority="low"'} class="hero-img">`
-          : `<span style='font-size:80px'>🛍️</span>`}
+          : `<span style='color:var(--text-muted)'>${icone('sacola', 72)}</span>`}
         <div class="hero-text-wrap${b.escurecer === true ? ' escurecer' : ''}${soBotao ? ' so-botao' : ''}">
           ${b.badge ? `<div class="hero-badge">${esc(b.badge)}</div>` : ''}
           ${b.titulo ? `<h1 class="hero-title">${esc(b.titulo).replace(/\r?\n/g, '<br>')}</h1>` : ''}
@@ -113,7 +113,7 @@ const HERO_CACHE_KEY = 'zipshop_banners_v1';
 <!-- PRODUTOS EM DESTAQUE -->
 <div class="section" style="padding-top:0">
   <div class="section-header">
-    <h2 class="section-title" data-texto="home_titulo_ofertas">⚡ Ofertas do Dia</h2>
+    <h2 class="section-title" style="display:flex;align-items:center;gap:8px"><span style="color:var(--primary);display:inline-flex"><i data-ico="raio" data-tam="22"></i></span><span data-texto="home_titulo_ofertas">Ofertas do Dia</span></h2>
     <a href="produtos.html" class="section-link">Ver todos →</a>
   </div>
   <div class="product-grid" id="featured-grid"><div class="product-card esqueleto esqueleto-produto"></div><div class="product-card esqueleto esqueleto-produto"></div><div class="product-card esqueleto esqueleto-produto"></div><div class="product-card esqueleto esqueleto-produto"></div></div>
@@ -143,6 +143,7 @@ const HERO_CACHE_KEY = 'zipshop_banners_v1';
 
 
 
+<script src="js/icones.js"></script>
 <script src="js/cart.js"></script>
 <script src="js/main.js"></script>
 <script type="module">
@@ -229,7 +230,7 @@ function productCardHTML(p) {
     <div class="product-card-img" style="background:linear-gradient(135deg,#1e3a6e,#2563eb)">
       ${p.discount ? `<div class="discount-badge">-${p.discount}%</div>` : ''}
       ${esgotado ? '<div class="esgotado-badge">Esgotado</div>' : ''}
-      <button onclick="event.preventDefault(); toggleFavoritoCard(${p.id}, this)" class="fav-btn" data-fav="${favoritado ? '1' : '0'}" aria-label="Favoritar">${favoritado ? '💚' : '🤍'}</button>
+      <button onclick="event.preventDefault(); toggleFavoritoCard(${p.id}, this)" class="fav-btn" data-fav="${favoritado ? '1' : '0'}" aria-label="Favoritar">${iconeFav(favoritado)}</button>
       ${p.image_url ? `<img src="${p.image_thumb_url || p.image_url}" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:cover">` : `<span style="font-size:64px">${p.emoji}</span>`}
     </div>
     <div class="product-card-body">
@@ -243,14 +244,14 @@ function productCardHTML(p) {
       <div class="product-price">${p.temVariacoes ? '<span style="font-size:11px;font-weight:600;color:var(--text-muted)">a partir de </span>' : ''}${formatPrice(p.price)}</div>
       <div class="product-installment">ou 10x de ${formatPrice(p.price/10)}</div>
       <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px">
-        ${p.frete_gratis ? '<span style="font-size:10px;background:#1a3a1a;color:#4ade80;padding:2px 6px;border-radius:4px;font-weight:700">🚚 Frete Grátis</span>' : ''}
-        ${p.tipo_estoque === 'dropshipping' ? '<span style="font-size:10px;background:#1a2a3a;color:#93c5fd;padding:2px 6px;border-radius:4px;font-weight:700">🚚 5 a 15 dias</span>' : (p.entrega_24h ? '<span style="font-size:10px;background:#1a2a3a;color:#60a5fa;padding:2px 6px;border-radius:4px;font-weight:700">⚡ 24h</span>' : '')}
+        ${p.frete_gratis ? '<span style="font-size:10px;background:#1a3a1a;color:#4ade80;padding:2px 6px;border-radius:4px;font-weight:700;display:inline-flex;align-items:center;gap:3px">' + icone('caminhao', 11) + ' Frete Grátis</span>' : ''}
+        ${p.tipo_estoque === 'dropshipping' ? '<span style="font-size:10px;background:#1a2a3a;color:#93c5fd;padding:2px 6px;border-radius:4px;font-weight:700;display:inline-flex;align-items:center;gap:3px">' + icone('caminhao', 11) + ' 5 a 15 dias</span>' : (p.entrega_24h ? '<span style="font-size:10px;background:#1a2a3a;color:#60a5fa;padding:2px 6px;border-radius:4px;font-weight:700">⚡ 24h</span>' : '')}
       </div>
     </div>
     <div class="product-card-footer">
       ${esgotado
         ? '<button class="btn btn-outline btn-full btn-sm" disabled onclick="event.preventDefault()">Sem estoque</button>'
-        : `<button class="btn btn-primary btn-full btn-sm" onclick="event.preventDefault(); addToCart(${p.id}, 1, ${JSON.stringify(p).replace(/"/g, '&quot;')}, event)">🛒 Adicionar</button>`}
+        : `<button class="btn btn-primary btn-full btn-sm" onclick="event.preventDefault(); addToCart(${p.id}, 1, ${JSON.stringify(p).replace(/"/g, '&quot;')}, event)">${icone('carrinho', 16)} Adicionar</button>`}
     </div>
   </a>`;
 }
@@ -260,7 +261,7 @@ var _favoritosIds = null; // var: as funções abaixo são usadas antes desta li
 window.toggleFavoritoCard = async function(produtoId, btn) {
   const r = await toggleFavorito(produtoId);
   if (r.precisaLogin) { window.location.href = 'login.html'; return; }
-  btn.textContent = r.favoritado ? '💚' : '🤍';
+  btn.innerHTML = iconeFav(r.favoritado);
   btn.dataset.fav = r.favoritado ? '1' : '0';
 };
 
@@ -269,7 +270,7 @@ function categoriasHTML(categoriasDB, PRODUCTS) {
     return categoriasDB.map(cat => `<a href="produtos.html?cat=${encodeURIComponent(cat.name)}" class="cat-card">
       ${cat.image_url
         ? `<div class="cat-icon"><img src="${esc(cat.image_url)}" alt="${esc(cat.name)}" loading="lazy"></div>`
-        : `<div class="cat-icon">${esc(cat.emoji||'📦')}</div>`
+        : `<div class="cat-icon">${cat.emoji ? esc(cat.emoji) : icone('caixa', 30)}</div>`
       }
       <div class="cat-name">${esc(cat.name)}</div>
     </a>`).join('');
@@ -325,7 +326,7 @@ window.handleNewsletter = async (e) => {
     showToast('Não foi possível cadastrar. Confira o e-mail e tente de novo.', 'error');
     return;
   }
-  showToast('Inscrito com sucesso! 🎉', 'success');
+  showToast('Inscrito com sucesso!', 'success');
   form.reset();
 };
 </script>

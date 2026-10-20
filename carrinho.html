@@ -23,6 +23,7 @@
 
 <div id="footer"></div>
 
+<script src="js/icones.js"></script>
 <script src="js/cart.js"></script>
 <script src="js/main.js"></script>
 <script type="module">
@@ -83,7 +84,7 @@ window.renderCart = async function() {
 
   if (cart.length === 0) {
     el.innerHTML = `<div class="empty-state">
-      <div class="empty-icon">🛒</div>
+      <div class="empty-icon" style="color:var(--text-muted)"><i data-ico="carrinho" data-tam="60"></i></div>
       <h2>Seu carrinho está vazio</h2>
       <p>Adicione produtos para continuar comprando.</p>
       <a href="produtos.html" class="btn btn-primary btn-lg">Ver Produtos</a>
@@ -103,11 +104,13 @@ window.renderCart = async function() {
     const brand = esc(item.brand || '');
     const price = item.price || 0;
     const chave = esc(chaveItem(item));
+    // Foto e nome levam pra página do produto
+    const linkProduto = `produto.html?id=${encodeURIComponent(item.id)}`;
     return `<div class="cart-item">
-      ${cartItemImgHTML(item, 80)}
+      <a href="${linkProduto}" class="cart-item-link" aria-label="Ver ${nome}">${cartItemImgHTML(item, 80)}</a>
       <div class="cart-item-info">
         <div class="cart-item-brand">${brand}</div>
-        <div class="cart-item-name">${nome}</div>
+        <a href="${linkProduto}" class="cart-item-name cart-item-link">${nome}</a>
         <div class="cart-item-footer">
           <div class="qty-control">
             <button class="qty-btn" data-action="dec" data-chave="${chave}" data-qty="${item.qty}">−</button>
@@ -116,7 +119,7 @@ window.renderCart = async function() {
           </div>
           <div style="display:flex;align-items:center;gap:12px">
             <span class="cart-item-price">${formatPrice(price * item.qty)}</span>
-            <button class="qty-btn-remove" data-action="remove" data-chave="${chave}" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:18px" title="Remover">🗑️</button>
+            <button class="qty-btn-remove" data-action="remove" data-chave="${chave}" style="background:none;border:none;color:var(--text-muted);cursor:pointer;display:inline-flex" title="Remover" aria-label="Remover">${icone('lixeira', 20)}</button>
           </div>
         </div>
       </div>
@@ -133,22 +136,23 @@ window.renderCart = async function() {
     </div>
     <div>
       <div class="cart-summary">
-        <p style="font-size:15px;font-weight:900;margin-bottom:16px">Resumo do Pedido</p>
-        <form class="coupon-form" onsubmit="applyCoupon(event)">
-          <input type="text" id="coupon-input" placeholder="Cupom de desconto" style="text-transform:uppercase" value="${cupomAplicado?.codigo || ''}">
-          <button type="submit" class="btn btn-outline btn-sm">Aplicar</button>
+        <p class="resumo-titulo"><span class="resumo-titulo-ico">${icone('etiqueta', 22)}</span>Resumo do Pedido</p>
+        <form class="cupom-campo" onsubmit="applyCoupon(event)">
+          <span class="cupom-campo-ico">${icone('cupom', 20)}</span>
+          <input type="text" id="coupon-input" placeholder="CUPOM DE DESCONTO" style="text-transform:uppercase" value="${esc(cupomAplicado?.codigo || '')}" aria-label="Cupom de desconto">
+          <button type="submit" class="cupom-campo-btn">Aplicar</button>
         </form>
-        <button type="button" id="btn-ver-cupons" style="background:none;border:none;color:var(--primary);font-size:12px;font-weight:700;cursor:pointer;padding:0;margin-bottom:10px;display:flex;align-items:center;gap:4px">🎟️ Ver meus cupons disponíveis</button>
+        <button type="button" id="btn-ver-cupons" class="resumo-ver-cupons">${icone('cupom', 18)} Ver meus cupons disponíveis ${icone('chevron', 16)}</button>
         <div id="lista-cupons-carrinho" style="display:none;margin-bottom:12px"></div>
-        ${cupomAplicado ? `<p style="font-size:12px;color:#22c55e;margin-bottom:12px">✓ Cupom ${cupomAplicado.codigo} aplicado! ${descricaoCupom(cupomAplicado)} <a href="#" id="btn-remover-cupom" style="color:var(--text-muted);text-decoration:underline;margin-left:6px">remover</a></p>` : ''}
+        ${cupomAplicado ? `<p style="font-size:12px;color:#22c55e;margin-bottom:12px;display:flex;align-items:center;gap:6px;flex-wrap:wrap">${icone('checkCirculo', 14)} Cupom ${cupomAplicado.codigo} aplicado! ${descricaoCupom(cupomAplicado)} <a href="#" id="btn-remover-cupom" style="color:var(--text-muted);text-decoration:underline;margin-left:6px">remover</a></p>` : ''}
         <div id="cupom-feedback" style="display:none;margin-bottom:12px;font-size:12px"></div>
         <div class="summary-row"><span>Subtotal</span><span>${formatPrice(subtotal)}</span></div>
         ${discount > 0 ? `<div class="summary-row" style="color:#22c55e"><span>Desconto</span><span>−${formatPrice(discount)}</span></div>` : ''}
         <div class="summary-row"><span>Frete</span><span>${freight === 0 ? '<span style="color:#22c55e">Grátis</span>' : formatPrice(freight)}</span></div>
         <div class="summary-total"><span>Total</span><span style="color:var(--primary)">${formatPrice(total)}</span></div>
         <div style="margin-top:6px;font-size:12px;color:var(--text-muted);text-align:right">ou 12x de ${formatPrice(total/12)}</div>
-        <a href="checkout.html" class="btn btn-primary btn-full" style="margin-top:20px;font-size:15px">⚡ Finalizar Compra</a>
-        <a href="produtos.html" class="btn btn-ghost btn-full btn-sm" style="margin-top:8px;color:var(--text-muted)">Continuar Comprando</a>
+        <a href="checkout.html" class="btn btn-primary btn-full resumo-finalizar">${icone('cadeado', 20)} Finalizar Compra</a>
+        <a href="produtos.html" class="btn btn-full resumo-continuar"><span style="color:var(--primary);display:inline-flex">${icone('setaEsquerda', 18)}</span> Continuar Comprando</a>
       </div>
     </div>
   </div>`;
@@ -187,18 +191,18 @@ async function aplicarCupomCodigo(codigo) {
     .select('*').eq('codigo', codigo).eq('ativo', true).single();
 
   if (error || !cupom) {
-    if (fb) { fb.style.color = '#ef4444'; fb.textContent = '❌ Cupom inválido ou não encontrado.'; }
+    if (fb) { fb.style.color = '#ef4444'; fb.textContent = 'Cupom inválido ou não encontrado.'; }
     else showToast('Cupom inválido.', 'error');
     return;
   }
 
   if (cupom.valido_ate && new Date(cupom.valido_ate) < new Date()) {
-    if (fb) { fb.style.color = '#ef4444'; fb.textContent = '❌ Este cupom já expirou.'; }
+    if (fb) { fb.style.color = '#ef4444'; fb.textContent = 'Este cupom já expirou.'; }
     return;
   }
 
   if (cupom.uso_maximo && cupom.uso_atual >= cupom.uso_maximo) {
-    if (fb) { fb.style.color = '#ef4444'; fb.textContent = '❌ Este cupom atingiu o limite de usos.'; }
+    if (fb) { fb.style.color = '#ef4444'; fb.textContent = 'Este cupom atingiu o limite de usos.'; }
     return;
   }
 
@@ -208,14 +212,14 @@ async function aplicarCupomCodigo(codigo) {
     const { data: usoExistente } = await supabase.from('cupons_usos')
       .select('id').eq('cupom_id', cupom.id).eq('usuario_id', user.id).single();
     if (usoExistente) {
-      if (fb) { fb.style.color = '#ef4444'; fb.textContent = '❌ Você já utilizou este cupom.'; }
+      if (fb) { fb.style.color = '#ef4444'; fb.textContent = 'Você já utilizou este cupom.'; }
       return;
     }
   }
 
   const subtotal = getCartTotal();
   if (cupom.pedido_minimo && subtotal < cupom.pedido_minimo) {
-    if (fb) { fb.style.color = '#ef4444'; fb.textContent = `❌ Pedido mínimo para este cupom: ${formatPrice(cupom.pedido_minimo)}`; }
+    if (fb) { fb.style.color = '#ef4444'; fb.textContent = `Pedido mínimo para este cupom: ${formatPrice(cupom.pedido_minimo)}`; }
     return;
   }
 
@@ -268,7 +272,7 @@ async function carregarCuponsDisponiveisCarrinho() {
   });
 
   if (!cupons.length) {
-    lista.innerHTML = `<p style="font-size:12px;color:var(--text-muted)">Nenhum cupom disponível no momento. <a href="cupons.html" style="color:var(--primary)">Ver Meus Cupons →</a></p>`;
+    lista.innerHTML = `<div class="resumo-aviso"><span class="resumo-aviso-ico">${icone('info', 18)}</span><div>Nenhum cupom disponível no momento.<br><a href="cupons.html">Ver Meus Cupons →</a></div></div>`;
     return;
   }
 

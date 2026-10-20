@@ -109,6 +109,8 @@ function aplicarData(el) {
   el.textContent = (el.getAttribute('data-texto-prefixo') || '') + data;
 }
 
+const EMOJI = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B50}\u{2B06}\u{2B07}\u{FE0F}\u{200D}]/gu;
+
 function aplicarEm(el, mapa) {
   const chave = el.getAttribute('data-texto');
   const valor = mapa[chave];
@@ -120,7 +122,9 @@ function aplicarEm(el, mapa) {
   } else if (atributo) {
     el.setAttribute(atributo, valor);
   } else {
-    el.textContent = valor;
+    // O site usa ícones de linha no lugar de emojis: tira emojis que
+    // tenham ficado salvos nos textos do painel (ex: "👤 Entrar").
+    el.textContent = String(valor).replace(EMOJI, '').replace(/\s{2,}/g, ' ').trim();
   }
 
   // data-texto-mailto: o link (<a> em volta) acompanha o e-mail editado no

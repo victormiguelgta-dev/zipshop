@@ -212,7 +212,7 @@ function updateFloatCart() {
     cart.className = 'cart-float';
     cart.innerHTML = `
       <div class="cart-float-info">
-        <div class="cart-float-icon">🛒<span class="cart-float-badge" id="cart-float-badge">${count}</span></div>
+        <div class="cart-float-icon">${typeof icone === 'function' ? icone('carrinho', 24) : ''}<span class="cart-float-badge" id="cart-float-badge">${count}</span></div>
         <div>
           <div class="cart-float-text">${count} item(ns)</div>
           <div class="cart-float-total" id="cart-float-total">${total.toLocaleString('pt-BR', {style:'currency',currency:'BRL'})}</div>

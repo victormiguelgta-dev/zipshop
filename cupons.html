@@ -16,7 +16,7 @@
 <div class="page-hero sr-only">
   <div class="container">
     <div class="breadcrumb"><a href="index.html">Home</a><span>/</span><span>Meus Cupons</span></div>
-    <h1>🎟️ Meus Cupons</h1>
+    <h1>Meus Cupons</h1>
   </div>
 </div>
 
@@ -41,6 +41,7 @@
 </div>
 
 <div id="footer"></div>
+<script src="js/icones.js"></script>
 <script src="js/cart.js"></script>
 <script src="js/main.js"></script>
 <script type="module">
@@ -87,7 +88,7 @@ async function carregarCupons() {
 
   if (!cupons?.length) {
     lista.innerHTML = `<div class="card"><div class="card-body" style="text-align:center;padding:48px">
-      <p style="font-size:40px;margin-bottom:12px">🎟️</p>
+      <p style="margin-bottom:12px;color:var(--text-muted)"><i data-ico="cupom" data-tam="44"></i></p>
       <p style="font-weight:700;margin-bottom:8px">Nenhum cupom disponível</p>
       <p style="color:var(--text-muted)">Fique de olho nas promoções da Zipshop!</p>
     </div></div>`;
@@ -111,7 +112,7 @@ async function carregarCupons() {
       : c.tipo === 'fixo' ? `R$ ${c.valor} OFF`
       : 'Frete Grátis';
 
-    const icone = c.tipo === 'frete_gratis' ? '🚚' : c.tipo === 'percentual' ? '💸' : '🏷️';
+    const iconeCupom = window.icone(c.tipo === 'frete_gratis' ? 'caminhao' : c.tipo === 'percentual' ? 'porcentagem' : 'etiqueta', 22);
 
     const validade = c.valido_ate
       ? `Válido até ${new Date(c.valido_ate).toLocaleDateString('pt-BR')}`
@@ -127,7 +128,7 @@ async function carregarCupons() {
     <div class="card" style="margin-bottom:12px;opacity:${indisponivel ? '.55' : '1'}">
       <div class="card-body">
         <div style="display:flex;gap:14px;align-items:flex-start">
-          <div style="width:56px;height:56px;border-radius:12px;background:${indisponivel ? 'var(--bg-muted)' : 'rgba(170,239,0,0.1)'};border:1px solid ${indisponivel ? 'var(--border)' : 'rgba(170,239,0,0.3)'};display:flex;align-items:center;justify-content:center;font-size:26px;flex-shrink:0">${icone}</div>
+          <div style="width:56px;height:56px;border-radius:12px;background:${indisponivel ? 'var(--bg-muted)' : 'rgba(170,239,0,0.1)'};border:1px solid ${indisponivel ? 'var(--border)' : 'rgba(170,239,0,0.3)'};display:flex;align-items:center;justify-content:center;font-size:26px;flex-shrink:0;color:var(--primary)">${iconeCupom}</div>
           <div style="flex:1">
             <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap">
               <p style="font-weight:900;font-size:16px">${descTipo}</p>
@@ -138,10 +139,10 @@ async function carregarCupons() {
             <div style="display:flex;align-items:center;justify-content:space-between;margin-top:10px;padding-top:10px;border-top:1px dashed var(--border);flex-wrap:wrap;gap:8px">
               <div>
                 <span style="font-family:monospace;font-size:15px;font-weight:900;background:var(--bg-muted);padding:4px 12px;border-radius:6px;letter-spacing:2px">${c.codigo}</span>
-                <button onclick="copiarCodigo('${c.codigo}')" style="background:none;border:none;color:var(--primary);font-size:12px;cursor:pointer;margin-left:6px;font-weight:700">📋 Copiar</button>
+                <button onclick="copiarCodigo('${c.codigo}')" style="background:none;border:none;color:var(--primary);font-size:12px;cursor:pointer;margin-left:6px;font-weight:700;display:inline-flex;align-items:center;gap:4px">${icone('copiar', 13)} Copiar</button>
               </div>
               <div style="display:flex;align-items:center;gap:4px">
-                <span style="font-size:11px;color:var(--text-muted)">⏰ ${validade}</span>
+                <span style="font-size:11px;color:var(--text-muted);display:inline-flex;align-items:center;gap:4px">${icone('relogio', 12)} ${validade}</span>
               </div>
             </div>
           </div>
@@ -169,10 +170,10 @@ window.verificarCodigo = async function() {
 
   const { data: cupom } = await supabase.from('cupons').select('*').eq('codigo', codigo).eq('ativo', true).single();
 
-  if (!cupom) { fb.style.color = '#ef4444'; fb.textContent = '❌ Cupom não encontrado ou inválido.'; return; }
+  if (!cupom) { fb.style.color = '#ef4444'; fb.textContent = 'Cupom não encontrado ou inválido.'; return; }
 
   const expirado = cupom.valido_ate && new Date(cupom.valido_ate) < new Date();
-  if (expirado) { fb.style.color = '#ef4444'; fb.textContent = '❌ Este cupom já expirou.'; return; }
+  if (expirado) { fb.style.color = '#ef4444'; fb.textContent = 'Este cupom já expirou.'; return; }
 
   const desc = cupom.tipo === 'percentual' ? `${cupom.valor}% de desconto`
     : cupom.tipo === 'fixo' ? `R$ ${cupom.valor} de desconto`
@@ -184,8 +185,8 @@ window.verificarCodigo = async function() {
   const carrinhoTemItens = typeof getCart === 'function' && getCart().length > 0;
   fb.style.color = '#22c55e';
   fb.innerHTML = carrinhoTemItens
-    ? `✅ Cupom <strong>${esc(cupom.codigo)}</strong> (${desc}) aplicado! Levando você pro carrinho...`
-    : `✅ Cupom <strong>${esc(cupom.codigo)}</strong> (${desc}) guardado! Ele vai ser aplicado sozinho no carrinho quando você adicionar produtos.`;
+    ? `${icone('checkCirculo', 15)} Cupom <strong>${esc(cupom.codigo)}</strong> (${desc}) aplicado! Levando você pro carrinho...`
+    : `${icone('checkCirculo', 15)} Cupom <strong>${esc(cupom.codigo)}</strong> (${desc}) guardado! Ele vai ser aplicado sozinho no carrinho quando você adicionar produtos.`;
   if (carrinhoTemItens) setTimeout(() => { window.location.href = 'carrinho.html'; }, 1200);
 
   // CORREÇÃO BUG 13: antes o código verificado aqui não era guardado

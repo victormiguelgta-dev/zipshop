@@ -32,10 +32,13 @@ function aplicarTextosEm(el) {
 }
 
 // Ícone do usuário na navbar: a foto de perfil (se tiver) ou 👤
+// Ícone de linha (js/icones.js); sem o arquivo, não mostra nada
+function ic(nome, tamanho) { return typeof icone === 'function' ? icone(nome, tamanho) : ''; }
+
 function navAvatarHTML(url) {
   return (url && /^https:\/\//i.test(url))
     ? `<img src="${String(url).replace(/"/g, '%22')}" alt="" class="nav-avatar" id="nav-avatar">`
-    : `<span id="nav-avatar">👤</span>`;
+    : `<span id="nav-avatar">${ic('usuario', 20)}</span>`;
 }
 
 // Chamado pela conta.html quando a pessoa troca/remove a foto
@@ -90,7 +93,7 @@ function navbarHTML(user, isAdmin = false) {
     ? `<a href="${BASE}/conta.html" class="nav-btn" style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-flex;align-items:center">
         ${navAvatarHTML(user.user_metadata?.avatar_url)} ${primeiroNome}
        </a>`
-    : `<a href="${BASE}/login.html" class="nav-btn" data-texto="navbar_btn_entrar">👤 Entrar</a>`;
+    : `<a href="${BASE}/login.html" class="nav-btn" style="display:inline-flex;align-items:center;gap:6px">${ic('usuario', 18)}<span data-texto="navbar_btn_entrar">Entrar</span></a>`;
 
   return `
   <nav class="navbar">
@@ -101,28 +104,28 @@ function navbarHTML(user, isAdmin = false) {
       </a>
       <form class="search-form" onsubmit="handleSearch(event)" style="position:relative">
         <input type="search" id="search-input" placeholder="Buscar produtos, marcas e categorias..." data-texto="navbar_busca_placeholder" data-texto-attr="placeholder" autocomplete="off" oninput="buscarSugestoes(this.value, 'search-suggest')">
-        <button type="submit">🔍</button>
+        <button type="submit" aria-label="Buscar">${ic('busca', 18)}</button>
         <div class="search-suggest" id="search-suggest"></div>
       </form>
       <div class="nav-actions">
-        <button type="button" class="search-toggle-btn" onclick="toggleMobileSearch()" aria-label="Buscar">🔍</button>
-        ${isAdmin ? `<a href="${BASE}/admin/index.html" class="nav-btn" style="background:var(--primary);color:#000;font-weight:900;font-size:12px;padding:6px 12px">⚙️ Admin</a>` : ''}
+        <button type="button" class="search-toggle-btn" onclick="toggleMobileSearch()" aria-label="Buscar">${ic('busca', 20)}</button>
+        ${isAdmin ? `<a href="${BASE}/admin/index.html" class="nav-btn" style="background:var(--primary);color:#000;font-weight:900;font-size:12px;padding:6px 12px;display:inline-flex;align-items:center;gap:5px">${ic('grade', 14)} Admin</a>` : ''}
         ${userBtn}
-        <a href="${BASE}/carrinho.html" class="nav-btn cart-btn">
-          🛒
+        <a href="${BASE}/carrinho.html" class="nav-btn cart-btn" aria-label="Carrinho">
+          ${ic('carrinho', 22)}
           <span class="cart-count" id="cart-count" style="display:none">0</span>
         </a>
       </div>
     </div>
     <form class="mobile-search-bar" id="mobile-search-bar" onsubmit="handleSearch(event)" style="position:relative">
       <input type="search" id="mobile-search-input" placeholder="Buscar produtos, marcas e categorias..." data-texto="navbar_busca_placeholder" data-texto-attr="placeholder" autocomplete="off" oninput="buscarSugestoes(this.value, 'mobile-search-suggest')">
-      <button type="submit">🔍</button>
+      <button type="submit" aria-label="Buscar">${ic('busca', 18)}</button>
       <div class="search-suggest" id="mobile-search-suggest"></div>
     </form>
     <div class="nav-categories">
       <div class="nav-categories-inner">
         ${navCategoriasHTML()}
-        <a href="${BASE}/produtos.html?deal=1" class="nav-cat-link highlight" data-texto="navbar_cat_ofertas">🔥 Ofertas do Dia</a>
+        <a href="${BASE}/produtos.html?deal=1" class="nav-cat-link highlight" style="display:inline-flex;align-items:center;gap:5px">${ic('raio', 15)}<span data-texto="navbar_cat_ofertas">Ofertas do Dia</span></a>
       </div>
     </div>
   </nav>`;
@@ -255,7 +258,7 @@ window.buscarSugestoes = function(termo, containerId) {
     }
     box.innerHTML = data.map(p => `
       <a href="${BASE}/produto.html?id=${p.id}" class="search-suggest-item">
-        <div class="search-suggest-thumb">${p.image_url ? `<img src="${p.image_thumb_url || p.image_url}" loading="lazy">` : (p.emoji || '📦')}</div>
+        <div class="search-suggest-thumb">${p.image_url ? `<img src="${p.image_thumb_url || p.image_url}" loading="lazy">` : (p.emoji || ic('caixa', 18))}</div>
         <div>
           <div class="search-suggest-name">${String(p.name||'').replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'})[c])}</div>
           <div class="search-suggest-price">${Number(p.price).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</div>

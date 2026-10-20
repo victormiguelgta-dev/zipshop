@@ -22,6 +22,7 @@
 <div id="main-content"></div>
 <div id="footer"></div>
 
+<script src="js/icones.js"></script>
 <script src="js/cart.js"></script>
 <script src="js/main.js"></script>
 <script src="js/validadores.js"></script>
@@ -63,11 +64,12 @@ function dispararCelebracao() {
     overlay.appendChild(el);
   }
 
-  const moedas = ['🪙', '💰', '💚', '💚'];
+  const moedas = ['moedas', 'carteira', 'coracao', 'estrela'];
   for (let i = 0; i < 18; i++) {
     const el = document.createElement('div');
     el.className = 'moeda-cai';
-    el.textContent = moedas[Math.floor(Math.random() * moedas.length)];
+    el.innerHTML = icone(moedas[Math.floor(Math.random() * moedas.length)], 24);
+    el.style.color = '#AAEF00';
     el.style.left = (Math.random() * 100) + 'vw';
     el.style.fontSize = (16 + Math.random() * 16) + 'px';
     el.style.animationDuration = (1.7 + Math.random() * 1.2) + 's';
@@ -99,6 +101,8 @@ let selectedHorario = '';
 // Exclusiva: o pedido inteiro vai como "fornecedor", prazo de 5 a 15 dias.
 let _temFornecedor = false;
 let _soFornecedor = false;
+// Algum produto do carrinho não aceita pagamento na entrega (opção no cadastro)
+let _semPagarNaEntrega = false;
 // CORREÇÃO BUG 13: se um cupom já foi aplicado lá no carrinho, ele
 // continua aplicado aqui — não precisa digitar de novo.
 let _cupomAplicado = getCupomAplicado(); // { codigo, tipo, valor, id }
@@ -124,21 +128,21 @@ function calcFrete(subtotal) {
   return subtotal >= 14.90 ? 0 : 2.90;
 }
 
-// CORREÇÃO BUG 15 — horário de corte da Entrega Exclusiva:
-// Até as 18h, a Entrega Exclusiva chega em até 3h no mesmo dia.
-// Depois das 18h, as entregas do dia já acabaram — a próxima leva
-// começa às 8h do dia seguinte, então o prazo passa a ser "até 3h
-// depois disso", ou seja, até as 11h do dia seguinte.
+// "Receber hoje" (antiga Entrega Exclusiva): mesmo horário de corte da
+// página do produto (20h). Até as 20h chega em 3h a 5h no mesmo dia.
+// Depois das 20h, sai no primeiro horário do dia seguinte (até as 11h).
+const HORA_CORTE_HOJE = 20;
 function infoEntregaExclusiva() {
   const hora = new Date().getHours();
-  const foraDoHorario = hora >= 18;
+  const foraDoHorario = hora >= HORA_CORTE_HOJE;
   return {
     foraDoHorario,
-    tituloPrazo: foraDoHorario ? 'Fora do horário — até 11h de amanhã' : 'Motoboy exclusivo — até 3 horas',
-    previsao: foraDoHorario ? 'Até 11h do dia seguinte' : 'Até 3 horas',
+    nome: foraDoHorario ? 'Receber amanhã cedo' : 'Receber hoje',
+    tituloPrazo: foraDoHorario ? 'Pedidos após as 20h — chega amanhã até as 11h' : 'Motoboy exclusivo — chega em 3h a 5h',
+    previsao: foraDoHorario ? 'Até 11h do dia seguinte' : 'Em 3h a 5h',
     avisoExtra: foraDoHorario
-      ? '⏰ Já passou das 18h (horário de corte). Pedidos feitos agora entram na primeira rota do dia seguinte (a partir das 8h) e chegam em até 3h depois disso — ou seja, até as 11h de amanhã.'
-      : '⏰ Pedida até as 18h, chega em até 3h ainda hoje. Depois das 18h, o prazo passa a ser até as 11h do dia seguinte.'
+      ? `Já passou das ${HORA_CORTE_HOJE}h. O pedido sai no primeiro horário de amanhã e chega até as 11h.`
+      : `Peça até as ${HORA_CORTE_HOJE}h e receba hoje, em 3h a 5h. Depois das ${HORA_CORTE_HOJE}h, chega amanhã até as 11h.`
   };
 }
 
@@ -185,11 +189,11 @@ async function mostrarAvisoPedidoPendente() {
   aviso.style.cssText = 'max-width:1200px;margin:16px auto 0;padding:0 16px';
   aviso.innerHTML = `
     <div style="background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.4);border-radius:12px;padding:16px">
-      <p style="font-weight:700;margin-bottom:4px">⏳ Você tem um pedido aguardando pagamento</p>
+      <p style="font-weight:700;margin-bottom:4px;display:flex;align-items:center;gap:6px">${icone('ampulheta', 16)} Você tem um pedido aguardando pagamento</p>
       <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px">Pedido #${esc(p.id.slice(0, 8).toUpperCase())} — ${formatPrice(p.total)} (${p.pagamento === 'pix' ? 'Pix' : 'Cartão'}). Quer pagar esse pedido ou cancelar e escolher outra forma de pagamento?</p>
       ${p.created_at ? `<p style="font-size:13px;font-weight:700;margin-bottom:12px">Tempo pra pagar: <span data-expira="${new Date(new Date(p.created_at).getTime() + 24 * 60 * 60 * 1000).toISOString()}" style="font-variant-numeric:tabular-nums;color:#f59e0b">--:--:--</span></p>` : ''}
       <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <button type="button" class="btn btn-primary btn-sm" onclick="pagarPedidoPendente(this)">💳 Pagar esse pedido</button>
+        <button type="button" class="btn btn-primary btn-sm" onclick="pagarPedidoPendente(this)">${icone('cartao', 16)} Pagar esse pedido</button>
         <button type="button" class="btn btn-outline btn-sm" onclick="cancelarPedidoPendente(this)">Cancelar e trocar pagamento</button>
       </div>
     </div>`;
@@ -211,7 +215,7 @@ window.pagarPedidoPendente = async function(btn) {
     if (!resp.ok || dados.erro || !dados.url) throw new Error(dados.erro || 'Não foi possível abrir o pagamento.');
     window.location.href = dados.url;
   } catch (err) {
-    btn.disabled = false; btn.textContent = '💳 Pagar esse pedido';
+    btn.disabled = false; btn.innerHTML = icone('cartao', 16) + ' Pagar esse pedido';
     showToast(err.message, 'error');
   }
 };
@@ -249,7 +253,8 @@ async function renderCheckout() {
   try {
     const _sbProd = await _clienteSupabase();
     const ids = [...new Set(cart.map(i => Number(i.id)).filter(Boolean))];
-    const { data: tipos } = await _sbProd.from('produtos').select('id, tipo_estoque').in('id', ids);
+    const { data: tipos } = await _sbProd.from('produtos').select('id, tipo_estoque, aceita_pagamento_entrega').in('id', ids);
+    _semPagarNaEntrega = (tipos || []).some(t => t.aceita_pagamento_entrega === false);
     const doFornecedor = (tipos || []).filter(t => t.tipo_estoque === 'dropshipping');
     _temFornecedor = doFornecedor.length > 0;
     _soFornecedor = _temFornecedor && doFornecedor.length === ids.length;
@@ -313,7 +318,7 @@ async function renderCheckout() {
 
       <!-- AVISO SANTA MARIA -->
       <div style="background:rgba(170,239,0,0.08);border:1px solid rgba(170,239,0,0.3);border-radius:12px;padding:14px 16px;margin-bottom:16px;display:flex;gap:10px;align-items:flex-start">
-        <span style="font-size:20px">📍</span>
+        <span style="display:inline-flex;color:var(--primary)">${icone('local', 20)}</span>
         <div>
           <p style="font-weight:700;font-size:13px;margin-bottom:2px">Entrega apenas em Santa Maria — RS</p>
           <p style="font-size:12px;color:var(--text-muted)">Fora de Santa Maria? Entre em contato pelo 
@@ -347,16 +352,16 @@ async function renderCheckout() {
               <div class="card-endereco-salvo" data-id="${end.id}" onclick="selecionarEnderecoSalvo('${end.id}')"
                 style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;border:2px solid ${end.id === endFav?.id ? 'var(--primary)' : 'var(--border)'};border-radius:12px;cursor:pointer;${end.id === endFav?.id ? 'background:rgba(170,239,0,0.05)' : ''}">
                 <div style="display:flex;align-items:center;gap:10px;min-width:0">
-                  <span style="font-size:20px">${{'Casa':'🏠','Trabalho':'🏢','Prédio de estudo':'🎓'}[end.apelido] || '📍'}</span>
+                  <span style="display:inline-flex;color:var(--primary)">${icone({'Casa':'casa','Trabalho':'loja','Prédio de estudo':'arquivo'}[end.apelido] || 'local', 20)}</span>
                   <div style="min-width:0">
-                    <p style="font-size:13px;font-weight:700">${esc(end.apelido || 'Endereço')}${end.favorito ? ' ⭐' : ''}</p>
+                    <p style="font-size:13px;font-weight:700">${esc(end.apelido || 'Endereço')}${end.favorito ? ' ' + icone('estrela', 12) : ''}</p>
                     <p style="font-size:12px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(end.rua)}, ${esc(end.numero)} — ${esc(end.bairro)}</p>
                   </div>
                 </div>
               </div>`).join('')}
               <div id="card-novo-endereco" onclick="mostrarNovoEndereco()"
                 style="display:flex;align-items:center;gap:10px;padding:12px 14px;border:2px dashed var(--border);border-radius:12px;cursor:pointer;color:var(--text-muted)">
-                <span style="font-size:20px">➕</span>
+                <span style="display:inline-flex;color:var(--primary)">${icone('mais', 20)}</span>
                 <p style="font-size:13px;font-weight:700">Novo endereço de entrega</p>
               </div>
             </div>
@@ -373,7 +378,7 @@ async function renderCheckout() {
                 ${['Casa','Trabalho','Prédio de estudo'].map(m => `
                 <button type="button" onclick="selecionarModalidade('${m}')" data-modalidade="${m}"
                   class="btn btn-sm" style="border:2px solid var(--border);background:none;color:var(--text)">
-                  ${{'Casa':'🏠','Trabalho':'🏢','Prédio de estudo':'🎓'}[m]} ${m}
+                  ${icone({'Casa':'casa','Trabalho':'loja','Prédio de estudo':'arquivo'}[m], 15)} ${m}
                 </button>`).join('')}
               </div>
               <input type="hidden" id="campo-apelido-endereco" value="${esc(endFav?.apelido || 'Casa')}">
@@ -421,7 +426,7 @@ async function renderCheckout() {
             <div style="display:flex;flex-direction:column;gap:8px">
               <div onclick="selecionarEntregaAusencia('eu')" id="ausencia-eu"
                 style="display:flex;align-items:center;gap:10px;padding:12px 14px;border:2px solid var(--primary);border-radius:12px;cursor:pointer;background:rgba(170,239,0,0.05)">
-                <span style="font-size:20px">🏠</span>
+                <span style="display:inline-flex;color:var(--primary)">${icone('casa', 20)}</span>
                 <div>
                   <p style="font-size:13px;font-weight:700">Só entregar para mim</p>
                   <p style="font-size:11px;color:var(--text-muted)">Entregador aguarda ou agenda nova tentativa</p>
@@ -429,7 +434,7 @@ async function renderCheckout() {
               </div>
               <div onclick="selecionarEntregaAusencia('portaria')" id="ausencia-portaria"
                 style="display:flex;align-items:center;gap:10px;padding:12px 14px;border:2px solid var(--border);border-radius:12px;cursor:pointer">
-                <span style="font-size:20px">📬</span>
+                <span style="display:inline-flex;color:var(--primary)">${icone('caixa', 20)}</span>
                 <div>
                   <p style="font-size:13px;font-weight:700">Deixar na portaria</p>
                   <p style="font-size:11px;color:var(--text-muted)">Deixar com o porteiro ou na entrada</p>
@@ -437,7 +442,7 @@ async function renderCheckout() {
               </div>
               <div onclick="selecionarEntregaAusencia('vizinho')" id="ausencia-vizinho"
                 style="display:flex;align-items:center;gap:10px;padding:12px 14px;border:2px solid var(--border);border-radius:12px;cursor:pointer">
-                <span style="font-size:20px">👥</span>
+                <span style="display:inline-flex;color:var(--primary)">${icone('pessoas', 20)}</span>
                 <div>
                   <p style="font-size:13px;font-weight:700">Entregar para um vizinho</p>
                   <p style="font-size:11px;color:var(--text-muted)">Informe qual vizinho pode receber</p>
@@ -459,7 +464,7 @@ async function renderCheckout() {
         <div id="card-fornecedor"
           style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border:2px solid var(--primary);border-radius:12px;background:rgba(170,239,0,0.05)">
           <div style="display:flex;align-items:center;gap:12px">
-            <span style="font-size:24px">🚚</span>
+            <span style="display:inline-flex;color:var(--primary)">${icone('caminhao', 24)}</span>
             <div>
               <div style="font-weight:700;font-size:14px">Envio pelo fornecedor</div>
               <div style="font-size:12px;color:var(--text-muted)">Prazo: 5 a 15 dias</div>
@@ -472,13 +477,13 @@ async function renderCheckout() {
         <p style="font-size:12px;color:var(--text-muted);margin-top:10px">
           ${_soFornecedor
             ? 'Este produto é enviado direto do fornecedor. Você acompanha tudo em Meus Pedidos.'
-            : '⚠️ Seu carrinho tem produto enviado direto do fornecedor, então o pedido todo chega junto, em 5 a 15 dias. Quer receber os outros itens antes? Faça um pedido separado para eles.'}
+            : 'Seu carrinho tem produto enviado direto do fornecedor, então o pedido todo chega junto, em 5 a 15 dias. Quer receber os outros itens antes? Faça um pedido separado para eles.'}
         </p>` : `
         <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px">
           <div onclick="selecionarEntrega('rota')" id="card-rota"
             style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border:2px solid var(--primary);border-radius:12px;cursor:pointer;background:rgba(170,239,0,0.05)">
             <div style="display:flex;align-items:center;gap:12px">
-              <span style="font-size:24px">🛵</span>
+              <span style="display:inline-flex;color:var(--primary)">${icone('moto', 24)}</span>
               <div>
                 <div style="font-weight:700;font-size:14px">Entrega por Rota</div>
                 <div style="font-size:12px;color:var(--text-muted)">Prazo: 24 a 48 horas — Santa Maria</div>
@@ -491,9 +496,9 @@ async function renderCheckout() {
           <div onclick="selecionarEntrega('exclusiva')" id="card-exclusiva"
             style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border:2px solid var(--border);border-radius:12px;cursor:pointer">
             <div style="display:flex;align-items:center;gap:12px">
-              <span style="font-size:24px">⚡</span>
+              <span style="display:inline-flex;color:var(--primary)">${icone('raio', 24)}</span>
               <div>
-                <div style="font-weight:700;font-size:14px">Entrega Exclusiva</div>
+                <div style="font-weight:700;font-size:14px">${infoEntregaExclusiva().nome}</div>
                 <div style="font-size:12px;color:var(--text-muted)" id="exclusiva-prazo-label">${infoEntregaExclusiva().tituloPrazo}</div>
               </div>
             </div>
@@ -507,15 +512,15 @@ async function renderCheckout() {
           <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:6px">
             <div onclick="selecionarHorario('08:00-12:00')" id="h1"
               style="padding:10px;border:2px solid var(--border);border-radius:10px;text-align:center;cursor:pointer;font-size:13px">
-              🌅 08h–12h
+              08h–12h
             </div>
             <div onclick="selecionarHorario('12:00-16:00')" id="h2"
               style="padding:10px;border:2px solid var(--border);border-radius:10px;text-align:center;cursor:pointer;font-size:13px">
-              ☀️ 12h–16h
+              12h–16h
             </div>
             <div onclick="selecionarHorario('16:00-20:00')" id="h3"
               style="padding:10px;border:2px solid var(--border);border-radius:10px;text-align:center;cursor:pointer;font-size:13px">
-              🌆 16h–20h
+              16h–20h
             </div>
           </div>
           <p style="font-size:11px;color:var(--text-muted);margin-top:6px">* Horário estimado — o entregador pode chegar dentro desta janela de 4 horas.</p>
@@ -523,7 +528,7 @@ async function renderCheckout() {
 
         <!-- AVISO EXCLUSIVA -->
         <div id="aviso-exclusiva" style="display:none;margin-top:12px;background:rgba(170,239,0,0.08);border:1px solid rgba(170,239,0,0.3);border-radius:10px;padding:14px">
-          <p style="font-weight:700;font-size:13px;margin-bottom:6px">⚡ Entrega Exclusiva</p>
+          <p style="font-weight:700;font-size:13px;margin-bottom:6px;display:flex;align-items:center;gap:6px"><span style="display:inline-flex;color:var(--primary)">${icone('raio', 16)}</span> ${infoEntregaExclusiva().nome}</p>
           <ul style="font-size:12px;color:var(--text-muted);padding-left:16px;line-height:1.8" id="lista-aviso-exclusiva">
             <li>Motoboy exclusivo para seu pedido — <span id="exclusiva-aviso-prazo">${infoEntregaExclusiva().previsao}</span></li>
             <li>Frete de <strong>R$ 9,90</strong> incluído no total</li>
@@ -539,21 +544,21 @@ async function renderCheckout() {
         <div class="checkout-step-title"><span class="step-num">3</span> Forma de Pagamento</div>
         <div class="payment-options" id="opcoes-pagamento">
           <div class="payment-option selected" onclick="selectPayment('pix')" id="pay-pix">
-            <div class="payment-option-icon">📱</div>
+            <div class="payment-option-icon">${icone('pix', 24)}</div>
             <div class="payment-option-label">PIX</div>
           </div>
           <div class="payment-option" onclick="selectPayment('cartao')" id="pay-cartao">
-            <div class="payment-option-icon">💳</div>
+            <div class="payment-option-icon">${icone('cartao', 24)}</div>
             <div class="payment-option-label">Cartão</div>
           </div>
-          <div class="payment-option" onclick="selectPayment('dinheiro')" id="pay-dinheiro"${_temFornecedor ? ' style="display:none"' : ''}>
-            <div class="payment-option-icon">💵</div>
+          <div class="payment-option" onclick="selectPayment('dinheiro')" id="pay-dinheiro"${_temFornecedor || _semPagarNaEntrega ? ' style="display:none"' : ''}>
+            <div class="payment-option-icon">${icone('dinheiro', 24)}</div>
             <div class="payment-option-label">Na Entrega</div>
           </div>
         </div>
         <div id="payment-detail"></div>
         <div id="aviso-pago-saldo" style="display:none;background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.4);border-radius:10px;padding:14px">
-          <p style="font-weight:700;font-size:14px;color:#22c55e;margin-bottom:4px">✓ Seu saldo cobre todo o pedido</p>
+          <p style="font-weight:700;font-size:14px;color:#22c55e;margin-bottom:4px;display:flex;align-items:center;gap:6px">${icone('checkCirculo', 16)} Seu saldo cobre todo o pedido</p>
           <p style="font-size:12px;color:var(--text-muted)">Nada a pagar — nem pelo app, nem na entrega.</p>
         </div>
       </div>
@@ -565,15 +570,15 @@ async function renderCheckout() {
           <input type="text" class="form-input" id="campo-cupom" placeholder="Digite o código do cupom" style="flex:1;min-width:0;text-transform:uppercase;border-color:var(--primary)" value="${_cupomAplicado?.codigo || ''}">
           <button onclick="aplicarCupom()" class="btn btn-outline" style="white-space:nowrap;flex-shrink:0;padding:0 16px;border-color:var(--primary);color:var(--primary)">Aplicar</button>
         </div>
-        <div id="cupom-feedback" style="margin-top:8px;font-size:13px;${_cupomAplicado ? '' : 'display:none'}">${_cupomAplicado ? `✅ Cupom aplicado! ${_cupomAplicado.codigo}` : ''}</div>
-        <a href="cupons.html" style="display:block;margin-top:10px;font-size:12px;color:var(--primary);font-weight:700">🎟️ Ver meus cupons disponíveis</a>
+        <div id="cupom-feedback" style="margin-top:8px;font-size:13px;${_cupomAplicado ? '' : 'display:none'}">${_cupomAplicado ? `${icone('checkCirculo', 14)} Cupom aplicado! ${esc(_cupomAplicado.codigo)}` : ''}</div>
+        <a href="cupons.html" style="display:block;margin-top:10px;font-size:12px;color:var(--primary);font-weight:700;display:flex;align-items:center;gap:6px">${icone('cupom', 16)} Ver meus cupons disponíveis</a>
       </div>
 
       ${_saldoDisponivel > 0 ? `
       <div class="checkout-step" style="padding:16px">
         <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
           <input type="checkbox" id="usar-saldo-check" onchange="toggleUsarSaldo(this.checked)" style="width:18px;height:18px;accent-color:var(--primary)">
-          <span style="font-size:14px;font-weight:700">💰 Usar meu saldo (${formatPrice(_saldoDisponivel)} disponível)</span>
+          <span style="font-size:14px;font-weight:700;display:inline-flex;align-items:center;gap:6px"><span style="color:var(--primary);display:inline-flex">${icone('carteira', 16)}</span> Usar meu saldo (${formatPrice(_saldoDisponivel)} disponível)</span>
         </label>
         <p style="font-size:12px;color:var(--text-muted);margin-top:4px;margin-left:28px">Abate direto no total dessa compra. <a href="saldo.html" style="color:var(--primary);font-weight:700">Ver extrato →</a></p>
       </div>` : ''}
@@ -584,7 +589,7 @@ async function renderCheckout() {
       </label>
 
       <button class="btn btn-primary btn-lg btn-full" id="btn-confirmar" onclick="finalizarPedido()">
-        ⚡ Confirmar Pedido — ${formatPrice(totalFinal)}
+        ${icone('cadeado', 18)} Confirmar Pedido — ${formatPrice(totalFinal)}
       </button>
 
     </div>
@@ -600,10 +605,10 @@ async function renderCheckout() {
             <span style="color:#22c55e">Desconto PIX (5%)</span><span style="color:#22c55e">-${formatPrice(subtotal * 0.05)}</span>
           </div>
           <div class="summary-row" id="resumo-desconto-cupom" style="display:none">
-            <span style="color:#22c55e">🎟️ Cupom</span><span style="color:#22c55e" id="resumo-cupom-valor"></span>
+            <span style="color:#22c55e;display:inline-flex;align-items:center;gap:5px">${icone('cupom', 14)} Cupom</span><span style="color:#22c55e" id="resumo-cupom-valor"></span>
           </div>
           <div class="summary-row" id="resumo-desconto-saldo" style="display:none">
-            <span style="color:#22c55e">💰 Saldo usado</span><span style="color:#22c55e" id="resumo-saldo-valor"></span>
+            <span style="color:#22c55e;display:inline-flex;align-items:center;gap:5px">${icone('carteira', 14)} Saldo usado</span><span style="color:#22c55e" id="resumo-saldo-valor"></span>
           </div>
           <div class="summary-row" id="resumo-frete">
             <span>Frete</span>
@@ -675,7 +680,7 @@ function atualizarResumoTotal() {
   if (aviso) aviso.style.display = quitado ? '' : 'none';
 
   const btn = document.getElementById('btn-confirmar');
-  if (btn) btn.textContent = quitado ? '⚡ Confirmar Pedido — pago com saldo' : `⚡ Confirmar Pedido — ${formatPrice(total)}`;
+  if (btn) btn.innerHTML = icone('cadeado', 18) + (quitado ? ' Confirmar Pedido — pago com saldo' : ` Confirmar Pedido — ${formatPrice(total)}`);
 }
 
 function totalQuitado(total) {
@@ -704,21 +709,21 @@ window.aplicarCupom = async function() {
 
   if (error || !cupom) {
     _cupomAplicado = null; clearCupomAplicado();
-    feedback.style.color='#ef4444'; feedback.textContent='❌ Cupom inválido ou não encontrado.';
+    feedback.style.color='#ef4444'; feedback.textContent='Cupom inválido ou não encontrado.';
     atualizarResumoTotal(); return;
   }
 
   // Valida expiração
   if (cupom.valido_ate && new Date(cupom.valido_ate) < new Date()) {
     _cupomAplicado = null; clearCupomAplicado();
-    feedback.style.color='#ef4444'; feedback.textContent='❌ Este cupom expirou.';
+    feedback.style.color='#ef4444'; feedback.textContent='Este cupom expirou.';
     atualizarResumoTotal(); return;
   }
 
   // Valida uso máximo
   if (cupom.uso_maximo && cupom.uso_atual >= cupom.uso_maximo) {
     _cupomAplicado = null; clearCupomAplicado();
-    feedback.style.color='#ef4444'; feedback.textContent='❌ Este cupom atingiu o limite de usos.';
+    feedback.style.color='#ef4444'; feedback.textContent='Este cupom atingiu o limite de usos.';
     atualizarResumoTotal(); return;
   }
 
@@ -728,7 +733,7 @@ window.aplicarCupom = async function() {
       .select('id').eq('cupom_id', cupom.id).eq('usuario_id', user.id).single();
     if (jaUsou) {
       _cupomAplicado = null; clearCupomAplicado();
-      feedback.style.color='#ef4444'; feedback.textContent='❌ Você já utilizou este cupom.';
+      feedback.style.color='#ef4444'; feedback.textContent='Você já utilizou este cupom.';
       atualizarResumoTotal(); return;
     }
   }
@@ -738,7 +743,7 @@ window.aplicarCupom = async function() {
   if (cupom.pedido_minimo && subtotal < cupom.pedido_minimo) {
     _cupomAplicado = null; clearCupomAplicado();
     feedback.style.color='#ef4444';
-    feedback.textContent = `❌ Pedido mínimo para este cupom: ${formatPrice(cupom.pedido_minimo)}`;
+    feedback.textContent = `Pedido mínimo para este cupom: ${formatPrice(cupom.pedido_minimo)}`;
     atualizarResumoTotal(); return;
   }
 
@@ -750,7 +755,7 @@ window.aplicarCupom = async function() {
   const desc = cupom.tipo === 'percentual' ? `${cupom.valor}% de desconto`
     : cupom.tipo === 'fixo' ? `R$ ${cupom.valor} de desconto`
     : 'Frete Grátis';
-  feedback.style.color='#22c55e'; feedback.textContent=`✅ Cupom aplicado! ${desc}`;
+  feedback.style.color='#22c55e'; feedback.textContent=`Cupom aplicado! ${desc}`;
   atualizarResumoTotal();
 };
 
@@ -860,11 +865,11 @@ async function buscarCEP() {
         // CEP geral da cidade (ex: 97010-000): o ViaCEP não traz a rua,
         // mas a entrega é possível — a pessoa só preenche o endereço à mão
         feedback.style.color = 'var(--text-muted)';
-        feedback.textContent = 'CEP de Santa Maria ✅ — preencha a rua e o bairro abaixo.';
+        feedback.textContent = 'CEP de Santa Maria — preencha a rua e o bairro abaixo.';
         document.getElementById('campo-rua')?.focus();
       } else {
         feedback.style.color = '#ef4444';
-        feedback.textContent = '❌ CEP não encontrado.';
+        feedback.textContent = 'CEP não encontrado.';
       }
       return;
     }
@@ -875,16 +880,16 @@ async function buscarCEP() {
     if (bairro && !bairro.value) bairro.value = data.bairro || '';
     else if (bairro) bairro.value = data.bairro || bairro.value;
     feedback.style.color = '#22c55e';
-    feedback.textContent = '✅ Endereço encontrado — confira e edite se necessário.';
+    feedback.textContent = 'Endereço encontrado — confira e edite se necessário.';
     document.getElementById('campo-numero')?.focus();
   } catch(e) {
     // Se o ViaCEP estiver fora do ar, não trava quem é de Santa Maria
     if (ehSantaMaria) {
       feedback.style.color = 'var(--text-muted)';
-      feedback.textContent = 'CEP de Santa Maria ✅ — preencha a rua e o bairro abaixo.';
+      feedback.textContent = 'CEP de Santa Maria — preencha a rua e o bairro abaixo.';
     } else {
       feedback.style.color = '#ef4444';
-      feedback.textContent = '❌ Erro ao buscar CEP. Tente novamente.';
+      feedback.textContent = 'Erro ao buscar CEP. Tente novamente.';
     }
   }
 }
@@ -913,7 +918,7 @@ function selecionarEntrega(tipo) {
 
   // Exclusiva: pagamento OBRIGATÓRIO pelo app (PIX ou Cartão) — sem opção de dinheiro
   const optDinheiro = document.getElementById('pay-dinheiro');
-  if (tipo === 'exclusiva') {
+  if (tipo === 'exclusiva' || _temFornecedor || _semPagarNaEntrega) {
     optDinheiro.style.display = 'none';
     if (selectedPayment === 'dinheiro') selectPayment('pix');
   } else {
@@ -925,7 +930,7 @@ function selecionarEntrega(tipo) {
 
   // Atualiza resumo
   atualizarResumoTotal();
-  document.getElementById('resumo-frete').innerHTML = `<span>Frete (${tipo === 'exclusiva' ? 'Exclusiva' : 'Rota'})</span><span>${frete === 0 ? '<span style="color:#22c55e">Grátis</span>' : formatPrice(frete)}</span>`;
+  document.getElementById('resumo-frete').innerHTML = `<span>Frete (${tipo === 'exclusiva' ? infoEntregaExclusiva().nome : 'Rota'})</span><span>${frete === 0 ? '<span style="color:#22c55e">Grátis</span>' : formatPrice(frete)}</span>`;
 }
 
 function selecionarHorario(h) {
@@ -952,15 +957,15 @@ function selectPayment(type) {
   if (!det) return;
   if (type === 'cartao') {
     det.innerHTML = `<div style="margin-top:12px;background:var(--bg-muted);border-radius:10px;padding:14px;font-size:13px;color:var(--text-muted)">
-      💳 Você será redirecionado para o Mercado Pago para pagar com cartão de forma segura.</div>`;
+      ${icone('cartao', 15)} Você será redirecionado para o Mercado Pago para pagar com cartão de forma segura.</div>`;
   } else if (type === 'dinheiro') {
     det.innerHTML = `<div style="margin-top:12px;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.3);border-radius:10px;padding:14px">
-      <p style="font-weight:700;font-size:13px;margin-bottom:4px">💵 Pagamento na Entrega</p>
+      <p style="font-weight:700;font-size:13px;margin-bottom:4px;display:flex;align-items:center;gap:6px">${icone('dinheiro', 16)} Pagamento na Entrega</p>
       <p style="font-size:12px;color:var(--text-muted)">Tenha o valor <strong>exato e trocado</strong>. Caso não haja troco, poderá ser cobrada taxa adicional.</p>
     </div>`;
   } else {
     det.innerHTML = `<div style="margin-top:12px;background:var(--bg-muted);border-radius:10px;padding:14px;font-size:13px;color:var(--text-muted)">
-      📱 Você será redirecionado para pagar via PIX no Mercado Pago.</div>`;
+      ${icone('pix', 15)} Você será redirecionado para pagar via PIX no Mercado Pago.</div>`;
   }
 
   // Recalcula o resumo (desconto PIX, cupom e saldo)
@@ -1074,7 +1079,7 @@ async function finalizarPedido() {
     cidade: 'Santa Maria - RS',
     tipo: selectedDelivery,
     horario_preferido: selectedDelivery === 'rota' ? selectedHorario
-      : selectedDelivery === 'fornecedor' ? 'Envio pelo fornecedor' : `Exclusiva - ${exclusivaInfo.previsao}`,
+      : selectedDelivery === 'fornecedor' ? 'Envio pelo fornecedor' : `${exclusivaInfo.nome} - ${exclusivaInfo.previsao}`,
     previsao: selectedDelivery === 'rota' ? `Janela: ${selectedHorario} (24-48h)`
       : selectedDelivery === 'fornecedor' ? '5 a 15 dias' : exclusivaInfo.previsao,
     instrucao_ausencia: instrucaoAusencia
@@ -1110,19 +1115,19 @@ async function finalizarPedido() {
     );
     pedido = resp.data; error = resp.error;
   } catch (timeoutErr) {
-    btn.disabled = false; btn.textContent = '⚡ Confirmar Pedido';
+    btn.disabled = false; btn.innerHTML = icone('cadeado', 18) + ' Confirmar Pedido';
     showToast(timeoutErr.message, 'error');
     return;
   }
 
   if (error) {
-    btn.disabled = false; btn.textContent = '⚡ Confirmar Pedido';
+    btn.disabled = false; btn.innerHTML = icone('cadeado', 18) + ' Confirmar Pedido';
     // Mensagem vinda da trava no banco (trigger checar_perfil_completo_para_pedido)
     if (error.message && error.message.includes('Cadastro incompleto')) {
       showToast(error.message, 'error');
     } else if (error.message && error.message.includes('ESTOQUE_INSUFICIENTE')) {
       const nomeProduto = error.message.split('ESTOQUE_INSUFICIENTE:')[1]?.split('—')[0]?.trim();
-      showToast(`😕 Ih, "${nomeProduto || 'um item'}" ficou sem estoque suficiente. Ajusta a quantidade no carrinho.`, 'error');
+      showToast(`Ih, "${nomeProduto || 'um item'}" ficou sem estoque suficiente. Ajusta a quantidade no carrinho.`, 'error');
       setTimeout(() => window.location.href = 'carrinho.html', 2500);
     } else if (error.message && /Muitos pedidos|aguardando pagamento/.test(error.message)) {
       showToast(error.message, 'error');
@@ -1160,36 +1165,36 @@ async function finalizarPedido() {
       <p style="font-size:18px;font-weight:700;margin-bottom:4px">#${pedidoIdCurto}</p>
       <div class="order-info-card">
         <div class="order-info-row">
-          <div class="order-info-icon">📍</div>
+          <div class="order-info-icon">${icone('local', 20)}</div>
           <div class="order-info-text">
             <div class="order-info-label">Endereço</div>
             <div class="order-info-value">${endereco}, ${bairro}</div>
           </div>
         </div>
         <div class="order-info-row">
-          <div class="order-info-icon">📞</div>
+          <div class="order-info-icon">${icone('telefone', 20)}</div>
           <div class="order-info-text">
             <div class="order-info-label">Telefone</div>
             <div class="order-info-value">${telefone}</div>
           </div>
         </div>
         <div class="order-info-row">
-          <div class="order-info-icon">🚀</div>
+          <div class="order-info-icon">${icone('foguete', 20)}</div>
           <div class="order-info-text">
             <div class="order-info-label">Entrega</div>
-            <div class="order-info-value">${selectedDelivery === 'exclusiva' ? `Exclusiva — ${dadosEntrega.previsao}` : selectedDelivery === 'fornecedor' ? 'Pelo fornecedor — 5 a 15 dias' : 'Por rota — 24-48h'}</div>
+            <div class="order-info-value">${selectedDelivery === 'exclusiva' ? `${infoEntregaExclusiva().nome} — ${dadosEntrega.previsao}` : selectedDelivery === 'fornecedor' ? 'Pelo fornecedor — 5 a 15 dias' : 'Por rota — 24-48h'}</div>
           </div>
         </div>
         ${selectedHorario ? `
         <div class="order-info-row">
-          <div class="order-info-icon">🕐</div>
+          <div class="order-info-icon">${icone('relogio', 20)}</div>
           <div class="order-info-text">
             <div class="order-info-label">Janela</div>
             <div class="order-info-value">${selectedHorario}</div>
           </div>
         </div>` : ''}
         <div class="order-info-row">
-          <div class="order-info-icon">${pagoComSaldo ? '💰' : '💵'}</div>
+          <div class="order-info-icon">${icone(pagoComSaldo ? 'carteira' : 'dinheiro', 20)}</div>
           <div class="order-info-text">
             <div class="order-info-label">Pagamento</div>
             <div class="order-info-value">${pagoComSaldo
@@ -1198,7 +1203,7 @@ async function finalizarPedido() {
           </div>
         </div>
         <div class="order-info-row">
-          <div class="order-info-icon">🔑</div>
+          <div class="order-info-icon">${icone('chave', 20)}</div>
           <div class="order-info-text">
             <div class="order-info-label">Código de confirmação</div>
             <div class="order-info-value">${pedido.codigo_confirmacao} — informe pro entregador na hora da entrega</div>
@@ -1226,11 +1231,11 @@ async function finalizarPedido() {
     clearCart();
     document.getElementById('main-content').innerHTML = `
     <div class="success-box">
-      <div class="success-icon">✅</div>
+      <div class="success-icon" style="color:var(--primary)">${icone('checkCirculo', 64)}</div>
       <h1>Pedido Salvo!</h1>
       <p style="font-size:15px;font-weight:700;margin-bottom:8px">#${pedidoIdCurto}</p>
       <div style="background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.3);border-radius:12px;padding:14px;margin-bottom:20px">
-        <p style="font-size:13px;color:#f59e0b;font-weight:700">⚠️ Ambiente Local (Live Server)</p>
+        <p style="font-size:13px;color:#f59e0b;font-weight:700">Ambiente Local (Live Server)</p>
         <p style="font-size:12px;color:var(--text-muted);margin-top:4px">O pagamento via Mercado Pago só funciona quando o site está publicado no Netlify. Pedido salvo no banco com sucesso!</p>
       </div>
       <div style="display:flex;gap:12px">
@@ -1262,7 +1267,7 @@ async function finalizarPedido() {
     window.location.href = mpData.url;
 
   } catch (err) {
-    btn.disabled = false; btn.textContent = '⚡ Confirmar Pedido';
+    btn.disabled = false; btn.innerHTML = icone('cadeado', 18) + ' Confirmar Pedido';
     showToast(err.message || 'Erro ao conectar com pagamento. Tente novamente.', 'error');
   }
 }
@@ -1293,7 +1298,7 @@ if (statusMP) {
     } catch { /* se falhar, só não mostra o código aqui — não é crítico */ }
   }
 
-  const icons = { aprovado:'✅', pendente:'⏳', erro:'❌' };
+  const icons = { aprovado: icone('checkCirculo', 64), pendente: icone('ampulheta', 64), erro: icone('xCirculo', 64) };
   const titles = { aprovado:'Pagamento Aprovado!', pendente:'Pagamento Pendente', erro:'Pagamento não aprovado' };
   const msgs = {
     aprovado: 'Seu pedido foi confirmado e está sendo processado.',
@@ -1309,14 +1314,14 @@ if (statusMP) {
             <path class="success-check-mark" d="M14 27l7 7 17-17"/>
           </svg>
         </div>`
-      : `<div class="success-icon">${icons[statusMP]||'❓'}</div>`
+      : `<div class="success-icon">${icons[statusMP] || icone('info', 64)}</div>`
     }
     <h1>${titles[statusMP]||'Status do Pedido'}</h1>
     <p style="color:var(--text-muted);margin-bottom:${codigoConfirmacao ? '16px' : '32px'}">${msgs[statusMP]||''}</p>
     ${codigoConfirmacao ? `
     <div class="order-info-card" style="margin-bottom:24px">
       <div class="order-info-row" style="border-bottom:none">
-        <div class="order-info-icon">🔑</div>
+        <div class="order-info-icon">${icone('chave', 20)}</div>
         <div class="order-info-text">
           <div class="order-info-label">Código de confirmação</div>
           <div class="order-info-value">${codigoConfirmacao} — informe pro entregador na hora da entrega</div>
@@ -1375,11 +1380,11 @@ if (statusMP) {
 
       document.getElementById('main-content').innerHTML = `
       <div class="success-box" style="text-align:center;padding:48px 24px">
-        <div style="font-size:48px;margin-bottom:16px">👤</div>
+        <div style="margin-bottom:16px;color:var(--primary)">${icone('usuario', 48)}</div>
         <h1 style="font-size:22px;margin-bottom:12px">Complete seu perfil</h1>
         <p style="color:var(--text-muted);margin-bottom:12px">Para finalizar uma compra, precisamos que seu cadastro esteja completo.</p>
         <div style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.25);border-radius:12px;padding:16px;margin-bottom:24px;text-align:left">
-          <p style="font-size:13px;font-weight:700;margin-bottom:8px;color:#ef4444">⚠️ Dados faltando:</p>
+          <p style="font-size:13px;font-weight:700;margin-bottom:8px;color:#ef4444">Dados faltando:</p>
           ${faltando.map(f => '<p style="font-size:13px;color:var(--text-muted);margin-bottom:4px">• ' + f + '</p>').join('')}
         </div>
         <a href="conta.html?secao=profile" class="btn btn-primary" style="display:inline-block">Completar Cadastro</a>
@@ -1390,13 +1395,13 @@ if (statusMP) {
       // tela — só os últimos dígitos.
       document.getElementById('main-content').innerHTML = `
       <div class="success-box" style="text-align:center;padding:48px 24px">
-        <div style="font-size:48px;margin-bottom:16px">📋</div>
+        <div style="margin-bottom:16px;color:var(--primary)">${icone('arquivo', 48)}</div>
         <h1 style="font-size:22px;margin-bottom:12px;color:var(--primary)">Confira seus dados</h1>
         <p style="color:var(--text-muted);margin-bottom:20px">Esses dados vão junto com o seu pedido. Estão corretos?</p>
         <div style="background:var(--bg-card);border:1px solid var(--primary);border-radius:12px;padding:16px;margin-bottom:24px;text-align:left">
-          <p style="font-size:14px;margin-bottom:8px">👤 <strong>Nome:</strong> ${esc(perfilCheck.nome)}</p>
-          <p style="font-size:14px;margin-bottom:8px">🪪 <strong>CPF:</strong> ${window.mascararCPF(perfilCheck.cpf)}</p>
-          <p style="font-size:14px">📞 <strong>Telefone:</strong> ${esc(perfilCheck.telefone)}</p>
+          <p style="font-size:14px;margin-bottom:8px"><strong>Nome:</strong> ${esc(perfilCheck.nome)}</p>
+          <p style="font-size:14px;margin-bottom:8px"><strong>CPF:</strong> ${window.mascararCPF(perfilCheck.cpf)}</p>
+          <p style="font-size:14px"><strong>Telefone:</strong> ${esc(perfilCheck.telefone)}</p>
         </div>
         <div style="display:flex;gap:12px">
           <a href="conta.html?secao=profile" class="btn btn-outline" style="flex:1">Editar dados</a>
@@ -1423,10 +1428,10 @@ if (statusMP) {
   } catch (erroInicial) {
     document.getElementById('main-content').innerHTML = `
     <div class="success-box" style="text-align:center;padding:48px 24px">
-      <div style="font-size:48px;margin-bottom:16px">⚠️</div>
+      <div style="margin-bottom:16px;color:#f59e0b">${icone('alerta', 48)}</div>
       <h1 style="font-size:22px;margin-bottom:12px">Não foi possível carregar o checkout</h1>
       <p style="color:var(--text-muted);margin-bottom:24px">${esc(erroInicial.message) || 'Verifique sua conexão com a internet e tente novamente.'}</p>
-      <button type="button" onclick="window.location.reload()" class="btn btn-primary" style="display:inline-block">🔄 Tentar novamente</button>
+      <button type="button" onclick="window.location.reload()" class="btn btn-primary" style="display:inline-flex;align-items:center;gap:6px">${icone('troca', 16)} Tentar novamente</button>
     </div>`;
   }
 }

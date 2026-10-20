@@ -16,7 +16,7 @@
 <div class="page-hero sr-only">
   <div class="container">
     <div class="breadcrumb"><a href="index.html">Home</a><span>/</span><span>Meu Saldo</span></div>
-    <h1>💰 Meu Saldo</h1>
+    <h1>Meu Saldo</h1>
   </div>
 </div>
 
@@ -34,11 +34,11 @@
   <!-- Código de indicação -->
   <div class="card" style="margin-bottom:20px">
     <div class="card-body">
-      <p style="font-weight:700;margin-bottom:4px">🤝 Indique e ganhe</p>
+      <p style="font-weight:700;margin-bottom:4px;display:flex;align-items:center;gap:8px"><span style="color:var(--primary);display:inline-flex"><i data-ico="pessoas" data-tam="18"></i></span>Indique e ganhe</p>
       <p style="font-size:13px;color:var(--text-muted);margin-bottom:14px">Compartilhe seu link. Quando alguém comprar por ele, você ganha uma comissão em saldo — automaticamente, sem precisar fazer nada.</p>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <input type="text" id="link-indicacao" readonly style="flex:1;min-width:180px;background:var(--bg-muted);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:10px 12px;font-size:13px">
-        <button onclick="copiarLinkIndicacao()" class="btn btn-primary btn-sm">📋 Copiar link</button>
+        <button onclick="copiarLinkIndicacao()" class="btn btn-primary btn-sm"><i data-ico="copiar" data-tam="15"></i> Copiar link</button>
       </div>
     </div>
   </div>
@@ -46,7 +46,7 @@
   <!-- Bônus por avaliação (crédito feito pelo banco: _interno/sql-bonus-avaliacao.sql) -->
   <div class="card" style="margin-bottom:20px">
     <div class="card-body">
-      <p style="font-weight:700;margin-bottom:4px">⭐ Avalie e ganhe</p>
+      <p style="font-weight:700;margin-bottom:4px;display:flex;align-items:center;gap:8px"><span style="color:var(--primary);display:inline-flex"><i data-ico="estrela" data-tam="18"></i></span>Avalie e ganhe</p>
       <p style="font-size:13px;color:var(--text-muted)">Ganhe <strong style="color:var(--primary)">R$ 0,50</strong> de saldo a cada produto que você avaliar depois de receber, ou <strong style="color:var(--primary)">R$ 1,00</strong> se escrever 100+ caracteres e mandar 1 foto e 1 vídeo. É só abrir o produto, ir na aba <strong>Avaliações</strong> e contar como foi. O saldo cai quando a avaliação for aprovada.</p>
     </div>
   </div>
@@ -59,6 +59,7 @@
 </div>
 
 <div id="footer"></div>
+<script src="js/icones.js"></script>
 <script src="js/cart.js"></script>
 <script src="js/main.js"></script>
 <script type="module">
@@ -94,14 +95,14 @@ async function carregarSaldo() {
   const lista = document.getElementById('extrato-lista');
   if (!extrato?.length) {
     lista.innerHTML = `<div class="card"><div class="card-body" style="text-align:center;padding:48px">
-      <p style="font-size:40px;margin-bottom:12px">💰</p>
+      <p style="margin-bottom:12px;color:var(--text-muted)"><i data-ico="carteira" data-tam="44"></i></p>
       <p style="font-weight:700;margin-bottom:8px">Nenhuma movimentação ainda</p>
       <p style="color:var(--text-muted)">Compre produtos com cashback ou indique amigos pra começar a acumular saldo.</p>
     </div></div>`;
     return;
   }
 
-  const rotulos = { cashback: '💰 Cashback', indicacao: '🤝 Indicação', resgate: '🛒 Usado em uma compra', reembolso: '↩️ Reembolso', avaliacao: '⭐ Avaliação' };
+  const rotulos = { cashback: 'Cashback', indicacao: 'Indicação', resgate: 'Usado em uma compra', reembolso: 'Reembolso', avaliacao: 'Avaliação' };
   lista.innerHTML = extrato.map(e => `
     <div class="card" style="margin-bottom:8px">
       <div class="card-body" style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px">

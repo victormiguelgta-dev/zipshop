@@ -212,9 +212,14 @@
         <span style="font-size:11px;color:var(--text-muted)">(exibe selo de entrega rápida)</span>
       </label>
       <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
-        <input type="checkbox" id="edit-drop" style="width:16px;height:16px;accent-color:var(--primary)">
+        <input type="checkbox" id="edit-drop" style="width:16px;height:16px;accent-color:var(--primary)" onchange="if (this.checked) document.getElementById('edit-paga-entrega').checked = false">
         <span style="font-size:13px;font-weight:600">📦 Produto drop</span>
         <span style="font-size:11px;color:var(--text-muted)">(enviado pelo fornecedor: mostra "Entrega em 5 a 15 dias" no lugar de "Entrega amanhã")</span>
+      </label>
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
+        <input type="checkbox" id="edit-paga-entrega" checked style="width:16px;height:16px;accent-color:var(--primary)">
+        <span style="font-size:13px;font-weight:600">💵 Aceita pagamento na entrega</span>
+        <span style="font-size:11px;color:var(--text-muted)">(desmarcado: o cliente só paga por PIX ou cartão quando este produto estiver no carrinho)</span>
       </label>
     </div>
     </div>
@@ -574,6 +579,7 @@ window.abrirModal = function() {
   document.getElementById('edit-frete-gratis').checked = false;
   document.getElementById('edit-entrega-24h').checked = false;
   document.getElementById('edit-drop').checked = false;
+  document.getElementById('edit-paga-entrega').checked = true;
   document.getElementById('edit-relacionados').value = '';
   document.getElementById('edit-cores').value = '';
   document.getElementById('edit-specs').value = '';
@@ -613,6 +619,7 @@ window.editarProduto = function(id) {
   document.getElementById('edit-frete-gratis').checked = p.frete_gratis||false;
   document.getElementById('edit-entrega-24h').checked = p.entrega_24h||false;
   document.getElementById('edit-drop').checked = p.tipo_estoque === 'dropshipping';
+  document.getElementById('edit-paga-entrega').checked = p.aceita_pagamento_entrega !== false;
   document.getElementById('edit-cashback').value = p.cashback_percentual || '';
   document.getElementById('edit-indicacao').value = p.indicacao_percentual || '';
   galeriaNovas = [];
@@ -697,6 +704,7 @@ window.salvarProduto = async function() {
     frete_gratis: document.getElementById('edit-frete-gratis').checked,
     entrega_24h: document.getElementById('edit-entrega-24h').checked,
     tipo_estoque: document.getElementById('edit-drop').checked ? 'dropshipping' : 'proprio',
+    aceita_pagamento_entrega: document.getElementById('edit-paga-entrega').checked,
     ...(document.getElementById('edit-drop').checked ? { prazo_entrega_dias: 15 } : {}),
     garantia: document.getElementById('edit-garantia').value || null,
     cashback_percentual: parseFloat(document.getElementById('edit-cashback').value) || 0,
