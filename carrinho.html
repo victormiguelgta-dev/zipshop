@@ -107,7 +107,7 @@ window.renderCart = async function() {
     // Foto e nome levam pra página do produto
     const linkProduto = `produto.html?id=${encodeURIComponent(item.id)}`;
     return `<div class="cart-item">
-      <a href="${linkProduto}" class="cart-item-link" aria-label="Ver ${nome}">${cartItemImgHTML(item, 80)}</a>
+      <a href="${linkProduto}" class="cart-item-link" aria-label="Ver ${nome}">${cartItemImgHTML(item, 96)}</a>
       <div class="cart-item-info">
         <div class="cart-item-brand">${brand}</div>
         <a href="${linkProduto}" class="cart-item-name cart-item-link">${nome}</a>
@@ -119,7 +119,7 @@ window.renderCart = async function() {
           </div>
           <div style="display:flex;align-items:center;gap:12px">
             <span class="cart-item-price">${formatPrice(price * item.qty)}</span>
-            <button class="qty-btn-remove" data-action="remove" data-chave="${chave}" style="background:none;border:none;color:var(--text-muted);cursor:pointer;display:inline-flex" title="Remover" aria-label="Remover">${icone('lixeira', 20)}</button>
+            <button class="qty-btn-remove carrinho-lixeira" data-action="remove" data-chave="${chave}" title="Remover" aria-label="Remover">${icone('lixeira', 18)}</button>
           </div>
         </div>
       </div>

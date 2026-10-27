@@ -75,15 +75,39 @@ async function atualizarCategoriasNav(sb) {
     const nomes = data.map(c => c.name).filter(Boolean);
     if (JSON.stringify(nomes) === JSON.stringify(categoriasSalvas())) return;
     localStorage.setItem(CATS_CACHE_KEY, JSON.stringify(nomes));
-    const ofertas = document.querySelector('.nav-categories-inner .highlight');
-    document.querySelectorAll('.nav-categories-inner .nav-cat-link:not(.highlight)').forEach(a => a.remove());
-    ofertas?.insertAdjacentHTML('beforebegin', navCategoriasHTML());
     const col = document.querySelector('#footer .footer-links');
     if (col) {
       col.querySelectorAll('a[href*="?cat="]').forEach(a => a.remove());
       col.insertAdjacentHTML('beforeend', footerCategoriasHTML());
     }
   } catch (e) { /* sem rede: fica a cópia salva */ }
+}
+
+// Faixa de vantagens abaixo do topo (no lugar da faixa de categorias,
+// que ficava repetida com as categorias da home e da lista de produtos).
+// Os textos podem ser trocados em Painel → Textos do Site (faixa_vantagem_1..4).
+function faixaVantagensHTML() {
+  const itens = [
+    ['local', 'faixa_vantagem_1', 'Feito pra Santa Maria', null],
+    ['caminhao', 'faixa_vantagem_2', 'Frete grátis em até 24h', null],
+    ['raio', 'faixa_vantagem_3', 'Receba em até 3h', `${BASE}/produtos.html?deal=1`],
+    ['cupom', 'faixa_vantagem_4', 'Cupons', `${BASE}/cupons.html`]
+  ];
+  return itens.map(([ico, chave, texto, link]) => {
+    const tag = link ? 'a' : 'span';
+    return `<${tag} class="faixa-item"${link ? ` href="${link}"` : ''}>${ic(ico, 16)}<span data-texto="${chave}">${texto}</span></${tag}>`;
+  }).join('<span class="faixa-ponto" aria-hidden="true"></span>');
+}
+// No celular, se a faixa não couber, ela desliza sozinha (devagar)
+function ligarFaixaVantagens() {
+  const faixa = document.getElementById('faixa-vantagens');
+  const trilho = faixa?.querySelector('.faixa-trilho');
+  if (!trilho || trilho.dataset.ligada) return;
+  trilho.dataset.ligada = '1';
+  if (trilho.scrollWidth > faixa.clientWidth + 4 && !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+    trilho.insertAdjacentHTML('beforeend', '<span class="faixa-ponto" aria-hidden="true"></span>' + trilho.innerHTML);
+    faixa.classList.add('rolando');
+  }
 }
 
 function navbarHTML(user, isAdmin = false) {
@@ -122,11 +146,8 @@ function navbarHTML(user, isAdmin = false) {
       <button type="submit" aria-label="Buscar">${ic('busca', 18)}</button>
       <div class="search-suggest" id="mobile-search-suggest"></div>
     </form>
-    <div class="nav-categories">
-      <div class="nav-categories-inner">
-        ${navCategoriasHTML()}
-        <a href="${BASE}/produtos.html?deal=1" class="nav-cat-link highlight" style="display:inline-flex;align-items:center;gap:5px">${ic('raio', 15)}<span data-texto="navbar_cat_ofertas">Ofertas do Dia</span></a>
-      </div>
+    <div class="faixa-vantagens" id="faixa-vantagens">
+      <div class="faixa-trilho">${faixaVantagensHTML()}</div>
     </div>
   </nav>`;
 }
@@ -303,6 +324,7 @@ async function initPage() {
   if (navEl) {
     navEl.innerHTML = navbarHTML(currentUser, isAdmin);
     aplicarTextosEm(navEl);
+    setTimeout(ligarFaixaVantagens, 300);
   }
   const footEl = document.getElementById('footer');
   if (footEl) {
@@ -332,6 +354,7 @@ async function initPage() {
       if (navEl) {
         navEl.innerHTML = navbarHTML(user, admin);
         aplicarTextosEm(navEl);
+        setTimeout(ligarFaixaVantagens, 300);
       }
     });
   }
