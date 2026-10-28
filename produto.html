@@ -187,10 +187,10 @@ async function render() {
       <div>
         <div style="font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">${p.brand}</div>
         <h1 class="detail-title">${p.name}</h1>
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
-          <span class="stars">${starsHTML(p.rating)}</span>
-          <span class="stars-count">(${p.reviews} avaliações)</span>
-        </div>
+        ${p.reviews > 0 ? `<div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
+          <span class="stars">${starsHTML(Math.round(p.rating))}</span>
+          <span class="stars-count">${Number(p.rating).toFixed(1)} (${p.reviews} ${p.reviews === 1 ? 'avaliação' : 'avaliações'})</span>
+        </div>` : '<div style="margin-bottom:12px"></div>'}
         <div class="detail-price-old" id="detail-price-old" ${p.oldPrice && !variacoes.length ? '' : 'hidden'}>${p.oldPrice ? formatPrice(p.oldPrice) : ''}</div>
         <div class="detail-price" id="detail-price">${variacoes.length ? '<span style="font-size:14px;font-weight:600;color:var(--text-muted)">a partir de </span>' : ''}${formatPrice(p.price)}</div>
         <div class="detail-installment pd-parcela">${ICO.cartao}<span id="detail-installment">ou 12x de ${formatPrice(p.price/12)} sem juros</span></div>
@@ -258,7 +258,8 @@ async function render() {
       </div>
       <div id="pane-desc">
         <div style="background:var(--bg-card);border:1px solid var(--primary);border-radius:var(--radius-lg);padding:24px">
-          <p style="color:var(--text-muted);line-height:1.8">${p.desc}</p>
+          <p class="pd-desc-texto fechada" id="pd-desc-texto" style="color:var(--text-muted);line-height:1.8">${p.desc}</p>
+          <button type="button" class="pd-ver-mais" id="pd-ver-mais" hidden onclick="alternarDescricao()">Ver mais ${icone('chevronBaixo', 16)}</button>
         </div>
       </div>
       <div id="pane-specs" style="display:none">
@@ -289,6 +290,11 @@ async function render() {
       <div id="tbm-grid" style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px"></div>
     </div>`;
 
+  // Descrição longa abre fechada, com "Ver mais"
+  const descEl = document.getElementById('pd-desc-texto');
+  if (descEl && descEl.scrollHeight > descEl.clientHeight + 4) document.getElementById('pd-ver-mais').hidden = false;
+  else descEl?.classList.remove('fechada');
+
   // Carrega avaliações, relacionados e "tbm pode gostar" em paralelo
   ligarCarrossel();
   carregarAvaliacoes(p);
@@ -303,7 +309,7 @@ async function render() {
 
 window.toggleFavoritoDetalhe = async function(produtoId) {
   const r = await toggleFavorito(produtoId);
-  if (r.precisaLogin) { window.location.href = 'login.html'; return; }
+  if (r.precisaLogin) { window.location.href = linkLogin(); return; }
   const btn = document.getElementById('btn-fav-detalhe');
   if (btn) btn.innerHTML = iconeFav(r.favoritado, 22);
 }
@@ -435,6 +441,15 @@ function avisarEscolherCor() {
   setTimeout(abrirOpcoes, 350);
 }
 
+window.alternarDescricao = function() {
+  const t = document.getElementById('pd-desc-texto');
+  const aberta = t.classList.toggle('fechada') === false;
+  const b = document.getElementById('pd-ver-mais');
+  b.innerHTML = (aberta ? 'Ver menos ' : 'Ver mais ') + icone('chevronBaixo', 16);
+  b.classList.toggle('aberta', aberta);
+  if (!aberta) t.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+};
+
 // ——— AVALIAÇÕES ———
 // Fotos/vídeos vão pro bucket 'avaliacoes' e toda avaliação passa pela
 // aprovação do admin antes de aparecer (_interno/sql-avaliacoes-midia-aprovacao.sql).
@@ -516,7 +531,7 @@ async function carregarAvaliacoes(p) {
 
   let formAvaliar;
   if (!user) {
-    formAvaliar = `<div style="background:var(--bg-muted);border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:13px;color:var(--text-muted)"><a href="login.html" style="color:var(--primary);font-weight:700">Faça login</a> para avaliar este produto.</div>`;
+    formAvaliar = `<div style="background:var(--bg-muted);border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:13px;color:var(--text-muted)"><a href="${linkLogin()}" style="color:var(--primary);font-weight:700">Faça login</a> para avaliar este produto.</div>`;
   } else if (!minha) {
     formAvaliar = recebeuProduto
       ? formAvaliacaoHTML(p, null)
@@ -681,8 +696,8 @@ window.enviarAvaliacao = async function(produtoId) {
 // ——— HELPER: card mini estilo AliExpress ———
 function miniCard(r) {
   const preco = formatPrice(parseFloat(r.price));
-  const rating = r.rating ? r.rating.toFixed(1) : '5.0';
-  const vendidos = r.reviews || 0;
+  const rating = (Number(r.rating) || 5).toFixed(1);
+  const vendidos = Number(r.reviews) || 0;
   const vendidosStr = vendidos >= 1000 ? (vendidos/1000).toFixed(1)+'mil' : vendidos;
   return `
     <a href="produto.html?id=${r.id}" style="text-decoration:none;display:flex;flex-direction:column;background:var(--bg-card);border:1px solid var(--border);border-radius:12px;overflow:hidden;transition:border-color .2s" onmouseover="this.style.borderColor='var(--primary)'" onmouseout="this.style.borderColor='var(--border)'">
@@ -694,10 +709,10 @@ function miniCard(r) {
       </div>
       <div style="padding:8px">
         <div style="font-size:12px;font-weight:600;color:var(--text);line-height:1.3;margin-bottom:5px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${esc(r.name)}</div>
-        <div style="display:flex;align-items:center;gap:5px;margin-bottom:5px">
+        ${vendidos ? `<div style="display:flex;align-items:center;gap:5px;margin-bottom:5px">
           <span style="display:inline-flex;align-items:center;gap:2px;background:#1a1a00;border:1px solid rgba(250,204,21,.25);border-radius:5px;padding:1px 6px;font-size:11px;font-weight:700;color:#facc15">★ ${rating}</span>
-          ${vendidos ? `<span style="font-size:11px;color:var(--text-muted)">${vendidosStr}+ vendido(s)</span>` : ''}
-        </div>
+          <span style="font-size:11px;color:var(--text-muted)">(${vendidosStr})</span>
+        </div>` : ''}
         <div style="font-size:15px;font-weight:900;color:var(--primary)">${preco}</div>
         ${r.old_price ? `<div style="font-size:11px;color:var(--text-muted);text-decoration:line-through">${formatPrice(parseFloat(r.old_price))}</div>` : ''}
       </div>

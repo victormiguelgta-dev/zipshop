@@ -43,7 +43,7 @@
         Continuar com Google
       </button>
     </div>
-    <div class="auth-footer">Não tem uma conta? <a href="cadastro.html">Criar conta grátis</a></div>
+    <div class="auth-footer">Não tem uma conta? <a href="cadastro.html" id="link-cadastro">Criar conta grátis</a></div>
   </div>
 </div>
 
@@ -59,9 +59,14 @@
   // E-mails com acesso admin (deve ser igual à lista em admin-guard.js e main.js)
   const ADMIN_EMAILS = ['victormiguelgta@gmail.com', 'admin@zipshop.com'];
 
+  // A página de volta fica guardada na aba: o login com Google sai do site
+  // e volta em login.html?oauth=1, sem o ?redirect=
+  const redirectDaUrl = new URLSearchParams(window.location.search).get('redirect');
+  try { if (redirectDaUrl) sessionStorage.setItem('login_destino', redirectDaUrl); } catch {}
+
   function getDestino(userObj) {
-    const params = new URLSearchParams(window.location.search);
-    const redirect = params.get('redirect') || '';
+    let redirect = redirectDaUrl || '';
+    try { redirect = redirect || sessionStorage.getItem('login_destino') || ''; sessionStorage.removeItem('login_destino'); } catch {}
     if (redirect === 'checkout') return 'checkout.html';
     // Volta pra página de onde veio (ex: produto.html?id=7, saldo.html).
     // Só aceita página interna do site — nada de "https://outro-site".
@@ -94,6 +99,8 @@
     // via o login "piscar" antes do redirecionamento pra conta.
     document.getElementById('auth-page').style.display = '';
   }
+
+  if (redirectDaUrl) document.getElementById('link-cadastro').href = 'cadastro.html?redirect=' + encodeURIComponent(redirectDaUrl);
 
   function mostrarErro(msg) {
     const el = document.getElementById('msg-erro');

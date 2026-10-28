@@ -1019,7 +1019,7 @@ async function finalizarPedido() {
 
   if (!user) {
     showToast('Faça login para finalizar sua compra', 'error');
-    setTimeout(() => window.location.href = 'login.html', 1500);
+    setTimeout(() => window.location.href = 'login.html?redirect=checkout', 1500);
     btn.disabled = false;
     return;
   }
@@ -1356,7 +1356,7 @@ if (statusMP) {
     const userCheck = sessionCheck?.user || null;
 
     if (!userCheck) {
-      window.location.replace('login.html');
+      window.location.replace('login.html?redirect=checkout');
     } else {
       const { data: perfilCheck } = await comTimeout(
         supabaseCheck.from('usuarios').select('nome, cpf, telefone').eq('id', userCheck.id).single(),

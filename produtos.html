@@ -131,7 +131,7 @@ window._produtosCache = {};
 
 window.toggleFavoritoCard = async function(produtoId, btn) {
   const r = await toggleFavorito(produtoId);
-  if (r.precisaLogin) { window.location.href = 'login.html'; return; }
+  if (r.precisaLogin) { window.location.href = linkLogin(); return; }
   btn.innerHTML = iconeFav(r.favoritado);
   btn.dataset.fav = r.favoritado ? '1' : '0';
 };

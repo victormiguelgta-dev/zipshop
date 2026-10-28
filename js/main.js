@@ -110,6 +110,15 @@ function ligarFaixaVantagens() {
   }
 }
 
+// Link pro login que volta pra página atual depois de entrar (ex: o
+// produto aberto pelo link de indicação), em vez de cair no perfil
+function linkLogin() {
+  const pagina = location.pathname.split('/').pop() || 'index.html';
+  if (BASE || /^(login|cadastro|conta)\.html$/.test(pagina)) return `${BASE}/login.html`;
+  return 'login.html?redirect=' + encodeURIComponent(pagina + location.search);
+}
+window.linkLogin = linkLogin;
+
 function navbarHTML(user, isAdmin = false) {
   const primeiroNome = (user?.user_metadata?.full_name || user?.email || '').split(' ')[0].split('@')[0]
     .replace(/[<>&"']/g, '');
@@ -117,7 +126,7 @@ function navbarHTML(user, isAdmin = false) {
     ? `<a href="${BASE}/conta.html" class="nav-btn" style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-flex;align-items:center">
         ${navAvatarHTML(user.user_metadata?.avatar_url)} ${primeiroNome}
        </a>`
-    : `<a href="${BASE}/login.html" class="nav-btn" style="display:inline-flex;align-items:center;gap:6px">${ic('usuario', 18)}<span data-texto="navbar_btn_entrar">Entrar</span></a>`;
+    : `<a href="${linkLogin()}" class="nav-btn" style="display:inline-flex;align-items:center;gap:6px">${ic('usuario', 18)}<span data-texto="navbar_btn_entrar">Entrar</span></a>`;
 
   return `
   <nav class="navbar">
