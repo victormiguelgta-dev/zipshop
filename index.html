@@ -60,7 +60,8 @@ function heroHTML(banners) {
   return banners.map((b, i) => {
     const link = linkSeguro(b.link_cat || b.link, 'produtos.html');
     // colunas novas (_interno/sql-banners-opcoes.sql); sem elas, vale o padrão
-    const mostrarBotao = b.mostrar_botao !== false;
+    // O banner inteiro já é clicável: o botão "Ver Produtos" saiu da home
+    const mostrarBotao = false;
     const textoBotao = (b.texto_botao || '').trim() || 'Ver Produtos';
     // Banner que já traz o texto na própria imagem: no celular o botão vai
     // embaixo da imagem em vez de ficar por cima dela
@@ -73,7 +74,7 @@ function heroHTML(banners) {
         ${b.image_url
           ? `<img src="${esc(b.image_url)}" alt="" decoding="async" ${i === 0 ? 'fetchpriority="high"' : 'fetchpriority="low"'} class="hero-img">`
           : `<span style='color:var(--text-muted)'>${icone('sacola', 72)}</span>`}
-        <div class="hero-text-wrap${b.escurecer === true ? ' escurecer' : ''}${soBotao ? ' so-botao' : ''}">
+        ${soBotao && !mostrarBotao ? '' : `<div class="hero-text-wrap${b.escurecer === true ? ' escurecer' : ''}${soBotao ? ' so-botao' : ''}">
           ${b.badge ? `<div class="hero-badge">${esc(b.badge)}</div>` : ''}
           ${b.titulo ? `<h1 class="hero-title">${esc(b.titulo).replace(/\r?\n/g, '<br>')}</h1>` : ''}
           ${b.subtitulo ? `<p class="hero-sub">${esc(b.subtitulo)}</p>` : ''}
@@ -81,7 +82,7 @@ function heroHTML(banners) {
           ${mostrarBotao ? `<div class="hero-btns">
             <a href="${esc(link)}" class="btn btn-primary btn-lg">${esc(textoBotao)}</a>
           </div>` : ''}
-        </div>
+        </div>`}
       </div>
     </div>`; }).join('') +
     (banners.length > 1 ? `<button class="hero-nav-btn hero-prev" onclick="changeSlide(-1)">&#8249;</button>

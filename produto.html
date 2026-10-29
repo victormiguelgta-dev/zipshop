@@ -16,7 +16,15 @@
 </head>
 <body>
 <div id="navbar"></div>
-<div id="content"></div>
+<div id="content">
+  <!-- Aparece enquanto o produto carrega (antes ficava só o rodapé na tela) -->
+  <div class="container pd-carregando" aria-label="Carregando produto">
+    <div class="esqueleto-produto pd-esq-foto"></div>
+    <div class="esqueleto-produto pd-esq-linha" style="width:40%"></div>
+    <div class="esqueleto-produto pd-esq-linha" style="width:90%"></div>
+    <div class="esqueleto-produto pd-esq-linha" style="width:55%;height:32px"></div>
+  </div>
+</div>
 <div id="footer"></div>
 
 <script src="js/icones.js"></script>
@@ -82,13 +90,15 @@ window.alternarInfo = function(id, btn) {
 };
 
 async function render() {
-  const p = await getProduct(id);
+  // Internet ruim: tenta de novo antes de desistir
+  let p = await getProduct(id);
+  if (!p && id) { await new Promise(r => setTimeout(r, 1200)); p = await getProduct(id); }
   window._produto = p;
-  registrarEvento('visualizacao_produto', { produtoId: p.id });
   if (!p) {
-    document.getElementById('content').innerHTML = `<div style="text-align:center;padding:80px 16px"><p style="color:var(--text-muted)">${icone('busca', 48)}</p><h2 style="margin:16px 0 8px">Produto não encontrado</h2><a href="produtos.html" class="btn btn-primary">Ver Produtos</a></div>`;
+    document.getElementById('content').innerHTML = `<div style="text-align:center;padding:80px 16px"><p style="color:var(--text-muted)">${icone('busca', 48)}</p><h2 style="margin:16px 0 8px">Produto não encontrado</h2><p style="color:var(--text-muted);margin-bottom:16px">Ele pode ter saído da loja, ou a internet falhou.</p><div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap"><button class="btn btn-outline" onclick="location.reload()">Tentar de novo</button><a href="produtos.html" class="btn btn-primary">Ver Produtos</a></div></div>`;
     return;
   }
+  registrarEvento('visualizacao_produto', { produtoId: p.id });
   document.title = p.name + ' — Zipshop';
   // specs pode vir como lista [{nome, valor}] (novo, mantém a ordem) ou objeto (antigo)
   const listaSpecs = Array.isArray(p.specs) ? p.specs
@@ -115,11 +125,18 @@ async function render() {
     urlsVistas.add(url);
     galeria.push({ url, thumb: (typeof item === 'object' && item.thumb) || url });
   });
+  // Vídeo do produto (enviado no painel) entra como primeiro item da galeria
+  if (p.video_url && /^https:\/\//.test(p.video_url)) {
+    galeria.unshift({ url: p.video_url, thumb: galeria[0]?.thumb || '', video: true });
+  }
+  const primeiraFoto = galeria.findIndex(g => !g.video);
   const galeriaHTML = galeria.length > 1 ? `
     <div class="pd-miniaturas" id="pd-miniaturas">
       ${galeria.map((img, i) => `
-        <button type="button" onclick="irParaFoto(${i})" class="${i === 0 ? 'ativa' : ''}" aria-label="Foto ${i + 1}">
-          <img src="${img.thumb || img.url}" loading="lazy" alt="" onerror="this.closest('button').remove()">
+        <button type="button" onclick="irParaFoto(${i})" class="${i === 0 ? 'ativa' : ''}${img.video ? ' pd-mini-video' : ''}" aria-label="${img.video ? 'Vídeo' : 'Foto ' + (i + 1)}">
+          ${img.video
+            ? `${img.thumb ? `<img src="${esc(img.thumb)}" loading="lazy" alt="">` : ''}<span class="pd-play">${icone('play', 18)}</span>`
+            : `<img src="${img.thumb || img.url}" loading="lazy" alt="" onerror="this.closest('button').remove()">`}
         </button>`).join('')}
     </div>` : '';
   const descontoPct = percentualDesconto(p);
@@ -177,7 +194,9 @@ async function render() {
         <div class="detail-img pd-carrossel-box" id="detail-img-wrap" style="background:${galeria.length ? '#fff' : 'linear-gradient(135deg,#1e3a6e,#2563eb)'}">
           ${galeria.length ? `
           <div class="pd-carrossel" id="pd-carrossel">
-            ${galeria.map((img, i) => `<img src="${img.url}" alt="${esc(p.name)}" ${i === 0 ? 'id="detail-main-img"' : 'loading="lazy"'} draggable="false" onclick="abrirImagemCheia(this.src)">`).join('')}
+            ${galeria.map((img, i) => img.video
+              ? `<video class="pd-video" src="${esc(img.url)}" ${galeria[primeiraFoto] ? `poster="${esc(galeria[primeiraFoto].url)}"` : ''} controls playsinline muted preload="metadata"></video>`
+              : `<img src="${img.url}" alt="${esc(p.name)}" ${i === primeiraFoto ? 'id="detail-main-img"' : 'loading="lazy"'} draggable="false" onclick="abrirImagemCheia(this.src)">`).join('')}
           </div>
           ${galeria.length > 1 ? `<span class="pd-contador" id="pd-contador">1/${galeria.length}</span>` : ''}` : `<span style="font-size:140px">${p.emoji ? esc(p.emoji) : icone('caixa', 120)}</span>`}
           <span class="pd-selo-desconto" id="pd-selo-desconto" ${descontoPct > 0 && !variacoes.length ? '' : 'hidden'}>-${descontoPct}%</span>
@@ -333,6 +352,8 @@ function ligarCarrossel() {
       const total = c.children.length;
       const cont = document.getElementById('pd-contador');
       if (cont) cont.textContent = `${i + 1}/${total}`;
+      // Saiu do vídeo: pausa
+      c.querySelectorAll('video').forEach((v, j) => { if (c.children[i] !== v && !v.paused) v.pause(); });
       document.querySelectorAll('#pd-miniaturas button').forEach((b, j) => b.classList.toggle('ativa', j === i));
       document.querySelectorAll('#pd-miniaturas button')[i]?.scrollIntoView({ inline: 'nearest', block: 'nearest' });
     });
@@ -460,6 +481,7 @@ const AV_MAX_VIDEO_MB = 50;
 let _avFotos = [];      // File[] novos
 let _avVideo = null;    // File novo
 let _avExistente = null; // avaliação do próprio cliente (pra editar)
+let _avPedidoId = null;   // compra que está sendo avaliada
 
 function midiaAvaliacaoHTML(a) {
   const fotos = (a.fotos || []).map(u => `<a href="${esc(u)}" target="_blank" rel="noopener"><img src="${esc(u)}" loading="lazy" alt="Foto da avaliação" style="width:72px;height:72px;object-fit:cover;border-radius:8px;border:1px solid var(--border)"></a>`).join('');
@@ -507,41 +529,61 @@ async function carregarAvaliacoes(p) {
 
   const { data: { session: _sessAval } } = await supabase.auth.getSession();
   const user = _sessAval?.user || null;
-  const minha = avaliacoes?.find(a => a.usuario_id === user?.id) || null;
+  // Uma avaliação por compra: cada pedido entregue com este produto pode
+  // ser avaliado uma vez (_interno/sql-avaliacao-por-compra-e-video.sql)
+  const minhas = (avaliacoes || []).filter(a => user && a.usuario_id === user.id);
   const aprovadas = (avaliacoes || []).filter(a => a.status === 'aprovada');
 
-  // Só pode avaliar quem já recebeu este produto (o banco também exige isso)
-  let recebeuProduto = false;
-  if (user && !minha) {
+  let comprasSemAvaliacao = [];
+  if (user) {
     const { data: entregues } = await supabase
       .from('pedidos')
-      .select('id')
+      .select('id, created_at')
       .eq('usuario_id', user.id)
       .eq('status', 'entregue')
       .contains('itens', JSON.stringify([{ produto_id: Number(p.id) }]))
-      .limit(1);
-    recebeuProduto = !!(entregues && entregues.length);
+      .order('created_at', { ascending: true });
+    const avaliados = new Set(minhas.map(a => a.pedido_id));
+    comprasSemAvaliacao = (entregues || []).filter(e => !avaliados.has(e.id));
   }
 
   const totalAv = aprovadas.length;
   const mediaAv = totalAv ? (aprovadas.reduce((s, a) => s + a.nota, 0) / totalAv).toFixed(1) : '-';
 
   _avFotos = []; _avVideo = null;
-  _avExistente = minha && minha.status === 'reprovada' ? minha : null;
+  const reprovada = minhas.find(a => a.status === 'reprovada') || null;
+  const aguardando = minhas.filter(a => a.status === 'pendente').length;
+  _avExistente = reprovada;
+  // Veio do botão "Avaliar" de um pedido em Meus Pedidos: avalia aquela compra
+  const pedidoDaUrl = new URLSearchParams(location.search).get('pedido');
+  const escolhida = comprasSemAvaliacao.find(e => e.id === pedidoDaUrl) || comprasSemAvaliacao[0];
+  _avPedidoId = reprovada ? reprovada.pedido_id : (escolhida?.id || null);
+
+  const caixa = (cor, borda, html) => `<div style="background:${cor};border:1px solid ${borda};border-radius:10px;padding:12px 16px;margin-bottom:12px;font-size:13px">${html}</div>`;
+  const avisoAguardando = aguardando
+    ? caixa('rgba(245,158,11,0.08)', 'rgba(245,158,11,0.4)', `${aguardando === 1 ? 'Sua avaliação foi enviada e está' : `Você tem ${aguardando} avaliações`} aguardando aprovação. O saldo cai assim que for aprovada.`)
+    : '';
+  const dataCompra = (pid) => {
+    const c = comprasSemAvaliacao.find(e => e.id === pid);
+    return c ? new Date(c.created_at).toLocaleDateString('pt-BR') : '';
+  };
 
   let formAvaliar;
   if (!user) {
     formAvaliar = `<div style="background:var(--bg-muted);border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:13px;color:var(--text-muted)"><a href="${linkLogin()}" style="color:var(--primary);font-weight:700">Faça login</a> para avaliar este produto.</div>`;
-  } else if (!minha) {
-    formAvaliar = recebeuProduto
-      ? formAvaliacaoHTML(p, null)
-      : `<div style="background:var(--bg-muted);border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:13px;color:var(--text-muted)">Você poderá avaliar este produto depois de recebê-lo.</div>`;
-  } else if (minha.status === 'pendente') {
-    formAvaliar = `<div style="background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.4);border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:13px">Sua avaliação foi enviada e está aguardando aprovação. O saldo cai assim que ela for aprovada.</div>`;
-  } else if (minha.status === 'reprovada') {
-    formAvaliar = `<div style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.4);border-radius:10px;padding:12px 16px;margin-bottom:12px;font-size:13px">Sua avaliação não foi aprovada${minha.motivo_reprovacao ? `: ${esc(minha.motivo_reprovacao)}` : '.'} Você pode ajustar e reenviar.</div>` + formAvaliacaoHTML(p, minha);
+  } else if (reprovada) {
+    formAvaliar = avisoAguardando + caixa('rgba(239,68,68,0.08)', 'rgba(239,68,68,0.4)', `Sua avaliação não foi aprovada${reprovada.motivo_reprovacao ? `: ${esc(reprovada.motivo_reprovacao)}` : '.'} Você pode ajustar e reenviar.`) + formAvaliacaoHTML(p, reprovada);
+  } else if (comprasSemAvaliacao.length) {
+    const extra = minhas.length || comprasSemAvaliacao.length > 1
+      ? `<p style="font-size:12px;color:var(--text-muted);margin:0 0 8px">Avaliando a compra de ${dataCompra(_avPedidoId)}${comprasSemAvaliacao.length > 1 ? ` (mais ${comprasSemAvaliacao.length - 1} pra avaliar depois)` : ''}.</p>`
+      : '';
+    formAvaliar = avisoAguardando + extra + formAvaliacaoHTML(p, null);
+  } else if (aguardando) {
+    formAvaliar = avisoAguardando;
+  } else if (minhas.length) {
+    formAvaliar = caixa('rgba(170,239,0,0.06)', 'rgba(170,239,0,0.25)', 'Você já avaliou suas compras deste produto. Comprou de novo? Depois da entrega dá pra avaliar outra vez.');
   } else {
-    formAvaliar = `<div style="background:rgba(170,239,0,0.06);border:1px solid rgba(170,239,0,0.25);border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:13px">Você já avaliou este produto.</div>`;
+    formAvaliar = `<div style="background:var(--bg-muted);border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:13px;color:var(--text-muted)">Você poderá avaliar este produto depois de recebê-lo.</div>`;
   }
 
   const listaHTML = totalAv ? aprovadas.map(a => `
@@ -681,7 +723,7 @@ window.enviarAvaliacao = async function(produtoId) {
     const dados = { nota: _notaSelecionada, texto, fotos, videos };
     const { error } = _avExistente
       ? await supabase.from('avaliacoes').update(dados).eq('id', _avExistente.id)
-      : await supabase.from('avaliacoes').insert({ ...dados, produto_id: produtoId, usuario_id: user.id });
+      : await supabase.from('avaliacoes').insert({ ...dados, produto_id: produtoId, usuario_id: user.id, pedido_id: _avPedidoId });
     if (error) throw error;
 
     showToast('Avaliação enviada! Ela aparece depois de aprovada.', 'success');
@@ -826,7 +868,10 @@ window.showTab = function(tab) {
   if (tab === 'avaliacoes') carregarAvaliacoes(window._produto);
 };
 
-render().then(() => {
+render().catch(err => {
+  console.error('Erro ao abrir o produto:', err);
+  document.getElementById('content').innerHTML = `<div style="text-align:center;padding:80px 16px"><h2 style="margin:0 0 8px">Não deu pra carregar o produto</h2><p style="color:var(--text-muted);margin-bottom:16px">Confira sua internet e tente de novo.</p><button class="btn btn-primary" onclick="location.reload()">Tentar de novo</button></div>`;
+}).then(() => {
   if (location.hash === '#avaliar' && window._produto) {
     showTab('avaliacoes');
     document.getElementById('tab-avaliacoes')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
