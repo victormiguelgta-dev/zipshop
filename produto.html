@@ -125,18 +125,11 @@ async function render() {
     urlsVistas.add(url);
     galeria.push({ url, thumb: (typeof item === 'object' && item.thumb) || url });
   });
-  // Vídeo do produto (enviado no painel) entra como primeiro item da galeria
-  if (p.video_url && /^https:\/\//.test(p.video_url)) {
-    galeria.unshift({ url: p.video_url, thumb: galeria[0]?.thumb || '', video: true });
-  }
-  const primeiraFoto = galeria.findIndex(g => !g.video);
   const galeriaHTML = galeria.length > 1 ? `
     <div class="pd-miniaturas" id="pd-miniaturas">
       ${galeria.map((img, i) => `
-        <button type="button" onclick="irParaFoto(${i})" class="${i === 0 ? 'ativa' : ''}${img.video ? ' pd-mini-video' : ''}" aria-label="${img.video ? 'Vídeo' : 'Foto ' + (i + 1)}">
-          ${img.video
-            ? `${img.thumb ? `<img src="${esc(img.thumb)}" loading="lazy" alt="">` : ''}<span class="pd-play">${icone('play', 18)}</span>`
-            : `<img src="${img.thumb || img.url}" loading="lazy" alt="" onerror="this.closest('button').remove()">`}
+        <button type="button" onclick="irParaFoto(${i})" class="${i === 0 ? 'ativa' : ''}" aria-label="Foto ${i + 1}">
+          <img src="${img.thumb || img.url}" loading="lazy" alt="" onerror="this.closest('button').remove()">
         </button>`).join('')}
     </div>` : '';
   const descontoPct = percentualDesconto(p);
@@ -194,9 +187,7 @@ async function render() {
         <div class="detail-img pd-carrossel-box" id="detail-img-wrap" style="background:${galeria.length ? '#fff' : 'linear-gradient(135deg,#1e3a6e,#2563eb)'}">
           ${galeria.length ? `
           <div class="pd-carrossel" id="pd-carrossel">
-            ${galeria.map((img, i) => img.video
-              ? `<video class="pd-video" src="${esc(img.url)}" ${galeria[primeiraFoto] ? `poster="${esc(galeria[primeiraFoto].url)}"` : ''} controls playsinline muted preload="metadata"></video>`
-              : `<img src="${img.url}" alt="${esc(p.name)}" ${i === primeiraFoto ? 'id="detail-main-img"' : 'loading="lazy"'} draggable="false" onclick="abrirImagemCheia(this.src)">`).join('')}
+            ${galeria.map((img, i) => `<img src="${img.url}" alt="${esc(p.name)}" ${i === 0 ? 'id="detail-main-img"' : 'loading="lazy"'} draggable="false" onclick="abrirImagemCheia(this.src)">`).join('')}
           </div>
           ${galeria.length > 1 ? `<span class="pd-contador" id="pd-contador">1/${galeria.length}</span>` : ''}` : `<span style="font-size:140px">${p.emoji ? esc(p.emoji) : icone('caixa', 120)}</span>`}
           <span class="pd-selo-desconto" id="pd-selo-desconto" ${descontoPct > 0 && !variacoes.length ? '' : 'hidden'}>-${descontoPct}%</span>
@@ -352,8 +343,6 @@ function ligarCarrossel() {
       const total = c.children.length;
       const cont = document.getElementById('pd-contador');
       if (cont) cont.textContent = `${i + 1}/${total}`;
-      // Saiu do vídeo: pausa
-      c.querySelectorAll('video').forEach((v, j) => { if (c.children[i] !== v && !v.paused) v.pause(); });
       document.querySelectorAll('#pd-miniaturas button').forEach((b, j) => b.classList.toggle('ativa', j === i));
       document.querySelectorAll('#pd-miniaturas button')[i]?.scrollIntoView({ inline: 'nearest', block: 'nearest' });
     });
@@ -530,7 +519,7 @@ async function carregarAvaliacoes(p) {
   const { data: { session: _sessAval } } = await supabase.auth.getSession();
   const user = _sessAval?.user || null;
   // Uma avaliação por compra: cada pedido entregue com este produto pode
-  // ser avaliado uma vez (_interno/sql-avaliacao-por-compra-e-video.sql)
+  // ser avaliado uma vez (_interno/sql-avaliacao-por-compra.sql)
   const minhas = (avaliacoes || []).filter(a => user && a.usuario_id === user.id);
   const aprovadas = (avaliacoes || []).filter(a => a.status === 'aprovada');
 

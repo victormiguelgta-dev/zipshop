@@ -109,17 +109,6 @@
     </div>
 
     <div class="form-group">
-      <label class="form-label">Vídeo do produto (opcional)</label>
-      <video id="video-preview" controls playsinline muted style="display:none;width:100%;max-height:220px;border-radius:10px;background:#000;margin-bottom:8px"></video>
-      <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <button type="button" class="btn btn-outline btn-sm" onclick="document.getElementById('video-input').click()" id="btn-video">+ Adicionar vídeo</button>
-        <button type="button" class="btn btn-outline btn-sm" onclick="removerVideo()" id="btn-video-remover" style="display:none">Remover vídeo</button>
-      </div>
-      <input type="file" id="video-input" accept="video/mp4,video/quicktime,video/webm" style="display:none" onchange="escolherVideo(this)">
-      <p style="font-size:12px;color:var(--text-muted);margin-top:4px">MP4 ou MOV, até 50MB (um vídeo curto, de uns 30 segundos). Aparece primeiro na galeria do produto.</p>
-    </div>
-
-    <div class="form-group">
       <label class="form-label">Nome *</label>
       <input type="text" class="form-input" id="edit-name" placeholder="Ex: iPhone 15 Pro Max">
     </div>
@@ -293,49 +282,6 @@ function renderGaleriaGrid() {
       <button type="button" onclick="removerFotoGaleriaNova(${i})" style="position:absolute;top:-6px;right:-6px;background:#ef4444;color:#fff;border:none;border-radius:50%;width:20px;height:20px;font-size:12px;cursor:pointer;line-height:1">✕</button>
     </div>`).join('');
   grid.innerHTML = (itensExistentes + itensNovos) || '<p style="font-size:12px;color:var(--text-muted)">Nenhuma foto extra ainda.</p>';
-}
-
-// Vídeo do produto: vai pra pasta "produtos-videos" do Storage
-// (_interno/sql-avaliacao-por-compra-e-video.sql)
-const LIMITE_VIDEO = 50 * 1024 * 1024;
-let videoFile = null;     // vídeo novo escolhido agora
-let videoAtual = null;    // link do vídeo que o produto já tem
-let videoRemovido = false;
-function mostrarVideo(src) {
-  const v = document.getElementById('video-preview');
-  if (src) { v.src = src; v.style.display = 'block'; } else { v.removeAttribute('src'); v.load(); v.style.display = 'none'; }
-  document.getElementById('btn-video-remover').style.display = src ? '' : 'none';
-  document.getElementById('btn-video').textContent = src ? 'Trocar vídeo' : '+ Adicionar vídeo';
-}
-function prepararVideo(url) {
-  videoFile = null; videoRemovido = false; videoAtual = url || null;
-  document.getElementById('video-input').value = '';
-  mostrarVideo(videoAtual);
-}
-window.escolherVideo = function(input) {
-  const f = input.files[0];
-  if (!f) return;
-  if (f.size > LIMITE_VIDEO) { alert('O vídeo passa de 50MB. Use um vídeo mais curto ou comprimido.'); input.value = ''; return; }
-  videoFile = f; videoRemovido = false;
-  mostrarVideo(URL.createObjectURL(f));
-};
-window.removerVideo = function() {
-  videoFile = null; videoRemovido = true;
-  document.getElementById('video-input').value = '';
-  mostrarVideo(null);
-};
-// Caminho do arquivo dentro da pasta, a partir do link público
-function caminhoVideo(url) {
-  const m = String(url || '').match(/\/object\/public\/produtos-videos\/(.+)$/);
-  return m ? decodeURIComponent(m[1]) : null;
-}
-async function enviarVideo(nome) {
-  const ext = (videoFile.name.split('.').pop() || 'mp4').toLowerCase().replace(/[^a-z0-9]/g, '') || 'mp4';
-  const base = nome.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 40) || 'produto';
-  const caminho = `${base}-${Date.now()}.${ext}`;
-  const { error } = await supabase.storage.from('produtos-videos').upload(caminho, videoFile, { cacheControl: '31536000', upsert: false, contentType: videoFile.type || 'video/mp4' });
-  if (error) { console.error(error); return null; }
-  return supabase.storage.from('produtos-videos').getPublicUrl(caminho).data.publicUrl;
 }
 
 window.adicionarFotosGaleria = async function(input) {
@@ -642,7 +588,6 @@ window.abrirModal = function() {
   document.getElementById('edit-indicacao').value = '';
   document.getElementById('foto-img').style.display = 'none';
   document.getElementById('foto-placeholder').style.display = 'block';
-  prepararVideo(null);
   document.getElementById('foto-input').value = '';
   fotoFile = null;
   galeriaNovas = [];
@@ -680,7 +625,6 @@ window.editarProduto = function(id) {
   galeriaNovas = [];
   galeriaExistente = Array.isArray(p.imagens) ? [...p.imagens] : [];
   renderGaleriaGrid();
-  prepararVideo(p.video_url);
   // Relacionados: array de IDs → string separada por vírgula
   document.getElementById('edit-relacionados').value = (p.relacionados_ids || []).join(', ');
   // Cores: array de {nome, hex} → uma por linha "Nome #hex"
@@ -740,18 +684,6 @@ window.salvarProduto = async function() {
   const imagensGaleria = await uploadGaleria(nome);
   if (galeriaFalhou) alert(`${galeriaFalhou} foto(s) da galeria não foram enviadas. O produto vai ser salvo sem elas.`);
 
-  let videoUrl = videoRemovido ? null : videoAtual;
-  if (videoFile) {
-    btn.textContent = 'Enviando vídeo...';
-    const enviado = await enviarVideo(nome);
-    if (!enviado) {
-      btn.disabled = false; btn.textContent = 'Salvar Produto';
-      alert('Não foi possível enviar o vídeo. O produto NÃO foi salvo — tente de novo ou use um vídeo menor.');
-      return;
-    }
-    videoUrl = enviado;
-  }
-
   const dados = {
     name: nome,
     brand: normalizarMarca(document.getElementById('edit-brand').value, marcas),
@@ -766,7 +698,6 @@ window.salvarProduto = async function() {
     variacoes,
     emoji: document.getElementById('edit-emoji').value || '📦',
     imagens: imagensGaleria,
-    video_url: videoUrl,
     description: document.getElementById('edit-desc').value,
     specs: textoParaSpecs(document.getElementById('edit-specs').value),
     oferta: document.getElementById('edit-oferta').checked,
@@ -804,11 +735,6 @@ window.salvarProduto = async function() {
   btn.disabled = false; btn.textContent = 'Salvar Produto';
 
   if (error) { alert('Erro ao salvar: ' + error.message); return; }
-
-  // Vídeo trocado ou removido: apaga o arquivo antigo pra não ocupar espaço
-  if (videoAtual && videoAtual !== videoUrl && caminhoVideo(videoAtual)) {
-    supabase.storage.from('produtos-videos').remove([caminhoVideo(videoAtual)]);
-  }
 
   fecharModal();
   await carregar();
