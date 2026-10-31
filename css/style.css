@@ -1865,3 +1865,8 @@ a.faixa-item:hover { color: var(--primary); }
 .cc-opcao { display: flex; align-items: center; gap: 10px; padding: 11px 12px; border: 1px solid var(--border); border-radius: 12px; margin-bottom: 8px; cursor: pointer; font-size: 14px; }
 .cc-opcao input { accent-color: var(--primary); width: 18px; height: 18px; }
 .cc-opcao:has(input:checked) { border-color: var(--primary); background: rgba(170,239,0,.06); }
+
+/* Botão de vídeo da avaliação desligado (em breve) */
+.av-midia-btn.av-midia-off { background: none; color: var(--text-muted); opacity: .6; text-align: left; font: inherit; font-size: 13px; font-weight: 700; }
+.av-midia-btn.av-midia-off:hover { border-color: var(--border); }
+.av-midia-off small { display: block; font-size: 11px; font-weight: 600; color: var(--text-muted); }

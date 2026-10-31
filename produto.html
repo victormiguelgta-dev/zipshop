@@ -499,6 +499,8 @@ function formAvaliacaoHTML(p, existente) {
         <label class="av-midia-btn">${icone('camera', 22)}<span>Fotos (até ${AV_MAX_FOTOS})</span>${icone('chevron', 16)}
           <input type="file" id="av-fotos" accept="image/*" multiple hidden onchange="adicionarFotosAvaliacao(this)">
         </label>
+        <!-- Vídeo: o botão fica, mas o envio está desligado por enquanto (o banco também recusa) -->
+        <button type="button" class="av-midia-btn av-midia-off" onclick="showToast('Envio de vídeo em breve! Por enquanto, mande fotos.', 'info')">${icone('video', 22)}<span>Vídeo <small>em breve</small></span>${icone('chevron', 16)}</button>
       </div>
       <div id="av-previews" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px"></div>
       <div id="av-bonus" class="av-bonus"></div>

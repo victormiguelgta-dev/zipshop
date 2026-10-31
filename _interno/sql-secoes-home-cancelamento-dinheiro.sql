@@ -5,6 +5,9 @@
 --    admin vê em Pedidos.
 -- 3) Pagamento em dinheiro na entrega desligado (o site já esconde a opção;
 --    aqui o banco também recusa). Pra religar: drop trigger trg_sem_dinheiro on pedidos;
+-- 4) Vídeo na avaliação desligado por enquanto: o botão aparece como "em
+--    breve" e o banco recusa vídeo novo. Pra religar:
+--    drop trigger trg_avaliacao_sem_video on avaliacoes;
 
 -- ── 1. Seções da Home ────────────────────────────────────────────────
 create table if not exists secoes_home (
@@ -91,3 +94,26 @@ $function$;
 drop trigger if exists trg_sem_dinheiro on pedidos;
 create trigger trg_sem_dinheiro before insert on pedidos
 for each row execute function recusar_pagamento_dinheiro();
+
+-- ── 4. Avaliação sem vídeo (por enquanto) ────────────────────────────
+create or replace function public.recusar_video_avaliacao()
+returns trigger
+language plpgsql
+security definer
+set search_path to 'public'
+as $function$
+begin
+  if is_admin() then
+    return new;
+  end if;
+  if cardinality(coalesce(new.videos, '{}')) > 0
+     and (tg_op = 'INSERT' or new.videos is distinct from old.videos) then
+    raise exception 'Envio de vídeo na avaliação ainda não está disponível.';
+  end if;
+  return new;
+end;
+$function$;
+
+drop trigger if exists trg_avaliacao_sem_video on avaliacoes;
+create trigger trg_avaliacao_sem_video before insert or update on avaliacoes
+for each row execute function recusar_video_avaliacao();
