@@ -198,7 +198,7 @@ async function render() {
         <div style="font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">${p.brand}</div>
         <h1 class="detail-title">${p.name}</h1>
         ${p.reviews > 0 ? `<div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
-          <span class="stars">${starsHTML(Math.round(p.rating))}</span>
+          <span class="av-estrelas av-estrelas-p">${[1,2,3,4,5].map(n => `<span class="av-estrela${n <= Math.round(p.rating) ? ' cheia' : ''}">${icone('coracao', 16)}</span>`).join('')}</span>
           <span class="stars-count">${Number(p.rating).toFixed(1)} (${p.reviews} ${p.reviews === 1 ? 'avaliação' : 'avaliações'})</span>
         </div>` : '<div style="margin-bottom:12px"></div>'}
         <div class="detail-price-old" id="detail-price-old" ${p.oldPrice && !variacoes.length ? '' : 'hidden'}>${p.oldPrice ? formatPrice(p.oldPrice) : ''}</div>
@@ -463,7 +463,7 @@ window.alternarDescricao = function() {
 // ——— AVALIAÇÕES ———
 // Fotos/vídeos vão pro bucket 'avaliacoes' e toda avaliação passa pela
 // aprovação do admin antes de aparecer (_interno/sql-avaliacoes-midia-aprovacao.sql).
-// Bônus sai na aprovação: R$ 1,00 com 100+ caracteres, 1 foto e 1 vídeo; senão R$ 0,50.
+// Bônus sai na aprovação: R$ 1,00 com 100+ caracteres, 1 foto; senão R$ 0,50.
 const AV_MIN_CARACTERES = 100;
 const AV_MAX_FOTOS = 5;
 const AV_MAX_VIDEO_MB = 50;
@@ -482,10 +482,10 @@ function formAvaliacaoHTML(p, existente) {
   return `
     <div class="av-card">
       <div class="av-form-topo">
-        <span class="av-form-ico">${icone('estrela', 18)}</span>
+        <span class="av-form-ico">${icone('coracao', 18)}</span>
         <div>
           <p class="av-form-titulo">${existente ? 'Editar sua avaliação' : 'Deixe sua avaliação'}</p>
-          <p class="av-form-sub">Ganhe <strong>R$ 0,50</strong> de saldo, ou <strong>R$ 1,00</strong> escrevendo ${AV_MIN_CARACTERES}+ caracteres com 1 foto e 1 vídeo. O saldo cai quando a avaliação for aprovada.</p>
+          <p class="av-form-sub">Ganhe <strong>R$ 0,50</strong> de saldo, ou <strong>R$ 1,00</strong> escrevendo ${AV_MIN_CARACTERES}+ caracteres com 1 foto. O saldo cai quando a avaliação for aprovada.</p>
         </div>
       </div>
       <div class="av-notas" id="estrelas-form">
@@ -498,9 +498,6 @@ function formAvaliacaoHTML(p, existente) {
       <div class="av-midias">
         <label class="av-midia-btn">${icone('camera', 22)}<span>Fotos (até ${AV_MAX_FOTOS})</span>${icone('chevron', 16)}
           <input type="file" id="av-fotos" accept="image/*" multiple hidden onchange="adicionarFotosAvaliacao(this)">
-        </label>
-        <label class="av-midia-btn">${icone('video', 22)}<span>Vídeo (até ${AV_MAX_VIDEO_MB} MB)</span>${icone('chevron', 16)}
-          <input type="file" id="av-video" accept="video/*" hidden onchange="adicionarVideoAvaliacao(this)">
         </label>
       </div>
       <div id="av-previews" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px"></div>
@@ -580,7 +577,7 @@ async function carregarAvaliacoes(p) {
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
         <div style="display:flex;align-items:center;gap:8px">
           <span style="font-weight:700;font-size:13px">${esc(a.autor_nome || 'Cliente')}</span>
-          <span class="av-estrelas av-estrelas-p">${[1,2,3,4,5].map(n => `<span class="av-estrela${n <= a.nota ? ' cheia' : ''}">${icone('estrela', 14)}</span>`).join('')}</span>
+          <span class="av-estrelas av-estrelas-p">${[1,2,3,4,5].map(n => `<span class="av-estrela${n <= a.nota ? ' cheia' : ''}">${icone('coracao', 14)}</span>`).join('')}</span>
         </div>
         <span style="font-size:11px;color:var(--text-muted)">${new Date(a.created_at).toLocaleDateString('pt-BR')}</span>
       </div>
@@ -589,7 +586,7 @@ async function carregarAvaliacoes(p) {
     </div>`).join('')
     : `<div class="av-vazio"><span class="av-vazio-ico">${icone('balao', 40)}</span><p>Nenhuma avaliação ainda.</p><strong>Seja o primeiro!</strong></div>`;
 
-  const estrelasMedia = [1,2,3,4,5].map(n => `<span class="av-estrela${mediaAv !== '-' && n <= Math.round(Number(mediaAv)) ? ' cheia' : ''}">${icone('estrela', 24)}</span>`).join('');
+  const estrelasMedia = [1,2,3,4,5].map(n => `<span class="av-estrela${mediaAv !== '-' && n <= Math.round(Number(mediaAv)) ? ' cheia' : ''}">${icone('coracao', 24)}</span>`).join('');
   document.getElementById('avaliacoes-content').innerHTML = `
     <div class="av-card av-resumo">
       ${totalAv ? `<p class="av-media">${mediaAv}</p>` : ''}
@@ -625,10 +622,11 @@ window.atualizarBonusAvaliacao = function() {
   const el = document.getElementById('av-bonus');
   if (!el) return;
   const chars = (document.getElementById('av-texto')?.value || '').trim().length;
-  const { fotos, videos } = contagemMidiasAvaliacao();
+  const { fotos } = contagemMidiasAvaliacao();
   const item = (ok, ico, texto) => `<span class="av-req${ok ? ' ok' : ''}">${icone(ok ? 'checkCirculo' : ico, 16)} ${texto}</span>`;
-  const completo = chars >= AV_MIN_CARACTERES && fotos >= 1 && videos >= 1;
-  el.innerHTML = `<div class="av-reqs">${item(chars >= AV_MIN_CARACTERES, 'arquivo', `${Math.min(chars, AV_MIN_CARACTERES)}/${AV_MIN_CARACTERES} caracteres`)}<span class="av-req-sep"></span>${item(fotos >= 1, 'imagem', '1 foto')}<span class="av-req-sep"></span>${item(videos >= 1, 'video', '1 vídeo')}</div>
+  // Vídeo saiu da avaliação: R$ 1,00 = texto caprichado + 1 foto
+  const completo = chars >= AV_MIN_CARACTERES && fotos >= 1;
+  el.innerHTML = `<div class="av-reqs">${item(chars >= AV_MIN_CARACTERES, 'arquivo', `${Math.min(chars, AV_MIN_CARACTERES)}/${AV_MIN_CARACTERES} caracteres`)}<span class="av-req-sep"></span>${item(fotos >= 1, 'imagem', '1 foto')}</div>
     <p class="av-bonus-linha"><span style="color:var(--primary);display:inline-flex">${icone('moedas', 18)}</span> Bônus ao aprovar: <strong>${completo ? 'R$ 1,00' : 'R$ 0,50'}</strong></p>`;
 };
 
@@ -741,7 +739,7 @@ function miniCard(r) {
       <div style="padding:8px">
         <div style="font-size:12px;font-weight:600;color:var(--text);line-height:1.3;margin-bottom:5px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${esc(r.name)}</div>
         ${vendidos ? `<div style="display:flex;align-items:center;gap:5px;margin-bottom:5px">
-          <span style="display:inline-flex;align-items:center;gap:2px;background:#1a1a00;border:1px solid rgba(250,204,21,.25);border-radius:5px;padding:1px 6px;font-size:11px;font-weight:700;color:#facc15">★ ${rating}</span>
+          <span class="pc-nota" style="font-size:11px"><span class="pc-estrela">${icone('coracao', 12)}</span> ${rating}</span>
           <span style="font-size:11px;color:var(--text-muted)">(${vendidosStr})</span>
         </div>` : ''}
         <div style="font-size:15px;font-weight:900;color:var(--primary)">${preco}</div>

@@ -441,7 +441,7 @@ async function loadOrders() {
         <div class="ped-item-foto">${thumb}</div>
         <div class="ped-item-texto"><p class="ped-item-nome">${nome}</p>${variacao ? `<p class="ped-item-var">${variacao}</p>` : ''}</div>
         <span class="ped-item-qtd">${Number(i.quantidade) || 1}x</span>
-      </${tag}>${avaliar ? `<a class="ped-btn-avaliar" href="produto.html?id=${pid}&pedido=${encodeURIComponent(p.id)}#avaliar">${window.icone('estrela', 14)} Avaliar e ganhar até R$ 1,00*</a>` : ''}`;
+      </${tag}>${avaliar ? `<a class="ped-btn-avaliar" href="produto.html?id=${pid}&pedido=${encodeURIComponent(p.id)}#avaliar">${window.icone('coracao', 14)} Avaliar e ganhar até R$ 1,00*</a>` : ''}`;
     }).join('');
     const podeEditar = p.status === 'pendente';
     const expiraEm = prazoPagamento(p);

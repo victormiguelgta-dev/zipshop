@@ -1831,3 +1831,11 @@ a.faixa-item:hover { color: var(--primary); }
   .hero .hero-dots { bottom: 8px; padding: 0; }
   .secao-categorias { padding-top: 12px; }
 }
+
+/* Nota das avaliações com corações verdes (no lugar das estrelas amarelas) */
+.av-estrela { color: var(--primary); }
+.av-estrela svg { opacity: .45; }
+.av-estrela.cheia svg { fill: var(--primary); opacity: 1; }
+.pc-nota { color: var(--primary); }
+.pc-estrela { display: inline-flex; }
+.pc-estrela svg { fill: var(--primary); stroke: var(--primary); }

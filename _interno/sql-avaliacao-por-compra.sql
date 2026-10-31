@@ -2,6 +2,8 @@
 --    Cada avaliação fica ligada ao pedido entregue que ela avalia; quem
 --    compra o mesmo produto de novo pode avaliar de novo, e cada avaliação
 --    aprovada dá o bônus de saldo.
+-- 2) Vídeo saiu da avaliação: o bônus de R$ 1,00 agora pede 100+
+--    caracteres e 1 foto (antes pedia também 1 vídeo).
 -- Roda depois de _interno/sql-avaliacoes-atualizar-nota.sql.
 
 -- ── 1. Avaliação por compra ──────────────────────────────────────────
@@ -112,7 +114,6 @@ begin
   v_bonus := case
     when char_length(trim(coalesce(new.texto, ''))) >= v_min_caracteres
      and cardinality(new.fotos) >= 1
-     and cardinality(new.videos) >= 1
     then v_bonus_completo else v_bonus_simples end;
 
   select name into v_nome from produtos where id = new.produto_id;

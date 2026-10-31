@@ -42,7 +42,7 @@
       <div class="product-card-body">
         <div class="product-brand">${esc(p.brand)}</div>
         <div class="product-name">${esc(p.name)}</div>
-        ${qtdAval ? `<div class="pc-nota"><span class="pc-estrela">${icone('estrela', 13)}</span> ${nota.toFixed(1)} <span class="pc-qtd">(${qtdAval >= 1000 ? (qtdAval / 1000).toFixed(1).replace('.', ',') + ' mil' : qtdAval})</span></div>` : ''}
+        ${qtdAval ? `<div class="pc-nota"><span class="pc-estrela">${icone('coracao', 13)}</span> ${nota.toFixed(1)} <span class="pc-qtd">(${qtdAval >= 1000 ? (qtdAval / 1000).toFixed(1).replace('.', ',') + ' mil' : qtdAval})</span></div>` : ''}
         <div class="pc-precos">
           <span class="product-price">${p.temVariacoes ? '<small>a partir de </small>' : ''}${preco(p.price)}</span>
           ${antigo ? `<s class="pc-antigo">${preco(antigo)}</s>` : ''}
