@@ -572,13 +572,42 @@ window.pagarPedido = async function(id, btn) {
   }
 };
 
-window.cancelarPedido = async function(id) {
-  if (!confirm('Tem certeza que deseja cancelar este pedido?')) return;
-  const { error } = await supabase.rpc('cancelar_meu_pedido', { p_pedido_id: id });
-  if (error) { showToast(error.message || 'Erro ao cancelar pedido.', 'error'); return; }
-  showToast('Pedido cancelado.', 'success');
-  loadOrders();
-  carregarResumo();
+// Cancelar: pergunta o motivo antes (fica salvo no pedido pro admin ver)
+const MOTIVOS_CANCELAMENTO = ['Comprei por engano', 'Demora para entregar', 'Encontrei mais barato', 'Quero trocar o produto ou a forma de pagamento', 'Outro motivo'];
+window.cancelarPedido = function(id) {
+  document.getElementById('modal-cancelar-pedido')?.remove();
+  const modal = document.createElement('div');
+  modal.id = 'modal-cancelar-pedido';
+  modal.style = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;display:flex;align-items:flex-end;justify-content:center;padding:16px';
+  modal.innerHTML = `
+    <div class="cc-caixa">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <h2 style="font-size:17px;font-weight:900">Por que quer cancelar?</h2>
+        <button onclick="document.getElementById('modal-cancelar-pedido').remove()" style="background:none;border:none;color:var(--text-muted);cursor:pointer;display:inline-flex" aria-label="Fechar">${window.icone('x', 20)}</button>
+      </div>
+      <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px">Sua resposta ajuda a gente a melhorar.</p>
+      ${MOTIVOS_CANCELAMENTO.map(m => `<label class="cc-opcao"><input type="radio" name="motivo-cancel" value="${esc(m)}"><span>${esc(m)}</span></label>`).join('')}
+      <textarea id="cancel-detalhe" class="form-input" rows="2" maxlength="300" placeholder="Quer contar mais? (opcional)" style="margin-top:8px;resize:vertical"></textarea>
+      <div style="display:flex;gap:10px;margin-top:14px">
+        <button class="btn btn-outline" style="flex:1" onclick="document.getElementById('modal-cancelar-pedido').remove()">Voltar</button>
+        <button class="btn" id="btn-confirmar-cancel" style="flex:1;background:#ef4444;color:#fff;border-color:#ef4444">Cancelar pedido</button>
+      </div>
+    </div>`;
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+  document.body.appendChild(modal);
+  document.getElementById('btn-confirmar-cancel').addEventListener('click', async (e) => {
+    const escolhido = modal.querySelector('input[name="motivo-cancel"]:checked')?.value;
+    if (!escolhido) { showToast('Escolha um motivo.', 'error'); return; }
+    const detalhe = document.getElementById('cancel-detalhe').value.trim();
+    const motivo = detalhe ? `${escolhido}: ${detalhe}` : escolhido;
+    e.currentTarget.disabled = true;
+    const { error } = await supabase.rpc('cancelar_meu_pedido', { p_pedido_id: id, p_motivo: motivo });
+    if (error) { e.currentTarget.disabled = false; showToast(error.message || 'Erro ao cancelar pedido.', 'error'); return; }
+    modal.remove();
+    showToast('Pedido cancelado.', 'success');
+    loadOrders();
+    carregarResumo();
+  });
 };
 
 // ===== RASTREIO DO PEDIDO (cartão dentro do pedido, ao vivo) =====
@@ -749,109 +778,112 @@ async function loadProfile() {
   const telefoneAtual = perfil?.telefone || '';
 
   const content = document.getElementById('account-content');
-  content.innerHTML = `<div class="card"><div class="card-body">
-    <form id="form-perfil" style="max-width:480px">
-      <div class="form-group"><label class="form-label">Nome completo</label>
-        <input type="text" class="form-input" id="edit-name" value="${esc(perfil?.nome || nome)}"></div>
-      <div class="form-group"><label class="form-label">E-mail</label>
-        <input type="email" class="form-input" value="${user.email}" disabled style="opacity:0.6"></div>
-      <button type="submit" class="btn btn-primary">Salvar Nome</button>
-    </form>
+  const nomeAtual = perfil?.nome || nome;
+  const ic = (n) => window.icone(n, 20);
+  // Modelo do cliente: uma linha por dado, lápis pra editar e um botão
+  // "Salvar alterações" só (o CPF não se troca por aqui)
+  content.innerHTML = `<div class="dp-card">
+    <div class="dp-topo">
+      <span class="dp-topo-ico">${window.icone('usuario', 22)}</span>
+      <div><p class="dp-titulo">Dados Pessoais</p>
+      <p class="dp-sub">Mantenha seus dados sempre atualizados para uma experiência ainda melhor na ZipShop.</p></div>
+    </div>
 
-    <div style="margin-top:24px;padding-top:24px;border-top:1px solid var(--border)">
-      <label class="form-label">CPF</label>
-      <div id="cpf-status" style="margin-bottom:10px;font-size:13px">
+    <div class="dp-linha">
+      <span class="dp-ico">${ic('usuario')}</span>
+      <div class="dp-campo"><span class="dp-rotulo">Nome completo</span>
+        <input type="text" class="dp-input" id="edit-name" value="${esc(nomeAtual)}" readonly maxlength="80"></div>
+      <button type="button" class="dp-lapis" onclick="editarCampoPerfil('edit-name')" aria-label="Editar nome">${window.icone('lapis', 16)}</button>
+    </div>
+
+    <div class="dp-linha">
+      <span class="dp-ico">${ic('email')}</span>
+      <div class="dp-campo"><span class="dp-rotulo">E-mail</span>
+        <input type="email" class="dp-input" id="edit-email" value="${esc(user.email)}" readonly maxlength="120"></div>
+      <button type="button" class="dp-lapis" onclick="editarCampoPerfil('edit-email')" aria-label="Editar e-mail">${window.icone('lapis', 16)}</button>
+    </div>
+
+    <div class="dp-linha">
+      <span class="dp-ico">${ic('arquivo')}</span>
+      <div class="dp-campo"><span class="dp-rotulo">CPF</span>
         ${cpfAtual
-          ? `<strong>${window.mascararCPF(cpfAtual)}</strong> <button type="button" id="btn-trocar-cpf" class="btn" style="padding:2px 10px;font-size:12px;margin-left:8px">Trocar CPF</button>`
-          : `<span style="color:#ef4444">Nenhum CPF cadastrado</span>`}
-      </div>
-      <div id="bloco-editar-cpf" style="display:${cpfAtual ? 'none' : 'block'}">
-        <div class="form-group">
-          <input type="text" class="form-input" id="input-cpf" placeholder="000.000.000-00" maxlength="14" oninput="mascaraCPF(this)">
-        </div>
-        <button type="button" id="btn-salvar-cpf" class="btn btn-primary">Salvar CPF</button>
-        <button type="button" id="btn-cancelar-cpf" class="btn" style="margin-left:8px;display:${cpfAtual ? 'inline-block' : 'none'}">Cancelar</button>
+          ? `<span class="dp-valor">${window.mascararCPF(cpfAtual)}</span>`
+          : `<input type="text" class="dp-input editando" id="input-cpf" placeholder="000.000.000-00" maxlength="14" oninput="mascaraCPF(this)">`}
       </div>
     </div>
 
-    <div style="margin-top:24px;padding-top:24px;border-top:1px solid var(--border)">
-      <label class="form-label">Telefone</label>
-      <div id="telefone-status" style="margin-bottom:10px;font-size:13px">
-        ${telefoneAtual
-          ? `<strong>${formatarTelExibicao(telefoneAtual)}</strong> <button type="button" id="btn-trocar-tel" class="btn" style="padding:2px 10px;font-size:12px;margin-left:8px">Trocar número</button>`
-          : `<span style="color:#ef4444">Nenhum telefone cadastrado</span>`}
-      </div>
-      <div id="bloco-editar-tel" style="display:${telefoneAtual ? 'none' : 'block'}">
-        <div class="form-group">
-          <input type="tel" class="form-input" id="input-tel" placeholder="(11) 99999-9999" maxlength="15" oninput="mascaraTelConta(this)">
-        </div>
-        <button type="button" id="btn-salvar-tel" class="btn btn-primary">Salvar telefone</button>
-        <button type="button" id="btn-cancelar-tel" class="btn" style="margin-left:8px;display:${telefoneAtual ? 'inline-block' : 'none'}">Cancelar</button>
-      </div>
+    <div class="dp-linha">
+      <span class="dp-ico">${ic('telefone')}</span>
+      <div class="dp-campo"><span class="dp-rotulo">Telefone</span>
+        <input type="tel" class="dp-input${telefoneAtual ? '' : ' editando'}" id="input-tel" value="${esc(telefoneAtual ? formatarTelExibicao(telefoneAtual) : '')}" placeholder="(55) 99999-9999" maxlength="15" ${telefoneAtual ? 'readonly' : ''} oninput="mascaraTelConta(this)"></div>
+      ${telefoneAtual ? `<button type="button" class="dp-trocar" onclick="editarCampoPerfil('input-tel', true)">Trocar número ${window.icone('chevron', 14)}</button>` : ''}
     </div>
-  </div></div>`;
 
-  // Salvar nome
-  document.getElementById('form-perfil').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const { error } = await supabase.from('usuarios')
-      .update({ nome: document.getElementById('edit-name').value })
-      .eq('id', user.id);
-    if (error) { showToast('Erro ao salvar.', 'error'); return; }
-    showToast('Nome atualizado!', 'success');
-    document.getElementById('user-name').textContent = primeiroNome(document.getElementById('edit-name').value);
-  });
+    <button type="button" class="btn btn-primary btn-full dp-salvar" id="btn-salvar-perfil">${window.icone('check', 18)} Salvar alterações</button>
+    <p class="dp-nota">${window.icone('cadeado', 16)} <span>Seus dados são protegidos e usados só para entregar seus pedidos e falar com você.</span></p>
+  </div>`;
 
-  // CPF — salva direto (sem confirmação por e-mail por enquanto; a
-  // checagem de CPF único continua valendo antes de salvar).
-  document.getElementById('btn-trocar-cpf')?.addEventListener('click', () => {
-    document.getElementById('bloco-editar-cpf').style.display = 'block';
-  });
-  document.getElementById('btn-cancelar-cpf')?.addEventListener('click', () => {
-    document.getElementById('bloco-editar-cpf').style.display = 'none';
-  });
-  document.getElementById('btn-salvar-cpf')?.addEventListener('click', async (e) => {
-    const cpfVal = document.getElementById('input-cpf').value;
-    if (!window.validarCPFReal(cpfVal)) { showToast('CPF inválido. Verifique os números.', 'error'); return; }
+  window.editarCampoPerfil = function(id, limpar) {
+    const el = document.getElementById(id);
+    el.readOnly = false;
+    el.classList.add('editando');
+    if (limpar) el.value = '';
+    el.focus();
+    if (!limpar) el.setSelectionRange?.(el.value.length, el.value.length);
+  };
 
-    const btn = e.target;
-    btn.disabled = true; btn.textContent = 'Salvando...';
+  document.getElementById('btn-salvar-perfil').addEventListener('click', async (e) => {
+    const btn = e.currentTarget;
+    const novoNome = document.getElementById('edit-name').value.trim();
+    const novoEmail = document.getElementById('edit-email').value.trim().toLowerCase();
+    const campoCpf = document.getElementById('input-cpf');
+    const campoTel = document.getElementById('input-tel');
+    const telMudou = !campoTel.readOnly && campoTel.value.trim() !== '';
+    const atualizar = {};
+    const avisos = [];
 
-    const { data: cpfLivre, error: erroCpf } = await supabase.rpc('cpf_disponivel', {
-      cpf_input: cpfVal,
-      usuario_atual: user.id
-    });
-    if (erroCpf) { btn.disabled = false; btn.textContent = 'Salvar CPF'; showToast('Não foi possível validar o CPF agora.', 'error'); return; }
-    if (cpfLivre === false) { btn.disabled = false; btn.textContent = 'Salvar CPF'; showToast('Este CPF já está em uso por outra conta.', 'error'); return; }
+    if (!novoNome || novoNome.split(/\s+/).length < 2) { showToast('Digite seu nome completo.', 'error'); return; }
+    if (novoNome !== nomeAtual) atualizar.nome = novoNome;
 
-    const { error } = await supabase.from('usuarios').update({ cpf: cpfVal }).eq('id', user.id);
-    btn.disabled = false; btn.textContent = 'Salvar CPF';
-    if (error) {
-      showToast(error.code === '23505' ? 'Este CPF já está em uso por outra conta.' : 'Erro ao salvar.', 'error');
-      return;
+    if (telMudou) {
+      if (!window.validarTelefoneReal(campoTel.value)) { showToast('Telefone inválido. Use um número real com DDD.', 'error'); return; }
+      atualizar.telefone = campoTel.value;
     }
-    showToast('CPF salvo com sucesso!', 'success');
-    loadProfile();
-  });
 
-  // Telefone — salva direto
-  document.getElementById('btn-trocar-tel')?.addEventListener('click', () => {
-    document.getElementById('bloco-editar-tel').style.display = 'block';
-  });
-  document.getElementById('btn-cancelar-tel')?.addEventListener('click', () => {
-    document.getElementById('bloco-editar-tel').style.display = 'none';
-  });
-  document.getElementById('btn-salvar-tel')?.addEventListener('click', async (e) => {
-    const telVal = document.getElementById('input-tel').value;
-    if (!window.validarTelefoneReal(telVal)) { showToast('Telefone inválido. Use um número real com DDD.', 'error'); return; }
+    if (campoCpf && campoCpf.value.trim()) {
+      if (!window.validarCPFReal(campoCpf.value)) { showToast('CPF inválido. Verifique os números.', 'error'); return; }
+      const { data: cpfLivre, error: erroCpf } = await supabase.rpc('cpf_disponivel', { cpf_input: campoCpf.value, usuario_atual: user.id });
+      if (erroCpf) { showToast('Não foi possível validar o CPF agora.', 'error'); return; }
+      if (cpfLivre === false) { showToast('Este CPF já está em uso por outra conta.', 'error'); return; }
+      atualizar.cpf = campoCpf.value;
+    }
 
-    const btn = e.target;
-    btn.disabled = true; btn.textContent = 'Salvando...';
-    const { error } = await supabase.from('usuarios').update({ telefone: telVal }).eq('id', user.id);
-    btn.disabled = false; btn.textContent = 'Salvar telefone';
-    if (error) { showToast('Erro ao salvar.', 'error'); return; }
-    showToast('Telefone salvo com sucesso!', 'success');
-    loadProfile();
+    const emailMudou = novoEmail !== String(user.email || '').toLowerCase();
+    if (emailMudou && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(novoEmail)) { showToast('Digite um e-mail válido.', 'error'); return; }
+
+    if (!Object.keys(atualizar).length && !emailMudou) { showToast('Nada para salvar.', 'info'); return; }
+
+    btn.disabled = true;
+    try {
+      if (Object.keys(atualizar).length) {
+        const { error } = await supabase.from('usuarios').update(atualizar).eq('id', user.id);
+        if (error) {
+          showToast(error.code === '23505' ? 'Este CPF já está em uso por outra conta.' : 'Erro ao salvar.', 'error');
+          return;
+        }
+        if (atualizar.nome) document.getElementById('user-name').textContent = primeiroNome(novoNome);
+      }
+      // Troca de e-mail: o Supabase manda um link de confirmação pro e-mail novo
+      if (emailMudou) {
+        const { error } = await supabase.auth.updateUser({ email: novoEmail }, { emailRedirectTo: location.origin + '/conta.html?secao=profile' });
+        if (error) { showToast('Não foi possível trocar o e-mail: ' + (error.message || 'tente de novo.'), 'error'); return; }
+        avisos.push('Enviamos um link para ' + novoEmail + '. O e-mail só muda depois que você confirmar.');
+      }
+      showToast(avisos[0] || 'Dados atualizados!', 'success');
+      loadProfile();
+    } finally {
+      btn.disabled = false;
+    }
   });
 }
 

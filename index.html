@@ -111,6 +111,8 @@ const HERO_CACHE_KEY = 'zipshop_banners_v1';
   <div class="category-grid" id="cat-grid"><div class="cat-card esqueleto"><div class="cat-icon"></div><div class="cat-name">&nbsp;</div></div><div class="cat-card esqueleto"><div class="cat-icon"></div><div class="cat-name">&nbsp;</div></div><div class="cat-card esqueleto"><div class="cat-icon"></div><div class="cat-name">&nbsp;</div></div><div class="cat-card esqueleto"><div class="cat-icon"></div><div class="cat-name">&nbsp;</div></div><div class="cat-card esqueleto"><div class="cat-icon"></div><div class="cat-name">&nbsp;</div></div><div class="cat-card esqueleto"><div class="cat-icon"></div><div class="cat-name">&nbsp;</div></div></div>
 </div>
 
+<!-- FAIXAS DE PRODUTOS — configuráveis no painel (Seções da Home) -->
+<div id="secoes-home">
 <!-- PRODUTOS EM DESTAQUE -->
 <div class="section" style="padding-top:0">
   <div class="section-header">
@@ -127,6 +129,7 @@ const HERO_CACHE_KEY = 'zipshop_banners_v1';
     <a href="produtos.html" class="section-link">Ver todos →</a>
   </div>
   <div class="product-grid" id="all-grid"><div class="product-card esqueleto esqueleto-produto"></div><div class="product-card esqueleto esqueleto-produto"></div><div class="product-card esqueleto esqueleto-produto"></div><div class="product-card esqueleto esqueleto-produto"></div></div>
+</div>
 </div>
 
 <!-- NEWSLETTER -->
@@ -163,6 +166,7 @@ const _pBanners = _sb.from('banners').select('*').eq('ativo', true).order('ordem
 const _pProdutos = loadProducts();
 const _pFavoritos = getFavoritosIds();
 const _pCategorias = _sb.from('categorias').select('*').eq('ativo', true).order('name');
+const _pSecoes = _sb.from('secoes_home').select('*').eq('ativo', true).order('ordem');
 
 // Cópia da última visita: desenha categorias e produtos na hora
 const HOME_CACHE_KEY = 'zipshop_home_v1';
@@ -171,7 +175,7 @@ try { _homeCache = JSON.parse(localStorage.getItem(HOME_CACHE_KEY) || 'null'); }
 // Desenha na hora com a cópia salva (se houver), sem esperar o Supabase
 const _cacheJSON = _homeCache ? JSON.stringify(_homeCache) : null;
 if (_homeCache && Array.isArray(_homeCache.produtos) && _homeCache.produtos.length) {
-  try { renderVitrine(_homeCache.produtos, _homeCache.categorias); } catch (e) {}
+  try { renderVitrine(_homeCache.produtos, _homeCache.categorias, _homeCache.secoes); } catch (e) {}
 }
 
 
@@ -283,8 +287,52 @@ function categoriasHTML(categoriasDB, PRODUCTS) {
   }).join('');
 }
 
-function renderVitrine(PRODUCTS, categoriasDB) {
+// Produtos de cada faixa da home, conforme o tipo escolhido no painel
+function produtosDaSecao(secao, PRODUCTS) {
+  const disponiveis = PRODUCTS.filter(p => !estaEsgotado(p));
+  let lista;
+  switch (secao.tipo) {
+    case 'ofertas': lista = disponiveis.filter(p => p.oferta || p.discount > 0); break;
+    case 'entrega_24h': lista = disponiveis.filter(p => p.entrega_24h && p.tipo_estoque !== 'dropshipping'); break;
+    case 'frete_gratis': lista = disponiveis.filter(p => p.frete_gratis); break;
+    case 'categoria': lista = disponiveis.filter(p => p.category === secao.categoria); break;
+    case 'manual': {
+      const porId = new Map(PRODUCTS.map(p => [p.id, p]));
+      lista = (secao.produtos_ids || []).map(id => porId.get(id)).filter(Boolean);
+      break;
+    }
+    default: lista = esgotadosNoFim(PRODUCTS);
+  }
+  return lista.slice(0, secao.limite || 8);
+}
+
+function linkDaSecao(secao) {
+  if (secao.tipo === 'categoria' && secao.categoria) return 'produtos.html?cat=' + encodeURIComponent(secao.categoria);
+  if (secao.tipo === 'ofertas') return 'produtos.html?deal=1';
+  return 'produtos.html';
+}
+
+function secoesHTML(secoes, PRODUCTS) {
+  return secoes.map(secao => {
+    const lista = produtosDaSecao(secao, PRODUCTS);
+    if (!lista.length) return '';
+    return `<div class="section" style="padding-top:0">
+      <div class="section-header">
+        <h2 class="section-title" style="display:flex;align-items:center;gap:8px">${secao.icone ? `<span style="color:var(--primary);display:inline-flex">${icone(secao.icone, 22)}</span>` : ''}<span>${esc(secao.titulo)}</span></h2>
+        <a href="${linkDaSecao(secao)}" class="section-link">Ver todos →</a>
+      </div>
+      <div class="product-grid">${lista.map(productCardHTML).join('')}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderVitrine(PRODUCTS, categoriasDB, secoes) {
   document.getElementById('cat-grid').innerHTML = categoriasHTML(categoriasDB, PRODUCTS);
+  if (secoes && secoes.length) {
+    document.getElementById('secoes-home').innerHTML = secoesHTML(secoes, PRODUCTS);
+    ligarFotosPassando(document);
+    return;
+  }
   // Oferta do dia: prioriza produtos marcados como oferta, fallback para discount > 0
   // Esgotados não aparecem nas ofertas — não faz sentido anunciar o que não dá pra comprar
   const ofertas = PRODUCTS.filter(p => (p.oferta || p.discount > 0) && !estaEsgotado(p));
@@ -296,18 +344,21 @@ function renderVitrine(PRODUCTS, categoriasDB) {
 }
 
 // Atualiza com os dados novos do Supabase
-const [PRODUCTS, _favs, { data: categoriasDB }] = await Promise.all([_pProdutos, _pFavoritos, _pCategorias]);
+const [PRODUCTS, _favs, { data: categoriasDB }, { data: secoesDB }] = await Promise.all([_pProdutos, _pFavoritos, _pCategorias, _pSecoes]);
 _favoritosIds = _favs;
 // Só a vitrine da home vai pro cache (ofertas + 8 primeiros), pra ficar pequeno
-const _vitrine = [...new Set([
-  ...PRODUCTS.filter(p => (p.oferta || p.discount > 0) && !estaEsgotado(p)),
-  ...esgotadosNoFim(PRODUCTS).slice(0, 8)
-])];
-const _novoCache = { produtos: _vitrine, categorias: categoriasDB || [] };
+const _secoes = secoesDB || [];
+const _vitrine = _secoes.length
+  ? [...new Set(_secoes.flatMap(sec => produtosDaSecao(sec, PRODUCTS)))]
+  : [...new Set([
+    ...PRODUCTS.filter(p => (p.oferta || p.discount > 0) && !estaEsgotado(p)),
+    ...esgotadosNoFim(PRODUCTS).slice(0, 8)
+  ])];
+const _novoCache = { produtos: _vitrine, categorias: categoriasDB || [], secoes: _secoes };
 try { localStorage.setItem(HOME_CACHE_KEY, JSON.stringify(_novoCache)); } catch (e) {}
 // Redesenha sempre que tem favoritos (corações) ou se algo mudou
 if (_favoritosIds?.size || _cacheJSON !== JSON.stringify(_novoCache)) {
-  renderVitrine(PRODUCTS, categoriasDB);
+  renderVitrine(PRODUCTS, categoriasDB, _secoes);
 }
 
 // Salva na tabela newsletter_inscritos (_interno/sql-newsletter.sql).

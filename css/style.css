@@ -1839,3 +1839,29 @@ a.faixa-item:hover { color: var(--primary); }
 .pc-nota { color: var(--primary); }
 .pc-estrela { display: inline-flex; }
 .pc-estrela svg { fill: var(--primary); stroke: var(--primary); }
+
+/* ── Dados Pessoais (modelo do cliente) ── */
+.dp-card { background: var(--bg-card); border: 1px solid var(--primary); border-radius: var(--radius-lg); padding: 18px; }
+.dp-topo { display: flex; gap: 12px; align-items: flex-start; padding-bottom: 14px; }
+.dp-topo-ico { flex-shrink: 0; width: 46px; height: 46px; border-radius: 12px; border: 1px solid rgba(170,239,0,.45); background: rgba(170,239,0,.07); color: var(--primary); display: flex; align-items: center; justify-content: center; }
+.dp-titulo { font-size: 18px; font-weight: 800; margin: 2px 0 4px; }
+.dp-sub { font-size: 12.5px; color: var(--text-muted); line-height: 1.45; margin: 0; }
+.dp-linha { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-top: 1px solid var(--border); }
+.dp-ico { flex-shrink: 0; width: 28px; display: flex; justify-content: center; color: var(--text-muted); }
+.dp-campo { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.dp-rotulo { font-size: 11.5px; color: var(--text-muted); }
+.dp-valor { font-size: 14.5px; font-weight: 600; }
+.dp-input { width: 100%; background: transparent; border: 1px solid transparent; border-radius: 8px; padding: 2px 0; color: var(--text); font: inherit; font-size: 14.5px; font-weight: 600; outline: none; text-overflow: ellipsis; }
+.dp-input.editando { background: var(--bg-muted, #111); border-color: var(--primary); padding: 7px 10px; }
+.dp-lapis { flex-shrink: 0; width: 34px; height: 34px; border-radius: 9px; border: 1px solid var(--border); background: var(--bg-muted, #111); color: var(--text-muted); display: flex; align-items: center; justify-content: center; cursor: pointer; }
+.dp-lapis:hover { color: var(--primary); border-color: var(--primary); }
+.dp-trocar { flex-shrink: 0; display: inline-flex; align-items: center; gap: 4px; padding: 7px 12px; border-radius: 999px; border: 1px solid var(--border); background: var(--bg-muted, #111); color: var(--primary); font-size: 12.5px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+.dp-salvar { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 10px; }
+.dp-nota { display: flex; gap: 8px; align-items: flex-start; margin: 14px 0 0; font-size: 12px; color: var(--text-muted); line-height: 1.45; }
+.dp-nota svg { flex-shrink: 0; color: var(--primary); }
+
+/* Cancelar pedido: motivo */
+.cc-caixa { background: var(--bg-card); border: 1px solid var(--border); border-radius: 20px; padding: 20px; width: 100%; max-width: 440px; max-height: 90vh; overflow-y: auto; }
+.cc-opcao { display: flex; align-items: center; gap: 10px; padding: 11px 12px; border: 1px solid var(--border); border-radius: 12px; margin-bottom: 8px; cursor: pointer; font-size: 14px; }
+.cc-opcao input { accent-color: var(--primary); width: 18px; height: 18px; }
+.cc-opcao:has(input:checked) { border-color: var(--primary); background: rgba(170,239,0,.06); }
