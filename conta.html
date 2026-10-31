@@ -305,6 +305,7 @@ function prazoPagamento(p) {
 const ICONES = {
   package: '<path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"/><path d="M12 22V12"/><path d="m3.3 7 8.7 5 8.7-5"/>',
   clock: '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
+  preparo: '<rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/>',
   check: '<circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/>',
   truck: '<path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/><path d="M15 18H9"/><path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.624l-3.48-4.35A1 1 0 0 0 17.52 8H14"/><circle cx="17" cy="18" r="2"/><circle cx="7" cy="18" r="2"/>',
   card: '<rect width="20" height="14" x="2" y="5" rx="2"/><path d="M2 10h20"/>',
@@ -329,7 +330,7 @@ function seloStatus(s, aguardandoPagamento) {
   if (aguardandoPagamento) return `<span class="ped-selo ped-selo-amarelo">${icone('clock')} A pagar</span>`;
   const selos = {
     pendente: ['package', 'Recebido', ''],
-    pago: ['card', 'Pagamento confirmado', ''],
+    pago: ['preparo', 'Preparando', ''],
     enviado: ['truck', 'Em trânsito', ''],
     entregue: ['check', 'Entregue', ''],
     cancelado: ['x', 'Cancelado', ' ped-selo-vermelho']
@@ -615,7 +616,8 @@ window.cancelarPedido = function(id) {
 // cumpridas, a etapa atual destacada e os botões Editar/Cancelar embaixo.
 const ETAPAS_RASTREIO = [
   { status: 'pendente', label: 'Pedido recebido', icone: 'package' },
-  { status: 'pago', label: 'Pagamento confirmado', icone: 'card' },
+  // Sem pagamento na entrega, "pago" já quer dizer que a loja está separando o pedido
+  { status: 'pago', label: 'Preparando para entrega', icone: 'preparo' },
   { status: 'enviado', label: 'Saiu para entrega', icone: 'truck' },
   { status: 'entregue', label: 'Entregue', icone: 'boxOpen' }
 ];

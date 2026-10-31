@@ -184,7 +184,7 @@ function formatDate(d) {
 }
 function statusBadge(s) {
   const map = { 'pendente': 'badge-yellow', 'pago': 'badge-blue', 'enviado': 'badge-blue', 'entregue': 'badge-green', 'cancelado': 'badge-red' };
-  const labels = { 'pendente': 'Recebido', 'pago': 'Pagamento OK', 'enviado': 'Saiu p/ entrega', 'entregue': 'Entregue', 'cancelado': 'Cancelado' };
+  const labels = { 'pendente': 'Recebido', 'pago': 'Preparando', 'enviado': 'Saiu p/ entrega', 'entregue': 'Entregue', 'cancelado': 'Cancelado' };
   return `<span class="badge ${map[s] || 'badge-muted'}">${labels[s] || s}</span>`;
 }
 
@@ -267,7 +267,7 @@ document.getElementById('orders-table').innerHTML = (pedidos||[]).slice(0,10).ma
     <td>
       <select onchange="updateStatus('${p.id}', this.value)" style="background:var(--bg-muted);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:4px 8px;font-size:12px">
         <option value="pendente" ${p.status==='pendente'?'selected':''}>Recebido</option>
-        <option value="pago" ${p.status==='pago'?'selected':''}>Pagamento confirmado</option>
+        <option value="pago" ${p.status==='pago'?'selected':''}>Pago / preparando para entrega</option>
         <option value="enviado" ${p.status==='enviado'?'selected':''}>Saiu para entrega</option>
         <option value="entregue" ${p.status==='entregue'?'selected':''}>Entregue</option>
         <option value="cancelado" ${p.status==='cancelado'?'selected':''}>Cancelado</option>
