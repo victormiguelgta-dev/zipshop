@@ -1976,3 +1976,9 @@ a.faixa-item:hover { color: var(--primary); }
   #modal .form-input { max-width: 100%; }
 }
 .ap-linha > span { flex: 1; min-width: 0; }
+
+/* Vídeo do produto na galeria */
+.pd-carrossel .pd-video { flex: 0 0 100%; width: 100%; height: 100%; object-fit: contain; background: #000; scroll-snap-align: center; }
+.pd-miniaturas .pd-mini-video { position: relative; background: #111; }
+.pd-play { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #fff; background: rgba(0,0,0,.35); }
+.pd-play svg { fill: #fff; }
