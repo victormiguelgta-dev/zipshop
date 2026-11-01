@@ -97,45 +97,31 @@
   <div class="admin-overlay" id="admin-overlay" onclick="toggleAdminMenu()"></div>
 
     <h1 class="admin-page-title">Pedidos</h1>
-    <p class="admin-page-sub">Gerencie e atualize o status dos pedidos</p>
+    <p class="admin-page-sub">Acompanhe seus pedidos de forma rápida e organizada</p>
 
-    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:20px" id="status-cards">
-      <div style="background:var(--bg-card);border:2px solid var(--border);border-radius:12px;padding:12px;text-align:center">
-        <p style="font-size:22px;font-weight:900">—</p><p style="font-size:11px;color:var(--text-muted)">Total</p>
-      </div>
-    </div>
+    <div class="ap-kpis" id="ap-kpis"></div>
 
-    <div class="card" style="margin-bottom:16px">
-      <div class="card-body" style="display:flex;gap:12px;flex-wrap:wrap">
-        <input type="text" class="form-input" id="busca" placeholder="Buscar por cliente ou pedido..." style="flex:1" oninput="filtrar()">
-        <select class="form-input" id="filtro-status" style="width:100%;max-width:180px" onchange="filtrar()">
-          <option value="">Todos os status</option>
-          <option>pendente</option>
-          <option>pago</option>
-          <option>enviado</option>
-          <option>entregue</option>
-          <option>cancelado</option>
-        </select>
-      </div>
-    </div>
+    <div class="ap-abas" id="ap-abas"></div>
 
-    <div class="table-wrap">
-      <table>
-        <thead><tr><th>Pedido</th><th>Cliente</th><th>Data</th><th>Itens</th><th>Total</th><th>Pagamento</th><th>Status</th><th>Confirmar Entrega</th></tr></thead>
-        <tbody id="orders-table">
-          <tr><td colspan="7" style="text-align:center;padding:40px;color:var(--text-muted)">Carregando...</td></tr>
-        </tbody>
-      </table>
-    </div>
+    <input type="search" class="form-input ap-busca" id="busca" placeholder="Buscar por cliente, telefone ou nº do pedido..." oninput="filtrar()">
+
+    <div id="ap-lista"><p class="ap-vazio">Carregando...</p></div>
   </main>
 </div>
 
+<script src="../js/icones.js"></script>
 <script type="module">
 import { isAdmin, supabase } from '../js/admin-guard.js';
 if (!isAdmin) throw new Error('not admin');
 
-
+// Gestão de pedidos no modelo do cliente: números no topo, abas por etapa,
+// um cartão por pedido com a próxima ação e os detalhes numa gaveta.
+// Funciona igual no celular e no computador.
 let pedidos = [];
+let fotos = {};
+let aba = 'preparar';
+
+const PRAZO_PAGAMENTO_HORAS = 24; // igual ao criar-pagamento.js
 
 function esc(str) {
   if (str === null || str === undefined) return '';
@@ -143,203 +129,261 @@ function esc(str) {
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
 }
-
+const ic = (n, t = 16) => window.icone(n, t);
 function formatPrice(v) {
-  return Number(v||0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  return Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+// created_at vem em UTC sem fuso
+const dataPedido = (p) => new Date(String(p.created_at).replace(' ', 'T') + (String(p.created_at).includes('Z') || String(p.created_at).includes('+') ? '' : 'Z'));
+function formatDataHora(p) {
+  const d = dataPedido(p);
+  return isNaN(d) ? '' : d.toLocaleDateString('pt-BR') + ' · ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+}
+const numero = (p) => '#' + p.id.slice(0, 8).toUpperCase();
+
+// Pix/cartão ainda não pago: o pedido existe, mas NÃO é pra separar nem entregar
+const aguardandoPagamento = (p) => p.status === 'pendente' && ['pix', 'cartao'].includes(p.pagamento);
+
+// Etapa do pedido no painel
+function etapa(p) {
+  if (p.status === 'cancelado') return 'cancelados';
+  if (aguardandoPagamento(p)) return 'pagamento';
+  if (p.status === 'pendente' || p.status === 'pago') return 'preparar';
+  if (p.status === 'enviado') return 'rota';
+  if (p.status === 'entregue') return 'entregues';
+  return 'preparar';
+}
+const ETAPAS = [
+  { id: 'pagamento', nome: 'Aguardando pagamento', curto: 'Aguard. pagamento', icone: 'relogio', cor: 'amarelo' },
+  { id: 'preparar', nome: 'Pagos / Preparar', curto: 'Pagos / Preparar', icone: 'checkCirculo', cor: 'verde' },
+  { id: 'rota', nome: 'Em rota', curto: 'Em rota', icone: 'caminhao', cor: 'azul' },
+  { id: 'entregues', nome: 'Entregues', curto: 'Entregues', icone: 'check', cor: 'verde' },
+  { id: 'cancelados', nome: 'Cancelados', curto: 'Cancelados', icone: 'xCirculo', cor: 'vermelho' }
+];
+
+function seloPedido(p) {
+  const e = etapa(p);
+  const textos = { pagamento: 'Aguardando pagamento', preparar: p.pagamento === 'saldo' ? 'Pago com saldo' : 'Pago', rota: 'Em rota', entregues: 'Entregue', cancelados: 'Cancelado' };
+  const cor = ETAPAS.find(x => x.id === e)?.cor || 'verde';
+  return `<span class="ap-selo ap-${cor}">${textos[e]}</span>`;
 }
 
-// Deixa claro no painel quando NÃO é para cobrar nada na entrega
-function rotuloPagamento(p) {
-  if (p.pagamento === 'saldo') return '<span style="color:#22c55e;font-weight:700">💰 Pago com saldo — não cobrar</span>';
-  if (p.pagamento === 'dinheiro') return `💵 Dinheiro — cobrar ${formatPrice(p.total)}`;
-  return esc(p.pagamento || '—');
+function nomePagamento(p) {
+  if (p.pagamento === 'saldo') return 'Pago com saldo';
+  if (p.pagamento === 'pix') return 'Pix';
+  if (p.pagamento === 'cartao') return 'Cartão';
+  if (p.pagamento === 'dinheiro') return 'Dinheiro na entrega';
+  return p.pagamento || '—';
 }
-function formatDate(d) {
-  return new Date(d).toLocaleDateString('pt-BR');
-}
-function statusBadge(s) {
-  const map = { 'pendente':'badge-yellow','pago':'badge-blue','enviado':'badge-blue','entregue':'badge-green','cancelado':'badge-red' };
-  const labels = { 'pendente':'Recebido','pago':'Preparando','enviado':'Saiu p/ entrega','entregue':'Entregue','cancelado':'Cancelado' };
-  return `<span class="badge ${map[s]||'badge-muted'}">${labels[s]||s}</span>`;
+function nomeEntrega(p) {
+  if (p.tipo_entrega === 'fornecedor') return 'Fornecedor (5 a 15 dias)';
+  if (p.tipo_entrega === 'exclusiva') return 'Receber hoje';
+  if (p.tipo_entrega === 'rota') return 'Entrega por rota';
+  return p.tipo_entrega || '—';
 }
 
 async function carregar() {
-  const { data } = await supabase.from('pedidos').select('*').order('created_at', { ascending: false });
+  const { data, error } = await supabase.from('pedidos').select('*').order('created_at', { ascending: false });
+  if (error) { document.getElementById('ap-lista').innerHTML = `<p class="ap-vazio">Erro ao carregar: ${esc(error.message)}</p>`; return; }
   pedidos = data || [];
-  renderCards();
-  renderTabela(pedidos);
+  const ids = [...new Set(pedidos.flatMap(p => (p.itens || []).map(i => Number(i.produto_id)).filter(Boolean)))];
+  if (ids.length) {
+    const { data: prods } = await supabase.from('produtos').select('id, image_thumb_url, image_url').in('id', ids);
+    (prods || []).forEach(pr => { fotos[pr.id] = pr.image_thumb_url || pr.image_url; });
+  }
+  // Abre na aba que tem trabalho: preparar; se vazia, aguardando pagamento
+  if (!pedidos.some(p => etapa(p) === 'preparar') && pedidos.some(p => etapa(p) === 'pagamento')) aba = 'pagamento';
+  filtrar();
 }
 
-function renderCards() {
-  const statuses = ['pendente','pago','enviado','entregue','cancelado'];
-  const colors = { pendente:'#f59e0b', pago:'#3b82f6', enviado:'#8b5cf6', entregue:'#22c55e', cancelado:'#ef4444' };
-  const currentFilter = document.getElementById('filtro-status').value;
-
-  document.getElementById('status-cards').innerHTML = [
-    { label: 'Total', value: '', count: pedidos.length },
-    ...statuses.map(s => ({ label: s, value: s, count: pedidos.filter(p => p.status === s).length }))
-  ].map(item => `
-    <button onclick="document.getElementById('filtro-status').value='${item.value}';filtrar()"
-      style="background:var(--bg-card);border:2px solid ${currentFilter===item.value?'var(--primary)':'var(--border)'};border-radius:12px;padding:12px;text-align:center;cursor:pointer;color:var(--text);width:100%">
-      <p style="font-size:22px;font-weight:900;color:${colors[item.value]||'var(--text)'}">${item.count}</p>
-      <p style="font-size:11px;color:var(--text-muted);margin-top:2px;text-transform:capitalize">${item.label}</p>
+function renderTopo() {
+  const conta = (id) => pedidos.filter(p => etapa(p) === id).length;
+  document.getElementById('ap-kpis').innerHTML = ETAPAS.slice(0, 4).map(e => `
+    <button class="ap-kpi${aba === e.id ? ' ativo' : ''}" onclick="trocarAba('${e.id}')">
+      <span class="ap-kpi-ico ap-${e.cor}">${ic(e.icone, 18)}</span>
+      <span class="ap-kpi-num">${conta(e.id)}</span>
+      <span class="ap-kpi-nome">${e.curto}</span>
     </button>`).join('');
+  document.getElementById('ap-abas').innerHTML = [...ETAPAS, { id: 'todos', curto: 'Todos' }].map(e => `
+    <button class="ap-aba${aba === e.id ? ' ativo' : ''}" onclick="trocarAba('${e.id}')">${e.curto} <span>${e.id === 'todos' ? pedidos.length : conta(e.id)}</span></button>`).join('');
 }
 
-function renderTabela(lista) {
-  const tbody = document.getElementById('orders-table');
-  if (!lista.length) {
-    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text-muted)">Nenhum pedido encontrado</td></tr>';
-    return;
-  }
-  tbody.innerHTML = lista.map(p => {
-    const itens = (p.itens||[]).map(i => esc(i.emoji||'📦')).join(' ');
-    return `<tr>
-      <td style="font-weight:700">
-        #${p.id.slice(0,8).toUpperCase()}
-        <button onclick="abrirDetalhesPedido('${p.id}')" title="Ver endereço, telefone e itens"
-          style="display:block;margin-top:4px;background:none;border:none;color:var(--primary);font-size:11px;font-weight:700;cursor:pointer;padding:0">👁 Detalhes</button>
-      </td>
-      <td>
-        <div style="font-weight:600">${esc(p.usuario_nome||'Visitante')}</div>
-        <div style="font-size:12px;color:var(--text-muted)">${esc(p.usuario_email||'')}</div>
-      </td>
-      <td style="color:var(--text-muted)">${formatDate(p.created_at)}</td>
-      <td style="font-size:18px">${itens}</td>
-      <td style="font-weight:700">${formatPrice(p.total)}</td>
-      <td style="font-size:12px;color:var(--text-muted)">${rotuloPagamento(p)}</td>
-      <td>
-        <select onchange="updateStatus('${p.id}', this.value)"
-          style="background:var(--bg-muted);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:4px 8px;font-size:12px">
-          <option value="pendente" ${p.status==='pendente'?'selected':''}>Recebido</option>
-          <option value="pago" ${p.status==='pago'?'selected':''}>Pago / preparando para entrega</option>
-          <option value="enviado" ${p.status==='enviado'?'selected':''}>Saiu para entrega</option>
-          <option value="entregue" ${p.status==='entregue'?'selected':''}>Entregue</option>
-          <option value="cancelado" ${p.status==='cancelado'?'selected':''}>Cancelado</option>
-        </select>
-      </td>
-      <td>${confirmacaoEntregaHTML(p)}</td>
-    </tr>`;
-  }).join('');
+function fotoItem(i) {
+  const url = fotos[Number(i.produto_id)];
+  return url ? `<img src="${esc(url)}" alt="" loading="lazy">` : `<span>${ic('caixa', 22)}</span>`;
 }
 
-// Confirmação de entrega tipo iFood: o admin digita o código que o
-// cliente informa na porta, e o pedido é marcado como entregue sozinho
-// se o código bater. Serve de respaldo pra loja.
-function confirmacaoEntregaHTML(p) {
-  if (p.status === 'entregue') {
-    return `<span style="font-size:12px;color:var(--primary);font-weight:700">✓ Entrega confirmada</span>`;
-  }
-  if (p.status === 'cancelado') {
-    return p.motivo_cancelamento
-      ? `<span style="font-size:12px;color:#ef4444" title="Motivo informado pelo cliente">Motivo: ${esc(p.motivo_cancelamento)}</span>`
-      : `<span style="font-size:12px;color:var(--text-muted)">—</span>`;
-  }
-  return `
-    <div style="display:flex;gap:6px">
-      <input type="text" id="cod-entrega-${p.id}" maxlength="4" placeholder="Código"
-        style="width:70px;background:var(--bg-muted);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:4px 8px;font-size:12px;text-align:center">
-      <button onclick="confirmarEntregaPorCodigo('${p.id}')" class="btn btn-outline btn-sm" style="font-size:11px;padding:4px 8px">Confirmar</button>
-    </div>`;
+function acaoPrincipal(p) {
+  const e = etapa(p);
+  if (e === 'pagamento') return `<button class="ap-btn ap-btn-espera" disabled>${ic('relogio', 15)} Aguardando pagamento</button>`;
+  if (e === 'preparar') return `<button class="ap-btn ap-btn-verde" onclick="mudarStatus('${p.id}', 'enviado')">${ic('caminhao', 15)} Saiu para entrega</button>`;
+  if (e === 'rota') return `<button class="ap-btn ap-btn-verde" onclick="abrirDetalhes('${p.id}', true)">${ic('checkCirculo', 15)} Confirmar entrega</button>`;
+  return '';
 }
 
-// Modal com os dados que o admin precisa pra entregar: endereço completo,
-// telefone de contato e a lista de itens do pedido.
-window.abrirDetalhesPedido = function(id) {
-  const p = pedidos.find(x => x.id === id);
-  if (!p) return;
+function cartaoPedido(p) {
+  const itens = p.itens || [];
+  const primeiro = itens[0] || {};
+  const qtd = itens.reduce((t, i) => t + (Number(i.quantidade) || 1), 0);
   const end = p.endereco || {};
-  const itensHTML = (p.itens || []).map(i => `
-    <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px">
-      <span>${i.emoji||'📦'} ${esc(i.nome||i.name||'Produto')} ${i.quantidade ? `× ${i.quantidade}` : ''}</span>
-      <span style="color:var(--text-muted)">${formatPrice(i.preco || i.price || 0)}</span>
-    </div>`).join('');
+  return `
+  <div class="ap-card">
+    <div class="ap-card-foto">${fotoItem(primeiro)}</div>
+    <div class="ap-card-meio">
+      <div class="ap-card-topo"><strong>Pedido ${numero(p)}</strong>${seloPedido(p)}</div>
+      <p class="ap-card-item">${esc(primeiro.nome || primeiro.name || 'Produto')}${itens.length > 1 ? ` <span>+${itens.length - 1} ${itens.length - 1 === 1 ? 'item' : 'itens'}</span>` : ''}</p>
+      <p class="ap-card-total">${formatPrice(p.total)} <span>· ${qtd} un. · ${esc(nomePagamento(p))}</span></p>
+      <p class="ap-card-info">${ic('calendario', 13)} ${formatDataHora(p)}</p>
+      <p class="ap-card-info">${ic('local', 13)} ${esc(end.bairro || '')}${end.bairro ? ' · ' : ''}${esc(p.usuario_nome || 'Cliente')}</p>
+    </div>
+    <div class="ap-card-acoes">
+      <button class="ap-btn ap-btn-borda" onclick="abrirDetalhes('${p.id}')">Ver detalhes ${ic('chevron', 14)}</button>
+      ${acaoPrincipal(p)}
+    </div>
+  </div>`;
+}
 
-  const modal = document.createElement('div');
-  modal.id = 'modal-detalhes-pedido';
-  modal.style = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;display:flex;align-items:center;justify-content:center;padding:16px';
-  modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
-  modal.innerHTML = `
-    <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:16px;padding:22px;width:100%;max-width:440px;max-height:88vh;overflow-y:auto">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-        <p style="font-weight:900;font-size:16px">Pedido #${p.id.slice(0,8).toUpperCase()}</p>
-        <button onclick="document.getElementById('modal-detalhes-pedido').remove()" style="background:none;border:none;color:var(--text-muted);font-size:20px;cursor:pointer">✕</button>
-      </div>
-
-      <p style="font-size:11px;color:var(--text-muted);text-transform:uppercase;font-weight:700;margin-bottom:4px">Cliente</p>
-      <p style="font-size:14px;margin-bottom:2px">${esc(p.usuario_nome || 'Visitante')}</p>
-      <p style="font-size:13px;color:var(--text-muted);margin-bottom:14px">${esc(p.usuario_email || '—')}</p>
-
-      <p style="font-size:11px;color:var(--text-muted);text-transform:uppercase;font-weight:700;margin-bottom:4px">📞 Telefone / Contato</p>
-      <p style="font-size:15px;font-weight:700;margin-bottom:14px">
-        ${esc(p.usuario_telefone || '—')}
-        ${p.usuario_telefone ? `<a href="https://wa.me/55${(p.usuario_telefone||'').replace(/\D/g,'')}" target="_blank" rel="noopener" style="margin-left:8px;color:var(--primary);font-size:12px;font-weight:700">Abrir WhatsApp →</a>` : ''}
-      </p>
-
-      <p style="font-size:11px;color:var(--text-muted);text-transform:uppercase;font-weight:700;margin-bottom:4px">📍 Endereço de entrega</p>
-      <p style="font-size:14px;line-height:1.5;margin-bottom:6px">
-        ${esc(end.endereco || '—')}${end.bairro ? `, ${esc(end.bairro)}` : ''}<br>
-        ${esc(end.cidade || 'Santa Maria - RS')}
-      </p>
-      ${end.referencia ? `<p style="font-size:13px;color:var(--text-muted);margin-bottom:6px">Referência: ${esc(end.referencia)}</p>` : ''}
-      ${end.instrucao_ausencia ? `<p style="font-size:13px;color:var(--text-muted);margin-bottom:14px">Instrução: ${esc(end.instrucao_ausencia)}</p>` : '<div style="margin-bottom:8px"></div>'}
-      ${end.horario_preferido ? `<p style="font-size:13px;color:var(--text-muted);margin-bottom:14px">Janela/Previsão: ${esc(end.horario_preferido)}</p>` : ''}
-
-      <p style="font-size:11px;color:var(--text-muted);text-transform:uppercase;font-weight:700;margin-bottom:4px">Pagamento / Entrega</p>
-      <p style="font-size:13px;margin-bottom:14px">${rotuloPagamento(p)} · ${p.tipo_entrega === 'fornecedor' ? '🚚 fornecedor (5 a 15 dias)' : esc(p.tipo_entrega || '—')}${p.codigo_confirmacao ? ` · Código de confirmação: <strong>${esc(p.codigo_confirmacao)}</strong>` : ''}</p>
-
-      <p style="font-size:11px;color:var(--text-muted);text-transform:uppercase;font-weight:700;margin-bottom:6px">Itens</p>
-      ${itensHTML || '<p style="font-size:13px;color:var(--text-muted)">Nenhum item registrado.</p>'}
-      <div style="display:flex;justify-content:space-between;font-weight:900;padding-top:10px;margin-top:6px">
-        <span>Total</span><span>${formatPrice(p.total)}</span>
-      </div>
-    </div>`;
-  document.body.appendChild(modal);
-};
-
-window.confirmarEntregaPorCodigo = async function(id) {
-  const input = document.getElementById(`cod-entrega-${id}`);
-  const codigoDigitado = (input.value || '').trim();
-  const p = pedidos.find(x => x.id === id);
-  if (!codigoDigitado) { input.style.borderColor = '#ef4444'; return; }
-
-  if (!p.codigo_confirmacao || codigoDigitado !== p.codigo_confirmacao) {
-    input.style.borderColor = '#ef4444';
-    input.value = '';
-    input.placeholder = 'Errado';
-    setTimeout(() => { input.placeholder = 'Código'; input.style.borderColor = 'var(--border)'; }, 1800);
-    return;
-  }
-
-  await supabase.from('pedidos').update({ status: 'entregue' }).eq('id', id);
-  p.status = 'entregue';
-  window.filtrar();
-};
+window.trocarAba = function(id) { aba = id; filtrar(); };
 
 window.filtrar = function() {
-  const q = document.getElementById('busca').value.toLowerCase();
-  const status = document.getElementById('filtro-status').value;
+  const q = document.getElementById('busca').value.trim().toLowerCase();
   const lista = pedidos.filter(p =>
-    (!q || p.usuario_nome?.toLowerCase().includes(q) || p.usuario_email?.toLowerCase().includes(q) || p.id.includes(q)) &&
-    (!status || p.status === status)
+    (aba === 'todos' || etapa(p) === aba) &&
+    (!q || [p.usuario_nome, p.usuario_email, p.usuario_telefone, p.id].some(v => String(v || '').toLowerCase().includes(q.replace(/^#/, ''))))
   );
-  renderCards();
-  renderTabela(lista);
+  renderTopo();
+  document.getElementById('ap-lista').innerHTML = lista.length
+    ? lista.map(cartaoPedido).join('')
+    : '<p class="ap-vazio">Nenhum pedido aqui.</p>';
 };
 
-window.updateStatus = async function(id, status) {
-  await supabase.from('pedidos').update({ status }).eq('id', id);
+// ===== Detalhes (gaveta) =====
+function passosHTML(p) {
+  const passos = [
+    { nome: 'Pedido realizado', feito: true },
+    { nome: 'Pagamento confirmado', feito: !aguardandoPagamento(p) && p.status !== 'cancelado' },
+    { nome: 'Em preparação', feito: ['pago', 'enviado', 'entregue'].includes(p.status) || (p.status === 'pendente' && !aguardandoPagamento(p)) },
+    { nome: 'Em rota', feito: ['enviado', 'entregue'].includes(p.status) },
+    { nome: 'Entregue', feito: p.status === 'entregue' }
+  ];
+  return `<div class="ap-passos">${passos.map(x => `<div class="ap-passo${x.feito ? ' feito' : ''}"><span class="ap-bola">${x.feito ? ic('check', 12) : ''}</span><small>${x.nome}</small></div>`).join('')}</div>`;
+}
+
+window.abrirDetalhes = function(id, focarCodigo) {
   const p = pedidos.find(x => x.id === id);
-  if (p) p.status = status;
-  renderCards();
+  if (!p) return;
+  document.getElementById('ap-gaveta')?.remove();
+  const end = p.endereco || {};
+  const tel = String(p.usuario_telefone || end.telefone || '').replace(/\D/g, '');
+  const itensHTML = (p.itens || []).map(i => `
+    <div class="ap-item">
+      <div class="ap-item-foto">${fotoItem(i)}</div>
+      <div class="ap-item-nome">${esc(i.nome || i.name || 'Produto')}<small>${Number(i.quantidade) || 1} unidade(s)</small></div>
+      <strong>${formatPrice((Number(i.preco || i.price) || 0) * (Number(i.quantidade) || 1))}</strong>
+    </div>`).join('');
+  const aviso = aguardandoPagamento(p)
+    ? `<div class="ap-aviso">${ic('relogio', 16)} <span><strong>Aguardando pagamento.</strong> Não separe nem entregue ainda. Se o cliente não pagar em ${PRAZO_PAGAMENTO_HORAS}h, o pedido é cancelado sozinho.</span></div>`
+    : '';
+  const g = document.createElement('div');
+  g.id = 'ap-gaveta';
+  g.className = 'ap-gaveta-fundo';
+  g.onclick = (e) => { if (e.target === g) g.remove(); };
+  g.innerHTML = `
+  <div class="ap-gaveta">
+    <div class="ap-gaveta-topo">
+      <div><p class="ap-gaveta-titulo">Pedido ${numero(p)}</p>${seloPedido(p)}</div>
+      <button class="ap-fechar" onclick="document.getElementById('ap-gaveta').remove()" aria-label="Fechar">${ic('x', 20)}</button>
+    </div>
+    ${aviso}
+    ${p.status !== 'cancelado' ? passosHTML(p) : `<div class="ap-aviso ap-aviso-vermelho">${ic('xCirculo', 16)} <span><strong>Cancelado.</strong>${p.motivo_cancelamento ? ' Motivo: ' + esc(p.motivo_cancelamento) : ''}</span></div>`}
+
+    <div class="ap-bloco">
+      <p class="ap-rotulo">Cliente</p>
+      <p class="ap-forte">${esc(p.usuario_nome || 'Visitante')}</p>
+      <p class="ap-fraco">${esc(p.usuario_email || '')}</p>
+      ${tel ? `<p class="ap-linha">${ic('telefone', 14)} ${esc(p.usuario_telefone || end.telefone)} <a href="https://wa.me/${tel.startsWith('55') ? tel : '55' + tel}" target="_blank" rel="noopener">Abrir WhatsApp ${ic('chevron', 12)}</a></p>` : ''}
+    </div>
+
+    <div class="ap-bloco">
+      <p class="ap-rotulo">Entrega</p>
+      <p class="ap-linha">${ic('local', 14)} <span>${esc(end.endereco || '—')}${end.bairro ? ', ' + esc(end.bairro) : ''} · ${esc(end.cidade || 'Santa Maria - RS')}</span></p>
+      ${end.referencia ? `<p class="ap-fraco">Referência: ${esc(end.referencia)}</p>` : ''}
+      ${end.instrucao_ausencia ? `<p class="ap-fraco">Instrução: ${esc(end.instrucao_ausencia)}</p>` : ''}
+      ${end.horario_preferido ? `<p class="ap-fraco">Janela/Previsão: ${esc(end.horario_preferido)}</p>` : ''}
+      <p class="ap-linha">${ic('caminhao', 14)} ${esc(nomeEntrega(p))}</p>
+    </div>
+
+    <div class="ap-bloco">
+      <p class="ap-rotulo">Pagamento</p>
+      <p class="ap-linha">${ic('cartao', 14)} ${esc(nomePagamento(p))} · <strong class="${aguardandoPagamento(p) ? 'ap-txt-amarelo' : 'ap-txt-verde'}">${aguardandoPagamento(p) ? 'aguardando pagamento' : p.status === 'cancelado' ? 'cancelado' : 'pago'}</strong></p>
+      <p class="ap-fraco">Feito em ${formatDataHora(p)}</p>
+    </div>
+
+    <div class="ap-bloco">
+      <p class="ap-rotulo">Itens</p>
+      ${itensHTML || '<p class="ap-fraco">Nenhum item registrado.</p>'}
+      ${Number(p.frete) > 0 ? `<p class="ap-soma"><span>Frete</span><span>${formatPrice(p.frete)}</span></p>` : ''}
+      ${Number(p.cupom_desconto) > 0 ? `<p class="ap-soma"><span>Cupom ${esc(p.cupom_codigo || '')}</span><span>- ${formatPrice(p.cupom_desconto)}</span></p>` : ''}
+      ${Number(p.saldo_usado) > 0 ? `<p class="ap-soma"><span>Saldo usado</span><span>- ${formatPrice(p.saldo_usado)}</span></p>` : ''}
+      <p class="ap-soma ap-total"><span>Total</span><span>${formatPrice(p.total)}</span></p>
+    </div>
+
+    ${p.status === 'enviado' ? `
+    <div class="ap-bloco">
+      <p class="ap-rotulo">Confirmar entrega</p>
+      <p class="ap-fraco">Peça ao cliente o código de 4 números que aparece no pedido dele.</p>
+      <div class="ap-codigo"><input type="text" inputmode="numeric" id="cod-entrega" maxlength="4" placeholder="0000"><button class="ap-btn ap-btn-verde" onclick="confirmarEntrega('${p.id}')">Confirmar</button></div>
+    </div>` : ''}
+
+    <div class="ap-bloco">
+      <p class="ap-rotulo">Mudar status manualmente</p>
+      <select class="form-input" onchange="mudarStatus('${p.id}', this.value)">
+        <option value="pendente" ${p.status === 'pendente' ? 'selected' : ''}>${aguardandoPagamento(p) ? 'Aguardando pagamento' : 'Recebido'}</option>
+        <option value="pago" ${p.status === 'pago' ? 'selected' : ''}>Pago / preparando</option>
+        <option value="enviado" ${p.status === 'enviado' ? 'selected' : ''}>Em rota (saiu para entrega)</option>
+        <option value="entregue" ${p.status === 'entregue' ? 'selected' : ''}>Entregue</option>
+        <option value="cancelado" ${p.status === 'cancelado' ? 'selected' : ''}>Cancelado</option>
+      </select>
+    </div>
+  </div>`;
+  document.body.appendChild(g);
+  if (focarCodigo) setTimeout(() => document.getElementById('cod-entrega')?.focus(), 150);
+};
+
+function avisar(texto, erro) {
   const toast = document.createElement('div');
-  toast.className = 'toast success show';
-  toast.textContent = 'Status atualizado!';
+  toast.className = 'toast show ' + (erro ? 'error' : 'success');
+  toast.textContent = texto;
   document.body.appendChild(toast);
   setTimeout(() => toast.remove(), 2500);
+}
+
+window.confirmarEntrega = async function(id) {
+  const input = document.getElementById('cod-entrega');
+  const p = pedidos.find(x => x.id === id);
+  const codigo = (input.value || '').trim();
+  if (!p?.codigo_confirmacao || codigo !== p.codigo_confirmacao) {
+    input.value = ''; input.placeholder = 'Errado'; input.classList.add('erro');
+    setTimeout(() => { input.placeholder = '0000'; input.classList.remove('erro'); }, 1800);
+    return;
+  }
+  await mudarStatus(id, 'entregue');
+};
+
+window.mudarStatus = async function(id, status) {
+  const p = pedidos.find(x => x.id === id);
+  if (!p || p.status === status) return;
+  if (status === 'enviado' && aguardandoPagamento(p) && !confirm('Este pedido ainda não foi pago. Mandar pra entrega mesmo assim?')) { filtrar(); return; }
+  if (status === 'cancelado' && !confirm('Cancelar este pedido?')) { filtrar(); return; }
+  const { error } = await supabase.from('pedidos').update({ status }).eq('id', id);
+  if (error) { avisar('Erro ao atualizar: ' + error.message, true); return; }
+  p.status = status;
+  avisar('Status atualizado!');
+  document.getElementById('ap-gaveta')?.remove();
+  filtrar();
 
   // E-mail avisando o cliente (não trava a tela se falhar)
-  if ((status === 'enviado' || status === 'entregue') && p) {
+  if (status === 'enviado' || status === 'entregue') {
     supabase.auth.getSession().then(({ data: { session } }) =>
       fetch('/.netlify/functions/enviar-email-status', {
         method: 'POST',
