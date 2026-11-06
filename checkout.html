@@ -23,6 +23,7 @@
 <div id="footer"></div>
 
 <script src="js/icones.js"></script>
+<script src="js/card-produto.js"></script>
 <script src="js/cart.js"></script>
 <script src="js/main.js"></script>
 <script src="js/validadores.js"></script>
@@ -40,6 +41,41 @@ function esc(str) {
 }
 
 function formatPrice(v) { return Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }); }
+
+// Depois de finalizar: "Você também pode gostar", como na Shopee.
+// Mostra primeiro produtos das mesmas categorias do que foi comprado,
+// depois ofertas; nunca o que acabou de comprar nem o que está esgotado.
+async function mostrarMaisProdutos(idsComprados) {
+  try {
+    const { loadProducts, estaEsgotado, percentualDesconto } = await import('./js/data.js');
+    const { toggleFavorito } = await import('./js/favoritos.js');
+    const todos = await loadProducts();
+    const comprados = new Set((idsComprados || []).map(Number));
+    const cats = new Set(todos.filter(p => comprados.has(Number(p.id))).map(p => p.category));
+    const disponiveis = todos.filter(p => !comprados.has(Number(p.id)) && !estaEsgotado(p));
+    const nota = p => (cats.has(p.category) ? 2 : 0) + (p.oferta || percentualDesconto(p) > 0 ? 1 : 0);
+    const lista = disponiveis.sort((a, b) => nota(b) - nota(a)).slice(0, 8);
+    if (!lista.length) return;
+    window._produtosCache = window._produtosCache || {};
+    window.toggleFavoritoPosCompra = async (id, btn) => {
+      const r = await toggleFavorito(id);
+      if (r.precisaLogin) { location.href = linkLogin(); return; }
+      btn.innerHTML = iconeFav(r.favoritado);
+    };
+    const secao = document.createElement('div');
+    secao.className = 'container pos-compra';
+    secao.innerHTML = `<h2 class="pos-compra-titulo"><span>Você também pode gostar</span></h2>
+      <div class="product-grid">${lista.map(p => {
+        window._produtosCache[p.id] = p;
+        return cardProdutoHTML(p, {
+          fav: false, esgotado: false, desconto: percentualDesconto(p), preco: formatPrice,
+          onFav: `toggleFavoritoPosCompra(${p.id}, this)`,
+          onAdd: `addToCart(${p.id}, 1, window._produtosCache[${p.id}], event)`
+        });
+      }).join('')}</div>`;
+    document.getElementById('main-content').appendChild(secao);
+  } catch (e) { console.error('Produtos pós-compra:', e); }
+}
 
 // Animação de comemoração do pedido confirmado: chuva de moedas + confete,
 // pra dar aquele "gostinho de prêmio" e reforçar a compra.
@@ -1222,6 +1258,7 @@ async function finalizarPedido() {
     </div>`;
     window.scrollTo(0,0);
     dispararCelebracao();
+    mostrarMaisProdutos((pedido.itens || []).map(i => i.produto_id));
     import('/js/analytics.js').then(m => m.registrarEvento('compra_concluida', { meta: { pedidoId: pedido.id, total: pedido.total } })).catch(() => {});
     return;
   }
@@ -1293,19 +1330,21 @@ if (statusMP) {
   }
 
   let codigoConfirmacao = null;
+  let pedidoRetorno = null;
   if (statusMP === 'aprovado' && pedidoMP) {
     try {
       const { createClient: createClientCod } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/+esm');
       const supabaseCod = createClientCod('https://kkliwdphrdbguclsvxcw.supabase.co', 'sb_publishable_OMXANLsZK98fPWygp8ZHfA_xzSpWgYb');
-      const { data: pedidoInfo } = await supabaseCod.from('pedidos').select('codigo_confirmacao').eq('id', pedidoMP).single();
+      const { data: pedidoInfo } = await supabaseCod.from('pedidos').select('codigo_confirmacao, total, itens').eq('id', pedidoMP).single();
       codigoConfirmacao = pedidoInfo?.codigo_confirmacao || null;
+      pedidoRetorno = pedidoInfo || null;
     } catch { /* se falhar, só não mostra o código aqui — não é crítico */ }
   }
 
   const icons = { aprovado: icone('checkCirculo', 64), pendente: icone('ampulheta', 64), erro: icone('xCirculo', 64) };
   const titles = { aprovado:'Pagamento Aprovado!', pendente:'Pagamento Pendente', erro:'Pagamento não aprovado' };
   const msgs = {
-    aprovado: 'Seu pedido foi confirmado e está sendo processado.',
+    aprovado: 'Parabéns pela compra! Seu pedido já está sendo preparado.',
     pendente: 'Seu pagamento está sendo processado. Aguarde a confirmação.',
     erro: 'Não foi possível processar seu pagamento. Tente novamente ou escolha outra forma de pagamento.'
   };
@@ -1320,7 +1359,7 @@ if (statusMP) {
         </div>`
       : `<div class="success-icon">${icons[statusMP] || icone('info', 64)}</div>`
     }
-    <h1>${titles[statusMP]||'Status do Pedido'}</h1>
+    <h1>${statusMP === 'aprovado' && pedidoRetorno?.total ? `Você pagou ${formatPrice(pedidoRetorno.total)}` : (titles[statusMP] || 'Status do Pedido')}</h1>
     <p style="color:var(--text-muted);margin-bottom:${codigoConfirmacao ? '16px' : '32px'}">${msgs[statusMP]||''}</p>
     ${codigoConfirmacao ? `
     <div class="order-info-card" style="margin-bottom:24px">
@@ -1340,6 +1379,7 @@ if (statusMP) {
       }
     </div>
   </div>`;
+  if (statusMP !== 'erro') mostrarMaisProdutos((pedidoRetorno?.itens || []).map(i => i.produto_id));
   if (statusMP === 'aprovado') {
     window.scrollTo(0,0);
     dispararCelebracao();

@@ -1982,3 +1982,8 @@ a.faixa-item:hover { color: var(--primary); }
 .pd-miniaturas .pd-mini-video { position: relative; background: #111; }
 .pd-play { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #fff; background: rgba(0,0,0,.35); }
 .pd-play svg { fill: #fff; }
+
+/* Depois de finalizar o pedido: "Você também pode gostar" */
+.pos-compra { padding-bottom: 48px; margin-top: -40px; }
+.pos-compra-titulo { display: flex; align-items: center; gap: 14px; font-size: 18px; font-weight: 800; margin: 0 0 16px; }
+.pos-compra-titulo::before, .pos-compra-titulo::after { content: ''; flex: 1; height: 1px; background: var(--border); }
